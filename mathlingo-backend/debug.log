@@ -1,0 +1,56 @@
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4ODU3MjR9.RXEzLJTXlXaNNByUunNv1ha_RMPQnr8UJZqNHm11ZM8
+➡️ Вызван create_access_token с данными: {'sub': 'test2@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MkBlbWFpbC5jb20iLCJleHAiOjE3Mzk4ODU5MDN9._tqkq01g7irPGFTcSfNTNzhAPX59uW31zwUmRRiDzbU
+➡️ Вызван create_access_token с данными: {'sub': 'test3@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0M0BlbWFpbC5jb20iLCJleHAiOjE3Mzk4ODgyMzF9.hsbkZaKMWUNRXPlbORzkLS0mPvDRL204WFPVjqopdHA
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4ODg3ODB9.6Qi4Qzyy4oyWFxMIJH1F_BDuUYZo5aorrzl2os5R-MU
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4ODkyODR9.QEZjuHoueOKkbth33ugDdWivpO59pIVUn-ofRhKrhFA
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4ODkyOTN9.SdP4VvXtNBfVtvXz6vRNKt4wkVHYfY3WsfhG6upXPP4
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4ODkzNzB9.dKvqMtEbwcu25VxoPixi6tYPABaXyHA-7gtpTISICX0
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4ODk3NzZ9.0pGJHy5mW3r4_-1A_woVoCRyS4gv3AIRC0vo9JH26IU
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4ODk4MTF9.Zydc1Cfbv47MGc0HzUlwUVtdRVdbWPvxgUF6xx-Gw5k
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTMzMTV9.csxpcuKbxmsEPVSY11jpfbDpqTO0EPK1iO6DEUxWfA4
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTQ5NzN9.hD128e1a-ERI5luT7TOMnXHL2TAqzQAhesZT6BtWSc0
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTQ5NzZ9.LfB_0I-hDv1wHqI4K3hlbTKVB9rvDyWOTOdDcUOgJjg
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTQ5NzZ9.LfB_0I-hDv1wHqI4K3hlbTKVB9rvDyWOTOdDcUOgJjg
+➡️ Вызван create_access_token с данными: {'sub': 'test4@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0NEBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTQ5OTV9.DxhVea6fu3yOsBfhyhrQxG5P6IWB04PcsmXTuq3eOII
+➡️ Вызван create_access_token с данными: {'sub': 'test5@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0NUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTUxNjZ9.T-rmZ28CNaK2F5b8_-OnCwiXr0oWZRyA6M1aYKyIq3M
+➡️ Вызван create_access_token с данными: {'sub': 'test6@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0NkBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTU1MTd9.kDZrybG4bz1ze4aZRzcYsAtyjms0MpUppSXIU1pZesc
+➡️ Вызван create_access_token с данными: {'sub': 'test2@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MkBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTU3MjJ9.3a2dmr6Kqh8ex8aZqmardtvEYVeHbJr-qH0e66APtJ0
+➡️ Вызван create_access_token с данными: {'sub': 'test2@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MkBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTU3NzR9.m5SuEvzJB_CvxMeeimyYu0am95tNw2cOeuyt86yQfDc
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTU4MjZ9.TVoAjCQkBGf1WhNktlHpFkN3guVzSQPKp7YuTC0JpDA
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTU4Mzh9.96s3JQOXSyvOhZDUKC6dap_Bl3GRDHP3O-pqIBe5gbk
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTU4OTd9.VBOBuq5_ZlP6jYGlRMVdbP9bZvNCO-9QOO_5AmGKc1s
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTU5MTF9.yRSsP62g44FM7ha3joK4ZPTjXJJbupP91IEr4wLsx68
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTU5OTd9.AAOFC3ldHyN6h0M8-cpLLTqOIf2Y2j_zxE7ON7V9Tsw
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTYwMDB9.ZCcvQiai49liMrzOztOdSkUL1BXEmZMdgdCEjoZ93as
+➡️ Вызван create_access_token с данными: {'sub': 'test1@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTYwMDZ9.4qC9UjTqQxWsUhtCIFjAcZO9xDV5ktYLGKoflBB9J5s
+➡️ Вызван create_access_token с данными: {'sub': 'test2@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MkBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTYwMTJ9.gsu7g0Oa2uIoqcXoHNo_gl6ImuQKN1AmW7MbDObBy4A
+➡️ Вызван create_access_token с данными: {'sub': 'test2@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MkBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTYwNTB9.yFuV26Fin7tkiwBHbfoJ8OKxmb4SzDniEayOtfYuIUE
+➡️ Вызван create_access_token с данными: {'sub': 'test2@email.com'}
+✅ Создан токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MkBlbWFpbC5jb20iLCJleHAiOjE3Mzk4OTYwODd9.ChtJL6i99dx-u50krWzEmMXW9hC14gFMfU09r_VwIWo
