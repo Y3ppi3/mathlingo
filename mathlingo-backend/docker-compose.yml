@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:latest
+    container_name: mathlingo-db
+    restart: always
+    environment:
+      POSTGRES_USER: mathlingo_user
+      POSTGRES_PASSWORD: test123
+      POSTGRES_DB: mathlingo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    container_name: mathlingo-backend
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://mathlingo_user:test123@db/mathlingo
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+volumes:
+  postgres_data:
