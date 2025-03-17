@@ -1,2 +1,0 @@
-# mathlingo
-math training game
