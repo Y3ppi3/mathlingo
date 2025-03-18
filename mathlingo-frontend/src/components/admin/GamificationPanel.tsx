@@ -1,6 +1,9 @@
 // src/components/admin/GamificationPanel.tsx
+// Enhanced version with deletion handlers for gamification elements
+
 import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
+import { deleteAdventureMap } from '../../utils/adminApi';
 
 interface Subject {
     id: number;
@@ -45,8 +48,7 @@ interface Task {
 }
 
 const GamificationPanel: React.FC = () => {
-
-    // Состояния для списков данных
+    // State for lists of data
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [maps, setMaps] = useState<AdventureMap[]>([]);
     const [locations, setLocations] = useState<MapLocation[]>([]);
@@ -54,19 +56,20 @@ const GamificationPanel: React.FC = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [assignedTasks, setAssignedTasks] = useState<Task[]>([]);
 
-    // Состояния для выбранных элементов
+    // State for selected elements
     const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
     const [selectedMap, setSelectedMap] = useState<number | null>(null);
     const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
     const [selectedTaskGroup, setSelectedTaskGroup] = useState<number | null>(null);
 
-    // Состояния для форм
+    // State for forms
     const [showMapForm, setShowMapForm] = useState(false);
     const [showLocationForm, setShowLocationForm] = useState(false);
     const [showTaskGroupForm, setShowTaskGroupForm] = useState(false);
     const [showAssignTasksForm, setShowAssignTasksForm] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // Данные форм
+    // Form data
     const [mapForm, setMapForm] = useState({
         name: '',
         description: '',
@@ -93,7 +96,6 @@ const GamificationPanel: React.FC = () => {
 
     const fetchAssignedTasks = async (groupId: number) => {
         try {
-            // Retrieve token from localStorage explicitly
             const token = localStorage.getItem('adminToken');
 
             if (!token) {
@@ -102,43 +104,181 @@ const GamificationPanel: React.FC = () => {
                 return;
             }
 
-            const apiRoutes = [
-                `/admin/gamification/task-groups/${groupId}/tasks`,
-                `/admin/task-groups/${groupId}/tasks`,
-                `/admin/gamification/task-groups/${groupId}`,
-                `/admin/tasks?task_group_id=${groupId}`
-            ];
+            try {
+                const response = await api.get(`/admin/gamification/task-groups/${groupId}/tasks`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-            for (const route of apiRoutes) {
-                try {
-                    const response = await api.get(route, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    // Check if response contains tasks
-                    const tasksData = response.data || [];
-                    setAssignedTasks(tasksData);
-                    return;
-                } catch (routeError) {
-                    console.log(`Route ${route} failed:`, routeError);
-                    // Continue to next route
-                }
+                setAssignedTasks(response.data || []);
+            } catch (routeError) {
+                console.log(`Failed to fetch assigned tasks for group ${groupId}:`, routeError);
+                setAssignedTasks([]);
             }
-
-            // If all routes fail
-            console.warn('Could not fetch assigned tasks for group', groupId);
-            setAssignedTasks([]);
-
         } catch (error) {
             console.error('Unexpected error in fetchAssignedTasks', error);
             setAssignedTasks([]);
         }
     };
 
-    // Загрузка данных
+// Function to delete an adventure map
+    const handleDeleteMap = async (mapId: number) => {
+        if (!window.confirm('Вы уверены, что хотите удалить эту карту приключений?')) {
+            return;
+        }
+
+        try {
+            setError(null);
+
+            // First attempt without force flag
+            const response = await deleteAdventureMap(mapId);
+
+            // Check if confirmation is required for cascade delete
+            if (response && response.status === 'confirmation_required') {
+                const { locations_count, task_groups_count } = response.related_data;
+
+                const confirmMessage = `
+            ⚠️ ВНИМАНИЕ! Удаление этой карты приключений повлечет за собой:
+            
+            - ${locations_count} локаций
+            - ${task_groups_count} групп заданий
+            
+            Все эти данные будут удалены. Продолжить?
+            `;
+
+                if (window.confirm(confirmMessage)) {
+                    // Force deletion with cascade
+                    const forceResponse = await deleteAdventureMap(mapId, true);
+
+                    if (forceResponse && forceResponse.status === 'success') {
+                        // Update the maps list
+                        if (selectedSubject) {
+                            fetchMaps(selectedSubject);
+                        }
+                    } else {
+                        setError('Получен неожиданный ответ от сервера при удалении карты.');
+                    }
+                }
+            } else if (response && response.status === 'success') {
+                // Normal deletion was successful
+                if (selectedSubject) {
+                    fetchMaps(selectedSubject);
+                }
+            } else {
+                setError('Получен неожиданный ответ от сервера при удалении карты.');
+            }
+        } catch (error) {
+            console.error('Ошибка при удалении карты:', error);
+            setError('Не удалось удалить карту приключений. Проверьте сетевое соединение или повторите позже.');
+        }
+    };
+
+    // Function to delete a location
+    const handleDeleteLocation = async (locationId: number) => {
+        try {
+            if (!window.confirm('Вы уверены, что хотите удалить эту локацию?')) {
+                return;
+            }
+
+            setError(null);
+            const token = localStorage.getItem('adminToken');
+
+            // Try to delete the location
+            const response = await api.delete(`/admin/gamification/locations/${locationId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            // Check if confirmation is required for cascade delete
+            if (response.data && response.data.status === 'confirmation_required') {
+                const { dependent_locations_count, task_groups_count } = response.data.related_data;
+
+                let confirmMessage = '⚠️ ВНИМАНИЕ! Удаление этой локации повлечет за собой:\n\n';
+
+                if (dependent_locations_count > 0) {
+                    confirmMessage += `- ${dependent_locations_count} зависимых локаций будут отвязаны\n`;
+                }
+
+                if (task_groups_count > 0) {
+                    confirmMessage += `- ${task_groups_count} групп заданий будут удалены\n`;
+                }
+
+                confirmMessage += '\nВы уверены, что хотите продолжить?';
+
+                if (window.confirm(confirmMessage)) {
+                    // Force deletion with cascade
+                    await api.delete(`/admin/gamification/locations/${locationId}?force=true`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    // Update the locations list
+                    if (selectedMap) {
+                        fetchLocations(selectedMap);
+                    }
+                }
+            } else {
+                // Normal deletion was successful
+                if (selectedMap) {
+                    fetchLocations(selectedMap);
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка при удалении локации:', error);
+            setError('Не удалось удалить локацию. Проверьте сетевое соединение или повторите позже.');
+        }
+    };
+
+    // Function to delete a task group
+    const handleDeleteTaskGroup = async (taskGroupId: number) => {
+        try {
+            if (!window.confirm('Вы уверены, что хотите удалить эту группу заданий?')) {
+                return;
+            }
+
+            setError(null);
+            const token = localStorage.getItem('adminToken');
+
+            // Try to delete the task group
+            const response = await api.delete(`/admin/gamification/task-groups/${taskGroupId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            // Check if confirmation is required for cascade delete
+            if (response.data && response.data.status === 'confirmation_required') {
+                const { tasks_count } = response.data.related_data;
+
+                const confirmMessage = `
+                ⚠️ ВНИМАНИЕ! В этой группе есть ${tasks_count} заданий.
+                
+                Они будут отвязаны от группы, но не удалены из системы.
+                Продолжить?
+                `;
+
+                if (window.confirm(confirmMessage)) {
+                    // Force deletion with cascade
+                    await api.delete(`/admin/gamification/task-groups/${taskGroupId}?force=true`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    // Update the task groups list
+                    if (selectedLocation) {
+                        fetchTaskGroups(selectedLocation);
+                    }
+                }
+            } else {
+                // Normal deletion was successful
+                if (selectedLocation) {
+                    fetchTaskGroups(selectedLocation);
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка при удалении группы заданий:', error);
+            setError('Не удалось удалить группу заданий. Проверьте сетевое соединение или повторите позже.');
+        }
+    };
+
+    // Data loading
     useEffect(() => {
         fetchSubjects();
     }, []);
@@ -172,7 +312,7 @@ const GamificationPanel: React.FC = () => {
             setTaskGroups([]);
         }
         setSelectedTaskGroup(null);
-        setAssignedTasks([]); // Clear assigned tasks when location changes
+        setAssignedTasks([]);
     }, [selectedLocation]);
 
     useEffect(() => {
@@ -183,11 +323,9 @@ const GamificationPanel: React.FC = () => {
         }
     }, [selectedTaskGroup]);
 
-
-    // Функции загрузки данных
+    // Data loading functions
     const fetchSubjects = async () => {
         try {
-            // Получаем токен авторизации
             const token = localStorage.getItem('adminToken');
 
             const response = await api.get('/admin/subjects', {
@@ -198,13 +336,12 @@ const GamificationPanel: React.FC = () => {
             setSubjects(response.data);
         } catch (error) {
             console.error('Ошибка при загрузке предметов:', error);
-            alert('Не удалось загрузить предметы');
+            setError('Не удалось загрузить предметы');
         }
     };
 
     const fetchMaps = async (subjectId: number) => {
         try {
-            // Получаем токен авторизации
             const token = localStorage.getItem('adminToken');
 
             const response = await api.get(`/gamification/maps/${subjectId}`, {
@@ -215,17 +352,14 @@ const GamificationPanel: React.FC = () => {
             setMaps(response.data);
         } catch (error) {
             console.error('Ошибка при загрузке карт:', error);
-            // Если карт нет, то просто установим пустой массив
             setMaps([]);
         }
     };
 
     const fetchLocations = async (mapId: number) => {
         try {
-            // Получаем токен авторизации
             const token = localStorage.getItem('adminToken');
 
-            // Пробуем альтернативный путь API, если стандартный не работает
             try {
                 const response = await api.get(`/admin/gamification/maps/${mapId}/locations`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -233,7 +367,6 @@ const GamificationPanel: React.FC = () => {
                 setLocations(response.data);
             } catch (error) {
                 console.log('Пробуем альтернативный путь API для локаций...');
-                // Попробуем альтернативный путь
                 const altResponse = await api.get(`/admin/maps/${mapId}/locations`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -241,19 +374,14 @@ const GamificationPanel: React.FC = () => {
             }
         } catch (error: unknown) {
             console.error('Ошибка при загрузке локаций:', error);
-            if (error instanceof Error) {
-                console.error('Детали ошибки:', error.message);
-            }
             setLocations([]);
         }
     };
 
     const fetchTaskGroups = async (locationId: number) => {
         try {
-            // Получаем токен авторизации
             const token = localStorage.getItem('adminToken');
 
-            // Пробуем альтернативный путь API, если стандартный не работает
             try {
                 const response = await api.get(`/admin/gamification/locations/${locationId}/task-groups`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -261,7 +389,6 @@ const GamificationPanel: React.FC = () => {
                 setTaskGroups(response.data);
             } catch (error) {
                 console.log('Пробуем альтернативный путь API для групп заданий...');
-                // Попробуем альтернативный путь
                 const altResponse = await api.get(`/admin/locations/${locationId}/task-groups`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -269,16 +396,12 @@ const GamificationPanel: React.FC = () => {
             }
         } catch (error: unknown) {
             console.error('Ошибка при загрузке групп заданий:', error);
-            if (error instanceof Error) {
-                console.error('Детали ошибки:', error.message);
-            }
             setTaskGroups([]);
         }
     };
 
     const fetchTasks = async (subjectId: number) => {
         try {
-            // Получаем токен авторизации
             const token = localStorage.getItem('adminToken');
 
             const response = await api.get(`/admin/tasks?subject_id=${subjectId}`, {
@@ -291,16 +414,14 @@ const GamificationPanel: React.FC = () => {
         }
     };
 
-    // Функции отправки форм
+    // Form submission handlers
     const handleCreateMap = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedSubject) return;
 
         try {
-            // Получаем токен из localStorage
             const token = localStorage.getItem('adminToken');
 
-            // Update this line in handleCreateMap function
             await api.post('/admin/gamification/maps', {
                 ...mapForm,
                 subject_id: selectedSubject
@@ -315,7 +436,7 @@ const GamificationPanel: React.FC = () => {
             setMapForm({ name: '', description: '', background_image: '' });
         } catch (error) {
             console.error('Ошибка при создании карты:', error);
-            alert('Не удалось создать карту');
+            setError('Не удалось создать карту');
         }
     };
 
@@ -324,9 +445,13 @@ const GamificationPanel: React.FC = () => {
         if (!selectedMap) return;
 
         try {
+            const token = localStorage.getItem('adminToken');
+
             await api.post('/admin/gamification/locations', {
                 ...locationForm,
                 adventure_map_id: selectedMap
+            }, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
             fetchLocations(selectedMap);
@@ -341,7 +466,7 @@ const GamificationPanel: React.FC = () => {
             });
         } catch (error) {
             console.error('Ошибка при создании локации:', error);
-            alert('Не удалось создать локацию');
+            setError('Не удалось создать локацию');
         }
     };
 
@@ -350,9 +475,13 @@ const GamificationPanel: React.FC = () => {
         if (!selectedLocation) return;
 
         try {
+            const token = localStorage.getItem('adminToken');
+
             await api.post('/admin/gamification/task-groups', {
                 ...taskGroupForm,
                 location_id: selectedLocation
+            }, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
             fetchTaskGroups(selectedLocation);
@@ -360,7 +489,7 @@ const GamificationPanel: React.FC = () => {
             setTaskGroupForm({ name: '', description: '', difficulty: 1, reward_points: 10 });
         } catch (error) {
             console.error('Ошибка при создании группы заданий:', error);
-            alert('Не удалось создать группу заданий');
+            setError('Не удалось создать группу заданий');
         }
     };
 
@@ -369,17 +498,14 @@ const GamificationPanel: React.FC = () => {
         if (!selectedTaskGroup || selectedTasks.length === 0) return;
 
         try {
-            // Получаем токен авторизации
             const token = localStorage.getItem('adminToken');
 
-            // Выводим отладочную информацию, чтобы проверить данные
             console.log('Отправка заданий:', {
                 taskGroupId: selectedTaskGroup,
                 selectedTasks: selectedTasks,
                 token: token ? token.substring(0, 10) + '...' : 'отсутствует'
             });
 
-            // Отправляем запрос с правильным форматом данных
             await api.post(
                 `/admin/gamification/task-groups/${selectedTaskGroup}/assign-tasks`,
                 selectedTasks,
@@ -400,29 +526,7 @@ const GamificationPanel: React.FC = () => {
             alert('Задания успешно назначены группе');
         } catch (error: unknown) {
             console.error('Ошибка при назначении заданий:', error);
-
-            // Расширенный вывод ошибки для отладки
-            if (error && typeof error === 'object' && 'response' in error) {
-                const axiosError = error as { response?: { status: number; data: any; headers: any } };
-                if (axiosError.response) {
-                    console.error('Детали ошибки:', {
-                        status: axiosError.response.status,
-                        data: axiosError.response.data,
-                        headers: axiosError.response.headers
-                    });
-                }
-            }
-
-            // Безопасное извлечение сообщения об ошибке
-            let errorMessage = 'Неизвестная ошибка';
-            if (error instanceof Error) {
-                errorMessage = error.message;
-            } else if (typeof error === 'object' && error !== null && 'response' in error) {
-                const axiosError = error as { response?: { data?: { detail?: string } } };
-                errorMessage = axiosError.response?.data?.detail || errorMessage;
-            }
-
-            alert(`Не удалось назначить задания: ${errorMessage}`);
+            setError('Не удалось назначить задания');
         }
     };
 
@@ -438,7 +542,13 @@ const GamificationPanel: React.FC = () => {
         <div className="p-6 text-white dark:text-gray-900 transition-colors">
             <h1 className="text-2xl font-bold mb-6 text-white dark:text-gray-900 transition-colors">Управление геймификацией</h1>
 
-            {/* Выбор предмета */}
+            {error && (
+                <div className="bg-red-900/50 dark:bg-red-100 text-red-200 dark:text-red-700 p-3 mb-4 rounded transition-colors">
+                    {error}
+                </div>
+            )}
+
+            {/* Subject selection */}
             <div className="mb-8">
                 <h2 className="text-lg font-semibold mb-3 text-white dark:text-gray-900 transition-colors">1. Выберите предмет</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -459,7 +569,7 @@ const GamificationPanel: React.FC = () => {
                 </div>
             </div>
 
-            {/* Управление картами */}
+            {/* Adventure maps management */}
             {selectedSubject && (
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
@@ -477,15 +587,30 @@ const GamificationPanel: React.FC = () => {
                             {maps.map(map => (
                                 <div
                                     key={map.id}
-                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                                    className={`relative p-4 border rounded-lg cursor-pointer ${
                                         selectedMap === map.id
                                             ? 'bg-blue-900 border-blue-600 dark:bg-blue-100 dark:border-blue-500 text-blue-200 dark:text-blue-900'
                                             : 'border-gray-600 dark:border-gray-300 hover:bg-gray-800 dark:hover:bg-gray-100 text-gray-200 dark:text-gray-800'
                                     } transition-colors`}
-                                    onClick={() => setSelectedMap(map.id)}
                                 >
-                                    <div className="font-medium">{map.name}</div>
-                                    <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{map.description}</div>
+                                    <button
+                                        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-600 transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent selecting the map
+                                            handleDeleteMap(map.id);
+                                        }}
+                                    >
+                                        ✕
+                                    </button>
+
+                                    <div
+                                        className="pt-2"
+                                        onClick={() => setSelectedMap(map.id)}
+                                    >
+                                        <div className="font-medium">{map.name}</div>
+                                        <div
+                                            className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{map.description}</div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -501,7 +626,7 @@ const GamificationPanel: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Форма создания карты */}
+                    {/* Map creation form */}
                     {showMapForm && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                             <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-6 max-w-md w-full transition-colors">
@@ -560,7 +685,7 @@ const GamificationPanel: React.FC = () => {
                 </div>
             )}
 
-            {/* Управление локациями */}
+            {/* Locations management */}
             {selectedMap && (
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
@@ -578,17 +703,31 @@ const GamificationPanel: React.FC = () => {
                             {locations.map(location => (
                                 <div
                                     key={location.id}
-                                    className={`p-4 border rounded-lg cursor-pointer ${
+                                    className={`relative p-4 border rounded-lg cursor-pointer ${
                                         selectedLocation === location.id
                                             ? 'bg-blue-900 border-blue-600 dark:bg-blue-100 dark:border-blue-500 text-blue-200 dark:text-blue-900'
                                             : 'border-gray-600 dark:border-gray-300 hover:bg-gray-800 dark:hover:bg-gray-100 text-gray-200 dark:text-gray-800'
                                     } transition-colors`}
-                                    onClick={() => setSelectedLocation(location.id)}
                                 >
-                                    <div className="font-medium">{location.name}</div>
-                                    <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{location.description}</div>
-                                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-600 transition-colors">
-                                        <span>Позиция: {location.position_x}% x {location.position_y}%</span>
+                                    <button
+                                        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-600 transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent selecting the location
+                                            handleDeleteLocation(location.id);
+                                        }}
+                                    >
+                                        ✕
+                                    </button>
+
+                                    <div
+                                        className="pt-2"
+                                        onClick={() => setSelectedLocation(location.id)}
+                                    >
+                                        <div className="font-medium">{location.name}</div>
+                                        <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{location.description}</div>
+                                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-600 transition-colors">
+                                            <span>Позиция: {location.position_x}% x {location.position_y}%</span>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -605,7 +744,7 @@ const GamificationPanel: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Форма создания локации */}
+                    {/* Location creation form */}
                     {showLocationForm && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                             <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-6 max-w-md w-full transition-colors">
@@ -720,7 +859,7 @@ const GamificationPanel: React.FC = () => {
                 </div>
             )}
 
-            {/* Управление группами заданий */}
+            {/* Task groups management */}
             {selectedLocation && (
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
@@ -738,18 +877,32 @@ const GamificationPanel: React.FC = () => {
                             {taskGroups.map(group => (
                                 <div
                                     key={group.id}
-                                    className={`p-4 border rounded-lg cursor-pointer ${
+                                    className={`relative p-4 border rounded-lg cursor-pointer ${
                                         selectedTaskGroup === group.id
                                             ? 'bg-blue-900 border-blue-600 dark:bg-blue-100 dark:border-blue-500 text-blue-200 dark:text-blue-900'
                                             : 'border-gray-600 dark:border-gray-300 hover:bg-gray-800 dark:hover:bg-gray-100 text-gray-200 dark:text-gray-800'
                                     } transition-colors`}
-                                    onClick={() => setSelectedTaskGroup(group.id)}
                                 >
-                                    <div className="font-medium">{group.name}</div>
-                                    <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{group.description}</div>
-                                    <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-600 transition-colors">
-                                        <span>Сложность: {group.difficulty}/5</span>
-                                        <span>{group.reward_points} очков</span>
+                                    <button
+                                        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-600 transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent selecting the group
+                                            handleDeleteTaskGroup(group.id);
+                                        }}
+                                    >
+                                        ✕
+                                    </button>
+
+                                    <div
+                                        className="pt-2"
+                                        onClick={() => setSelectedTaskGroup(group.id)}
+                                    >
+                                        <div className="font-medium">{group.name}</div>
+                                        <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{group.description}</div>
+                                        <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-600 transition-colors">
+                                            <span>Сложность: {group.difficulty}/5</span>
+                                            <span>{group.reward_points} очков</span>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -766,7 +919,7 @@ const GamificationPanel: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Форма создания группы заданий */}
+                    {/* Task group creation form */}
                     {showTaskGroupForm && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                             <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-6 max-w-md w-full transition-colors">
@@ -846,7 +999,7 @@ const GamificationPanel: React.FC = () => {
                 </div>
             )}
 
-            {/* Назначение заданий выбранной группе */}
+            {/* Task assignment panel */}
             {selectedTaskGroup && (
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
@@ -893,7 +1046,7 @@ const GamificationPanel: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Форма назначения заданий */}
+                    {/* Task assignment form */}
                     {showAssignTasksForm && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                             <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-6 max-w-lg w-full max-h-screen overflow-auto transition-colors">

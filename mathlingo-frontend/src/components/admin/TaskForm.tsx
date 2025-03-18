@@ -1,6 +1,6 @@
-// src/components/admin/TaskForm.tsx
+// В файле src/components/admin/TaskForm.tsx
 import React, { useState, useEffect } from 'react';
-import { createTask, updateTask, Task, fetchUsers, User } from '../../utils/adminApi';
+import { createTask, updateTask, Task, fetchUsers, User, fetchSubjects, Subject } from '../../utils/adminApi';
 import Input from '../Input';
 import Button from '../Button';
 
@@ -14,28 +14,35 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [subject, setSubject] = useState('');
-    const [ownerId, setOwnerId] = useState<string>('');
+    const [ownerId, setOwnerId] = useState<string | null>(null);
     const [users, setUsers] = useState<User[]>([]);
+    const [subjects, setSubjects] = useState<Subject[]>([]); // Добавляем состояние для предметов
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Загрузка списка пользователей для выбора
+    // Загружаем список пользователей и предметов при монтировании компонента
     useEffect(() => {
-        const loadUsers = async () => {
+        const loadData = async () => {
             try {
-                const data = await fetchUsers();
-                setUsers(data);
+                // Загружаем пользователей
+                const usersData = await fetchUsers();
+                setUsers(usersData);
+
+                // Загружаем предметы
+                const subjectsData = await fetchSubjects();
+                setSubjects(subjectsData);
 
                 // Если пользователи есть, и не задан owner_id, устанавливаем первого пользователя по умолчанию
-                if (data.length > 0 && !ownerId) {
-                    setOwnerId(data[0].id.toString());
+                if (usersData.length > 0 && !ownerId) {
+                    setOwnerId(usersData[0].id.toString());
                 }
             } catch (err) {
-                console.error('Ошибка при загрузке пользователей:', err);
+                console.error('Ошибка при загрузке данных:', err);
+                setError('Не удалось загрузить необходимые данные');
             }
         };
 
-        loadUsers();
+        loadData();
     }, []);
 
     useEffect(() => {
@@ -50,21 +57,14 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-
-        // Проверка наличия owner_id
-        if (!ownerId) {
-            setError('Необходимо выбрать владельца задания');
-            return;
-        }
-
         setLoading(true);
 
         try {
-            const taskData: Task = {
+            const taskData = {
                 title,
                 description: description || undefined,
-                subject,
-                owner_id: parseInt(ownerId)
+                subject, // Код предмета (например, "derivatives", "integrals" и т.д.)
+                owner_id: ownerId ? parseInt(ownerId) : undefined
             };
 
             if (task && task.id) {
@@ -108,12 +108,14 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
                         required
-                        className="w-full p-2 border rounded bg-gray-700 border-gray-600 text-white dark:bg-gray-200 dark:border-gray-300 dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     >
                         <option value="">Выберите предмет</option>
-                        <option value="derivatives">Производные</option>
-                        <option value="integrals">Интегралы</option>
-                        <option value="probability">Теория вероятности</option>
+                        {subjects.map(subject => (
+                            <option key={subject.id} value={subject.code}>
+                                {subject.name}
+                            </option>
+                        ))}
                     </select>
                 </div>
 
@@ -129,21 +131,24 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
                 </div>
 
                 <div className="mb-6">
-                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Владелец задания <span className="text-red-500">*</span></label>
+                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">
+                        Владелец задания (необязательно)
+                    </label>
                     <select
-                        value={ownerId}
-                        onChange={(e) => setOwnerId(e.target.value)}
-                        required
+                        value={ownerId || ''}
+                        onChange={(e) => setOwnerId(e.target.value || null)}
                         className="w-full p-2 border rounded bg-gray-700 border-gray-600 text-white dark:bg-gray-200 dark:border-gray-300 dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     >
-                        <option value="">Выберите пользователя</option>
+                        <option value="">Без владельца</option>
                         {users.map(user => (
                             <option key={user.id} value={user.id}>
                                 {user.username} ({user.email})
                             </option>
                         ))}
                     </select>
-                    <p className="mt-1 text-sm text-gray-400 dark:text-gray-500 transition-colors">Это поле обязательно для заполнения</p>
+                    <p className="mt-1 text-sm text-gray-400 dark:text-gray-500 transition-colors">
+                        Можно оставить без владельца
+                    </p>
                 </div>
 
                 <div className="flex justify-end space-x-4">

@@ -122,36 +122,60 @@ def update_location(
 @router.delete("/locations/{location_id}")
 def delete_location(
         location_id: int,
+        force: bool = False,
         db: Session = Depends(get_db),
         current_admin: Admin = Depends(get_admin_current_user)
 ):
-    """Удалить локацию"""
+    """Удаление локации с каскадным удалением связанных данных"""
     location = db.query(MapLocation).filter(MapLocation.id == location_id).first()
     if not location:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Локация не найдена")
 
-    # Проверяем, не используется ли локация для разблокировки других локаций
+    # Проверяем, используется ли локация для разблокировки других локаций
     dependent_locations = db.query(MapLocation).filter(
         MapLocation.unlocked_by_location_id == location_id
     ).all()
+    dependent_locations_count = len(dependent_locations)
 
-    if dependent_locations:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Эта локация используется для разблокировки других локаций")
-
-    # Проверяем, есть ли группы заданий в этой локации
+    # Находим группы заданий в этой локации
     task_groups = db.query(TaskGroup).filter(TaskGroup.location_id == location_id).all()
+    task_groups_count = len(task_groups)
 
-    if task_groups:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Сначала удалите все группы заданий в этой локации")
+    # Если есть зависимые локации или группы заданий и нет флага force,
+    # запрашиваем подтверждение
+    if (dependent_locations_count > 0 or task_groups_count > 0) and not force:
+        return {
+            "status": "confirmation_required",
+            "detail": "Обнаружены связанные данные",
+            "related_data": {
+                "dependent_locations_count": dependent_locations_count,
+                "task_groups_count": task_groups_count
+            }
+        }
+
+    # Каскадное удаление
+
+    # Обновляем зависимые локации, чтобы они не ссылались на удаляемую
+    if dependent_locations_count > 0:
+        for dep_location in dependent_locations:
+            dep_location.unlocked_by_location_id = None
+        db.commit()
+
+    # Удаляем группы заданий и отвязываем от них задания
+    if task_groups_count > 0:
+        for task_group in task_groups:
+            # Отвязываем задания от группы
+            db.query(Task).filter(Task.task_group_id == task_group.id).update({"task_group_id": None})
+            # Удаляем группу
+            db.delete(task_group)
+        db.commit()
 
     # Удаляем локацию
     db.delete(location)
     db.commit()
 
-    return {"detail": "Локация успешно удалена"}
+    return {"status": "success", "detail": "Локация и все связанные данные успешно удалены"}
 
 
 # --- Маршруты для управления группами заданий ---
@@ -215,10 +239,11 @@ def update_task_group(
 @router.delete("/task-groups/{task_group_id}")
 def delete_task_group(
         task_group_id: int,
+        force: bool = False,
         db: Session = Depends(get_db),
         current_admin: Admin = Depends(get_admin_current_user)
 ):
-    """Удалить группу заданий"""
+    """Удаление группы заданий с каскадным удалением или отвязкой связанных данных"""
     task_group = db.query(TaskGroup).filter(TaskGroup.id == task_group_id).first()
     if not task_group:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -226,16 +251,29 @@ def delete_task_group(
 
     # Проверяем, есть ли задания в этой группе
     tasks = db.query(Task).filter(Task.task_group_id == task_group_id).all()
+    tasks_count = len(tasks)
+
+    # Если есть задания и нет флага force, запрашиваем подтверждение
+    if tasks_count > 0 and not force:
+        return {
+            "status": "confirmation_required",
+            "detail": "Обнаружены связанные задания",
+            "related_data": {
+                "tasks_count": tasks_count
+            }
+        }
 
     # Снимаем привязку заданий к группе
-    for task in tasks:
-        task.task_group_id = None
+    if tasks_count > 0:
+        for task in tasks:
+            task.task_group_id = None
+        db.commit()
 
     # Удаляем группу заданий
     db.delete(task_group)
     db.commit()
 
-    return {"detail": "Группа заданий успешно удалена"}
+    return {"status": "success", "detail": "Группа заданий успешно удалена"}
 
 
 @router.post("/task-groups/{task_group_id}/assign-tasks")
@@ -334,3 +372,88 @@ def get_tasks_in_group(
             "subject": task.subject
         } for task in tasks
     ]
+
+
+@router.delete("/maps/{map_id}")
+def delete_adventure_map(
+        map_id: int,
+        force: bool = False,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user)
+):
+    """Deletion of adventure map with proper cascade handling"""
+    try:
+        # Check if the map exists
+        adventure_map = db.query(AdventureMap).filter(AdventureMap.id == map_id).first()
+        if not adventure_map:
+            raise HTTPException(status_code=404, detail="Карта не найдена")
+
+        # Get all locations for this map
+        locations = db.query(MapLocation).filter(MapLocation.adventure_map_id == map_id).all()
+
+        # If there are locations and force=False, ask for confirmation
+        if locations and not force:
+            # Count task groups
+            task_groups_count = 0
+            for location in locations:
+                task_groups_count += db.query(TaskGroup).filter(
+                    TaskGroup.location_id == location.id
+                ).count()
+
+            return {
+                "status": "confirmation_required",
+                "detail": "Обнаружены связанные данные",
+                "related_data": {
+                    "locations_count": len(locations),
+                    "task_groups_count": task_groups_count
+                }
+            }
+
+        # If force=True or no locations, proceed with deletion
+        try:
+            # Step 1: For each location, first unlink and delete task groups
+            for location in locations:
+                # Find all task groups for this location
+                task_groups = db.query(TaskGroup).filter(
+                    TaskGroup.location_id == location.id
+                ).all()
+
+                # Process each task group
+                for task_group in task_groups:
+                    # Unlink tasks from this group
+                    db.query(Task).filter(Task.task_group_id == task_group.id).update(
+                        {"task_group_id": None}, synchronize_session=False
+                    )
+                    # Delete the task group
+                    db.delete(task_group)
+
+                # Commit after processing all task groups for this location
+                db.commit()
+
+            # Step 2: Now all task groups are deleted, we can delete all locations
+            for location in locations:
+                db.delete(location)
+
+            # Commit after deleting all locations
+            db.commit()
+
+            # Step 3: Finally delete the adventure map
+            db.delete(adventure_map)
+            db.commit()
+
+            return {"status": "success", "detail": "Карта и связанные данные успешно удалены"}
+
+        except Exception as e:
+            db.rollback()
+            print(f"Error in cascade deletion: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Ошибка при удалении: {str(e)}"
+            )
+
+    except Exception as e:
+        print(f"Error deleting adventure map: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при удалении карты: {str(e)}"
+        )
