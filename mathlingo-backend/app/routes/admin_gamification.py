@@ -317,3 +317,20 @@ def delete_achievement(
     db.commit()
 
     return {"detail": "Достижение успешно удалено"}
+
+@router.get("/task-groups/{task_group_id}/tasks")
+def get_tasks_in_group(
+    task_group_id: int,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_admin_current_user)
+):
+    """Получить все задания для конкретной группы заданий"""
+    tasks = db.query(Task).filter(Task.task_group_id == task_group_id).all()
+    return [
+        {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "subject": task.subject
+        } for task in tasks
+    ]
