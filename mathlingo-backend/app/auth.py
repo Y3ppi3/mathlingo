@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import os
 import jwt
-from fastapi import Request, Depends, HTTPException
+from fastapi import Request, Depends, HTTPException, status
 from jose import JWTError
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
@@ -57,68 +57,107 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return token
 
 
+def get_token_from_request(request: Request) -> Optional[str]:
+    """
+    Получает токен из заголовка Authorization или из куки.
+    Возвращает токен или None, если токен не найден.
+    """
+    # Сначала пробуем получить токен из заголовка Authorization
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header.split(" ")[1]
+
+    # Если в заголовке токена нет, пробуем получить его из куки
+    return request.cookies.get("token")
+
+
 def get_admin_current_user(request: Request, db: Session = Depends(get_db)):
     """
-    Извлекает администратора из JWT-токена в заголовке Authorization.
+    Извлекает администратора из JWT-токена в заголовке Authorization или из куки.
     """
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401,
-            detail="Отсутствует токен авторизации администратора"
-        )
+    token = get_token_from_request(request)
 
-    token = auth_header.split(" ")[1]
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Отсутствует токен авторизации"
+        )
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_email = payload.get("sub")
         user_role = payload.get("role")
 
-        if not user_email or user_role != "admin":
+        # Проверяем роль из токена
+        if user_role == "admin":
+            admin = db.query(Admin).filter(Admin.email == user_email).first()
+            if admin:
+                print(f"✅ Авторизован администратор: {admin.email} (ID {admin.id})", flush=True)
+                return admin
+
+        # Если роль не админ или админ не найден, проверяем обычного пользователя
+        # и смотрим, может ли он иметь права администратора
+        user = db.query(User).filter(User.email == user_email).first()
+        if not user:
             raise HTTPException(
-                status_code=401,
-                detail="Недействительный токен администратора"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Пользователь не найден"
             )
+
+        # Проверяем, является ли пользователь также администратором
+        admin = db.query(Admin).filter(Admin.email == user.email).first()
+        if not admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Доступ запрещен - требуются права администратора"
+            )
+
+        return admin
+
     except JWTError:
         raise HTTPException(
-            status_code=401,
-            detail="Недействительный токен администратора"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Недействительный токен авторизации",
+            headers={"WWW-Authenticate": "Bearer"}
         )
-
-    admin = db.query(Admin).filter(Admin.email == user_email).first()
-    if not admin:
-        print(f"⚠️ Ошибка: Администратор {user_email} не найден в БД", flush=True)
-        raise HTTPException(
-            status_code=401,
-            detail="Администратор не найден"
-        )
-
-    print(f"✅ Авторизован администратор: {admin.email} (ID {admin.id})", flush=True)
-    return admin
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)):
     """
-    Извлекает пользователя из куки.
+    Извлекает пользователя из заголовка Authorization или из куки.
     """
-    token = request.cookies.get("token")
+    token = get_token_from_request(request)
+
     if not token:
-        print("⚠️ Ошибка: Токен отсутствует в куки", flush=True)
-        raise HTTPException(status_code=401, detail="Токен отсутствует")
+        print("⚠️ Ошибка: Токен отсутствует в заголовке и в куки", flush=True)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Токен отсутствует",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_email = payload.get("sub")
         if not user_email:
-            raise HTTPException(status_code=401, detail="Недействительный токен")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Недействительный токен"
+            )
     except JWTError:
-        raise HTTPException(status_code=401, detail="Недействительный токен")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Недействительный токен",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
     user = db.query(User).filter(User.email == user_email).first()
     if not user:
         print(f"⚠️ Ошибка: Пользователь {user_email} не найден в БД", flush=True)
-        raise HTTPException(status_code=401, detail="Пользователь не найден")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Пользователь не найден"
+        )
 
     print(f"✅ Авторизован пользователь: {user.email} (ID {user.id})", flush=True)
     return user

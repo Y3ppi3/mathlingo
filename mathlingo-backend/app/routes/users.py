@@ -26,13 +26,13 @@ def login_user(user: UserLogin, response: Response, db: Session = Depends(get_db
         value=access_token,
         httponly=True,        # Кука недоступна для JS
         secure=False,         # Для разработки на HTTP; в продакшене ставь True и используй HTTPS
-        samesite="Lax",       # Lax работает на HTTP
+        samesite="lax",       # Lowercase 'lax' to match standard
         path="/"
     )
 
     print("✅ Успешный вход, токен установлен:", access_token[:30], "...")
-    # Возвращаем тот же объект response, чтобы кука попала в ответ
-    return {"message": "Успешный вход"}
+    # Include token in response for debugging purposes
+    return {"message": "Успешный вход", "token": access_token}
 
 @router.post("/register/")
 def register_user(user: UserCreate, response: Response, db: Session = Depends(get_db)):

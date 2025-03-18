@@ -101,41 +101,42 @@ const Dashboard = () => {
 
     return (
         <div className="mt-16 container mx-auto px-4 py-6">
-            <h2 className="text-2xl font-bold mb-6">Панель управления</h2>
+            <h2 className="text-2xl font-bold mb-6 text-white dark:text-gray-900 transition-colors">Панель управления</h2>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-                <h3 className="text-xl font-semibold mb-4">Ваш профиль</h3>
+            <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-md p-6 mb-8 transition-colors">
+                <h3 className="text-xl font-semibold mb-4 text-white dark:text-gray-900 transition-colors">Ваш профиль</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <p className="text-gray-600 dark:text-gray-400">ID:</p>
-                        <p className="font-medium">{userData?.id}</p>
+                        <p className="text-gray-400 dark:text-gray-700 transition-colors">ID:</p>
+                        <p className="font-medium text-white dark:text-gray-900 transition-colors">{userData?.id}</p>
                     </div>
                     <div>
-                        <p className="text-gray-600 dark:text-gray-400">Имя пользователя:</p>
-                        <p className="font-medium">{userData?.username}</p>
+                        <p className="text-gray-400 dark:text-gray-700 transition-colors">Имя пользователя:</p>
+                        <p className="font-medium text-white dark:text-gray-900 transition-colors">{userData?.username}</p>
                     </div>
                     <div>
-                        <p className="text-gray-600 dark:text-gray-400">Email:</p>
-                        <p className="font-medium">{userData?.email}</p>
+                        <p className="text-gray-400 dark:text-gray-700 transition-colors">Email:</p>
+                        <p className="font-medium text-white dark:text-gray-900 transition-colors">{userData?.email}</p>
                     </div>
                 </div>
             </div>
 
             <div className="mb-8">
-                <h3 className="text-xl font-semibold mb-4">Доступные предметы</h3>
+                <h3 className="text-xl font-semibold mb-4 text-white dark:text-gray-900 transition-colors">Доступные предметы</h3>
 
                 {subjects.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {subjects.map((subject) => (
-                            <div key={subject.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                            <div key={subject.id}
+                                 className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-md overflow-hidden transition-colors">
                                 <div className="p-5">
                                     <div className="flex items-center">
                                         {subject.icon && (
-                                            <img src={subject.icon} alt={subject.name} className="w-10 h-10 mr-3" />
+                                            <img src={subject.icon} alt={subject.name} className="w-10 h-10 mr-3"/>
                                         )}
-                                        <h3 className="text-lg font-semibold">{subject.name}</h3>
+                                        <h3 className="text-lg font-semibold text-white dark:text-gray-900 transition-colors">{subject.name}</h3>
                                     </div>
-                                    <p className="mt-2 text-gray-600 dark:text-gray-300 line-clamp-2">{subject.description}</p>
+                                    <p className="mt-2 text-gray-400 dark:text-gray-700 line-clamp-2 transition-colors">{subject.description}</p>
 
                                     <div className="mt-4 flex space-x-3">
                                         {/* Кнопка для обычного режима */}
@@ -159,15 +160,15 @@ const Dashboard = () => {
                         ))}
                     </div>
                 ) : (
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-8 text-center">
-                        <p className="text-gray-500 dark:text-gray-400">Предметы не найдены</p>
+                    <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-8 text-center transition-colors">
+                        <p className="text-gray-400 dark:text-gray-700 transition-colors">Предметы не найдены</p>
                     </div>
                 )}
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-2">Что нового?</h3>
-                <p className="mb-4 text-gray-700 dark:text-gray-300">
+            <div className="bg-gray-700 dark:bg-gray-200 rounded-lg p-6 transition-colors">
+                <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900 transition-colors">Что нового?</h3>
+                <p className="mb-4 text-gray-300 dark:text-gray-800 transition-colors">
                     Теперь вы можете изучать математику в игровой форме!
                     Попробуйте новый режим "Приключение" и зарабатывайте очки, исследуя интерактивную карту.
                 </p>

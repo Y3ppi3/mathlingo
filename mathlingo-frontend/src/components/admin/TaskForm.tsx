@@ -1,5 +1,4 @@
-// src/components/admin/TaskForm.tsx - обновленная версия
-
+// src/components/admin/TaskForm.tsx
 import React, { useState, useEffect } from 'react';
 import { createTask, updateTask, Task, fetchUsers, User } from '../../utils/adminApi';
 import Input from '../Input';
@@ -84,16 +83,16 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
     };
 
     return (
-        <div>
+        <div className="text-white dark:text-gray-900 transition-colors">
             <h3 className="text-lg font-medium mb-4">
                 {task ? 'Редактирование задания' : 'Создание нового задания'}
             </h3>
 
-            {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
+            {error && <div className="bg-red-900/50 dark:bg-red-100 text-red-200 dark:text-red-700 p-3 rounded mb-4 transition-colors">{error}</div>}
 
             <form onSubmit={handleSubmit}>
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Название задания</label>
+                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Название задания</label>
                     <Input
                         type="text"
                         value={title}
@@ -104,12 +103,12 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Предмет</label>
+                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Предмет</label>
                     <select
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
                         required
-                        className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-2 border rounded bg-gray-700 border-gray-600 text-white dark:bg-gray-200 dark:border-gray-300 dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     >
                         <option value="">Выберите предмет</option>
                         <option value="derivatives">Производные</option>
@@ -119,23 +118,23 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Описание</label>
+                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Описание</label>
                     <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-2 border rounded bg-gray-700 border-gray-600 text-white dark:bg-gray-200 dark:border-gray-300 dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                         rows={5}
                         placeholder="Введите описание задания"
                     />
                 </div>
 
                 <div className="mb-6">
-                    <label className="block text-gray-700 mb-2">Владелец задания <span className="text-red-500">*</span></label>
+                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Владелец задания <span className="text-red-500">*</span></label>
                     <select
                         value={ownerId}
                         onChange={(e) => setOwnerId(e.target.value)}
                         required
-                        className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-2 border rounded bg-gray-700 border-gray-600 text-white dark:bg-gray-200 dark:border-gray-300 dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     >
                         <option value="">Выберите пользователя</option>
                         {users.map(user => (
@@ -144,7 +143,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
                             </option>
                         ))}
                     </select>
-                    <p className="mt-1 text-sm text-gray-500">Это поле обязательно для заполнения</p>
+                    <p className="mt-1 text-sm text-gray-400 dark:text-gray-500 transition-colors">Это поле обязательно для заполнения</p>
                 </div>
 
                 <div className="flex justify-end space-x-4">

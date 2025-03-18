@@ -184,9 +184,17 @@ const GamificationPanel: React.FC = () => {
         if (!selectedSubject) return;
 
         try {
-            await api.post('/gamification/maps/', {
+            // Получаем токен из localStorage
+            const token = localStorage.getItem('adminToken');
+
+            // Update this line in handleCreateMap function
+            await api.post('/admin/gamification/maps', {
                 ...mapForm,
                 subject_id: selectedSubject
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
 
             fetchMaps(selectedSubject);
@@ -270,25 +278,25 @@ const GamificationPanel: React.FC = () => {
     };
 
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Управление геймификацией</h1>
+        <div className="p-6 text-white dark:text-gray-900 transition-colors">
+            <h1 className="text-2xl font-bold mb-6 text-white dark:text-gray-900 transition-colors">Управление геймификацией</h1>
 
             {/* Выбор предмета */}
             <div className="mb-8">
-                <h2 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">1. Выберите предмет</h2>
+                <h2 className="text-lg font-semibold mb-3 text-white dark:text-gray-900 transition-colors">1. Выберите предмет</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {subjects.map(subject => (
                         <div
                             key={subject.id}
                             className={`p-4 border rounded-lg cursor-pointer transition-all ${
                                 selectedSubject === subject.id
-                                    ? 'bg-blue-100 border-blue-500 dark:bg-blue-900 dark:border-blue-500 text-blue-800 dark:text-blue-100'
-                                    : 'border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200'
-                            }`}
+                                    ? 'bg-blue-900 border-blue-600 dark:bg-blue-100 dark:border-blue-500 text-blue-200 dark:text-blue-900'
+                                    : 'border-gray-600 dark:border-gray-300 hover:bg-gray-800 dark:hover:bg-gray-100 text-gray-200 dark:text-gray-800'
+                            } transition-colors`}
                             onClick={() => setSelectedSubject(subject.id)}
                         >
                             <div className="font-medium">{subject.name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{subject.code}</div>
+                            <div className="text-sm text-gray-400 dark:text-gray-600 transition-colors">{subject.code}</div>
                         </div>
                     ))}
                 </div>
@@ -298,7 +306,7 @@ const GamificationPanel: React.FC = () => {
             {selectedSubject && (
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-lg font-semibold">2. Карты приключений</h2>
+                        <h2 className="text-lg font-semibold text-white dark:text-gray-900 transition-colors">2. Карты приключений</h2>
                         <button
                             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                             onClick={() => setShowMapForm(true)}
@@ -309,26 +317,26 @@ const GamificationPanel: React.FC = () => {
 
                     {maps.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {maps.map(map => (
+                            {maps.map(map => (
                                 <div
                                     key={map.id}
-                                    className={`p-4 border rounded-lg cursor-pointer ${
+                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
                                         selectedMap === map.id
-                                            ? 'bg-blue-100 border-blue-500 dark:bg-blue-900 dark:border-blue-500'
-                                            : 'border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
-                                    }`}
+                                            ? 'bg-blue-900 border-blue-600 dark:bg-blue-100 dark:border-blue-500 text-blue-200 dark:text-blue-900'
+                                            : 'border-gray-600 dark:border-gray-300 hover:bg-gray-800 dark:hover:bg-gray-100 text-gray-200 dark:text-gray-800'
+                                    } transition-colors`}
                                     onClick={() => setSelectedMap(map.id)}
                                 >
                                     <div className="font-medium">{map.name}</div>
-                                    <div className="text-sm text-gray-500 line-clamp-2">{map.description}</div>
+                                    <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{map.description}</div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <p className="text-gray-500 dark:text-gray-400">Нет доступных карт для этого предмета</p>
+                        <div className="text-center py-8 bg-gray-800 dark:bg-gray-100 rounded-lg transition-colors">
+                            <p className="text-gray-400 dark:text-gray-600 transition-colors">Нет доступных карт для этого предмета</p>
                             <button
-                                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                                 onClick={() => setShowMapForm(true)}
                             >
                                 Создать первую карту
@@ -339,34 +347,33 @@ const GamificationPanel: React.FC = () => {
                     {/* Форма создания карты */}
                     {showMapForm && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
-                                <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Создание карты
+                            <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-6 max-w-md w-full transition-colors">
+                                <h3 className="text-xl font-semibold mb-4 text-white dark:text-gray-900 transition-colors">Создание карты
                                     приключений</h3>
                                 <form onSubmit={handleCreateMap}>
                                     <div className="mb-4">
-                                        <label className="block mb-1 text-gray-700 dark:text-gray-300">Название
-                                            карты</label>
+                                        <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Название карты</label>
                                         <input
                                             type="text"
-                                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-white"
+                                            className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                             value={mapForm.name}
                                             onChange={e => setMapForm({...mapForm, name: e.target.value})}
                                             required
                                         />
                                     </div>
                                     <div className="mb-4">
-                                        <label className="block mb-1">Описание</label>
+                                        <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Описание</label>
                                         <textarea
-                                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                            className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                             value={mapForm.description}
                                             onChange={e => setMapForm({...mapForm, description: e.target.value})}
                                         />
                                     </div>
                                     <div className="mb-4">
-                                        <label className="block mb-1">URL фонового изображения</label>
+                                        <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">URL фонового изображения</label>
                                         <input
                                             type="text"
-                                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                            className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                             value={mapForm.background_image}
                                             onChange={e => setMapForm({...mapForm, background_image: e.target.value})}
                                         />
@@ -374,7 +381,7 @@ const GamificationPanel: React.FC = () => {
                                     <div className="flex justify-end space-x-2">
                                         <button
                                             type="button"
-                                            className="px-4 py-2 border rounded dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            className="px-4 py-2 border rounded border-gray-600 dark:border-gray-300 text-gray-300 dark:text-gray-700 hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors"
                                             onClick={() => {
                                                 setShowMapForm(false);
                                                 setMapForm({name: '', description: '', background_image: ''});
@@ -384,7 +391,7 @@ const GamificationPanel: React.FC = () => {
                                         </button>
                                         <button
                                             type="submit"
-                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                                         >
                                             Создать
                                         </button>
@@ -400,9 +407,9 @@ const GamificationPanel: React.FC = () => {
             {selectedMap && (
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-lg font-semibold">3. Локации на карте</h2>
+                        <h2 className="text-lg font-semibold text-white dark:text-gray-900 transition-colors">3. Локации на карте</h2>
                         <button
-                            className="px-3 py-1 bg-blue-600 text-white rounded"
+                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                             onClick={() => setShowLocationForm(true)}
                         >
                             Добавить локацию
@@ -411,29 +418,29 @@ const GamificationPanel: React.FC = () => {
 
                     {locations.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {locations.map(location => (
+                            {locations.map(location => (
                                 <div
                                     key={location.id}
                                     className={`p-4 border rounded-lg cursor-pointer ${
                                         selectedLocation === location.id
-                                            ? 'bg-blue-100 border-blue-500 dark:bg-blue-900 dark:border-blue-500'
-                                            : 'border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
-                                    }`}
+                                            ? 'bg-blue-900 border-blue-600 dark:bg-blue-100 dark:border-blue-500 text-blue-200 dark:text-blue-900'
+                                            : 'border-gray-600 dark:border-gray-300 hover:bg-gray-800 dark:hover:bg-gray-100 text-gray-200 dark:text-gray-800'
+                                    } transition-colors`}
                                     onClick={() => setSelectedLocation(location.id)}
                                 >
                                     <div className="font-medium">{location.name}</div>
-                                    <div className="text-sm text-gray-500 line-clamp-2">{location.description}</div>
-                                    <div className="mt-2 text-xs">
-                                        <span className="text-gray-500">Позиция: {location.position_x}% x {location.position_y}%</span>
+                                    <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{location.description}</div>
+                                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-600 transition-colors">
+                                        <span>Позиция: {location.position_x}% x {location.position_y}%</span>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <p className="text-gray-500">Нет локаций на этой карте</p>
+                        <div className="text-center py-8 bg-gray-800 dark:bg-gray-100 rounded-lg transition-colors">
+                            <p className="text-gray-400 dark:text-gray-600 transition-colors">Нет локаций на этой карте</p>
                             <button
-                                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
+                                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                                 onClick={() => setShowLocationForm(true)}
                             >
                                 Создать первую локацию
@@ -444,35 +451,35 @@ const GamificationPanel: React.FC = () => {
                     {/* Форма создания локации */}
                     {showLocationForm && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
-                                <h3 className="text-xl font-semibold mb-4">Создание локации</h3>
+                            <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-6 max-w-md w-full transition-colors">
+                                <h3 className="text-xl font-semibold mb-4 text-white dark:text-gray-900 transition-colors">Создание локации</h3>
                                 <form onSubmit={handleCreateLocation}>
                                     <div className="mb-4">
-                                        <label className="block mb-1">Название локации</label>
+                                        <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Название локации</label>
                                         <input
                                             type="text"
-                                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                            className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                             value={locationForm.name}
                                             onChange={e => setLocationForm({ ...locationForm, name: e.target.value })}
                                             required
                                         />
                                     </div>
                                     <div className="mb-4">
-                                        <label className="block mb-1">Описание</label>
+                                        <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Описание</label>
                                         <textarea
-                                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                            className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                             value={locationForm.description}
                                             onChange={e => setLocationForm({ ...locationForm, description: e.target.value })}
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 mb-4">
                                         <div>
-                                            <label className="block mb-1">Позиция X (%)</label>
+                                            <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Позиция X (%)</label>
                                             <input
                                                 type="number"
                                                 min="0"
                                                 max="100"
-                                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                                className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                                 value={locationForm.position_x}
                                                 onChange={e => setLocationForm({
                                                     ...locationForm,
@@ -482,12 +489,12 @@ const GamificationPanel: React.FC = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block mb-1">Позиция Y (%)</label>
+                                            <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Позиция Y (%)</label>
                                             <input
                                                 type="number"
                                                 min="0"
                                                 max="100"
-                                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                                className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                                 value={locationForm.position_y}
                                                 onChange={e => setLocationForm({
                                                     ...locationForm,
@@ -498,18 +505,18 @@ const GamificationPanel: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="mb-4">
-                                        <label className="block mb-1">URL иконки</label>
+                                        <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">URL иконки</label>
                                         <input
                                             type="text"
-                                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                            className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                             value={locationForm.icon_url}
                                             onChange={e => setLocationForm({ ...locationForm, icon_url: e.target.value })}
                                         />
                                     </div>
                                     <div className="mb-4">
-                                        <label className="block mb-1">Разблокируется локацией (опционально)</label>
+                                        <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Разблокируется локацией (опционально)</label>
                                         <select
-                                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                            className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                             value={locationForm.unlocked_by_location_id || ''}
                                             onChange={e => setLocationForm({
                                                 ...locationForm,
@@ -527,7 +534,7 @@ const GamificationPanel: React.FC = () => {
                                     <div className="flex justify-end space-x-2">
                                         <button
                                             type="button"
-                                            className="px-4 py-2 border rounded"
+                                            className="px-4 py-2 border rounded border-gray-600 dark:border-gray-300 text-gray-300 dark:text-gray-700 hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors"
                                             onClick={() => {
                                                 setShowLocationForm(false);
                                                 setLocationForm({
@@ -544,7 +551,7 @@ const GamificationPanel: React.FC = () => {
                                         </button>
                                         <button
                                             type="submit"
-                                            className="px-4 py-2 bg-blue-600 text-white rounded"
+                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                                         >
                                             Создать
                                         </button>
@@ -560,9 +567,9 @@ const GamificationPanel: React.FC = () => {
             {selectedLocation && (
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-lg font-semibold">4. Группы заданий</h2>
+                        <h2 className="text-lg font-semibold text-white dark:text-gray-900 transition-colors">4. Группы заданий</h2>
                         <button
-                            className="px-3 py-1 bg-blue-600 text-white rounded"
+                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                             onClick={() => setShowTaskGroupForm(true)}
                         >
                             Добавить группу
@@ -576,25 +583,25 @@ const GamificationPanel: React.FC = () => {
                                     key={group.id}
                                     className={`p-4 border rounded-lg cursor-pointer ${
                                         selectedTaskGroup === group.id
-                                            ? 'bg-blue-100 border-blue-500 dark:bg-blue-900 dark:border-blue-500'
-                                            : 'border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
-                                    }`}
+                                            ? 'bg-blue-900 border-blue-600 dark:bg-blue-100 dark:border-blue-500 text-blue-200 dark:text-blue-900'
+                                            : 'border-gray-600 dark:border-gray-300 hover:bg-gray-800 dark:hover:bg-gray-100 text-gray-200 dark:text-gray-800'
+                                    } transition-colors`}
                                     onClick={() => setSelectedTaskGroup(group.id)}
                                 >
                                     <div className="font-medium">{group.name}</div>
-                                    <div className="text-sm text-gray-500 line-clamp-2">{group.description}</div>
-                                    <div className="flex justify-between mt-2 text-xs">
-                                        <span className="text-gray-500">Сложность: {group.difficulty}/5</span>
-                                        <span className="text-gray-500">{group.reward_points} очков</span>
+                                    <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{group.description}</div>
+                                    <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-600 transition-colors">
+                                        <span>Сложность: {group.difficulty}/5</span>
+                                        <span>{group.reward_points} очков</span>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <p className="text-gray-500">Нет групп заданий в этой локации</p>
+                        <div className="text-center py-8 bg-gray-800 dark:bg-gray-100 rounded-lg transition-colors">
+                            <p className="text-gray-400 dark:text-gray-600 transition-colors">Нет групп заданий в этой локации</p>
                             <button
-                                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
+                                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                                 onClick={() => setShowTaskGroupForm(true)}
                             >
                                 Создать первую группу заданий
@@ -605,35 +612,35 @@ const GamificationPanel: React.FC = () => {
                     {/* Форма создания группы заданий */}
                     {showTaskGroupForm && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
-                                <h3 className="text-xl font-semibold mb-4">Создание группы заданий</h3>
+                            <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-6 max-w-md w-full transition-colors">
+                                <h3 className="text-xl font-semibold mb-4 text-white dark:text-gray-900 transition-colors">Создание группы заданий</h3>
                                 <form onSubmit={handleCreateTaskGroup}>
                                     <div className="mb-4">
-                                        <label className="block mb-1">Название группы</label>
+                                        <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Название группы</label>
                                         <input
                                             type="text"
-                                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                            className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                             value={taskGroupForm.name}
                                             onChange={e => setTaskGroupForm({ ...taskGroupForm, name: e.target.value })}
                                             required
                                         />
                                     </div>
                                     <div className="mb-4">
-                                        <label className="block mb-1">Описание</label>
+                                        <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Описание</label>
                                         <textarea
-                                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                            className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                             value={taskGroupForm.description}
                                             onChange={e => setTaskGroupForm({ ...taskGroupForm, description: e.target.value })}
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 mb-4">
                                         <div>
-                                            <label className="block mb-1">Сложность (1-5)</label>
+                                            <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Сложность (1-5)</label>
                                             <input
                                                 type="number"
                                                 min="1"
                                                 max="5"
-                                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                                className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                                 value={taskGroupForm.difficulty}
                                                 onChange={e => setTaskGroupForm({
                                                     ...taskGroupForm,
@@ -643,11 +650,11 @@ const GamificationPanel: React.FC = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block mb-1">Очки за выполнение</label>
+                                            <label className="block mb-1 text-gray-300 dark:text-gray-700 transition-colors">Очки за выполнение</label>
                                             <input
                                                 type="number"
                                                 min="1"
-                                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                                                className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
                                                 value={taskGroupForm.reward_points}
                                                 onChange={e => setTaskGroupForm({
                                                     ...taskGroupForm,
@@ -660,7 +667,7 @@ const GamificationPanel: React.FC = () => {
                                     <div className="flex justify-end space-x-2">
                                         <button
                                             type="button"
-                                            className="px-4 py-2 border rounded"
+                                            className="px-4 py-2 border rounded border-gray-600 dark:border-gray-300 text-gray-300 dark:text-gray-700 hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors"
                                             onClick={() => {
                                                 setShowTaskGroupForm(false);
                                                 setTaskGroupForm({ name: '', description: '', difficulty: 1, reward_points: 10 });
@@ -670,7 +677,7 @@ const GamificationPanel: React.FC = () => {
                                         </button>
                                         <button
                                             type="submit"
-                                            className="px-4 py-2 bg-blue-600 text-white rounded"
+                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                                         >
                                             Создать
                                         </button>
@@ -686,9 +693,9 @@ const GamificationPanel: React.FC = () => {
             {selectedTaskGroup && (
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-lg font-semibold">5. Задания в группе</h2>
+                        <h2 className="text-lg font-semibold text-white dark:text-gray-900 transition-colors">5. Задания в группе</h2>
                         <button
-                            className="px-3 py-1 bg-blue-600 text-white rounded"
+                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                             onClick={() => setShowAssignTasksForm(true)}
                         >
                             Назначить задания
@@ -698,16 +705,16 @@ const GamificationPanel: React.FC = () => {
                     {/* Форма назначения заданий */}
                     {showAssignTasksForm && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full max-h-screen overflow-auto">
-                                <h3 className="text-xl font-semibold mb-4">Назначить задания группе</h3>
+                            <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-6 max-w-lg w-full max-h-screen overflow-auto transition-colors">
+                                <h3 className="text-xl font-semibold mb-4 text-white dark:text-gray-900 transition-colors">Назначить задания группе</h3>
                                 <form onSubmit={handleAssignTasks}>
                                     <div className="mb-4">
-                                        <label className="block mb-2">Выберите задания:</label>
-                                        <div className="max-h-96 overflow-y-auto border rounded p-2">
+                                        <label className="block mb-2 text-white dark:text-gray-900 transition-colors">Выберите задания:</label>
+                                        <div className="max-h-96 overflow-y-auto border border-gray-600 dark:border-gray-300 rounded p-2 transition-colors">
                                             {tasks.length > 0 ? tasks.map(task => (
                                                 <div
                                                     key={task.id}
-                                                    className="p-2 border-b last:border-b-0 flex items-start"
+                                                    className="p-2 border-b last:border-b-0 border-gray-700 dark:border-gray-300 flex items-start transition-colors"
                                                 >
                                                     <input
                                                         type="checkbox"
@@ -716,14 +723,14 @@ const GamificationPanel: React.FC = () => {
                                                         checked={selectedTasks.includes(task.id)}
                                                         onChange={() => toggleTaskSelection(task.id)}
                                                     />
-                                                    <label htmlFor={`task-${task.id}`} className="cursor-pointer flex-1">
+                                                    <label htmlFor={`task-${task.id}`} className="cursor-pointer flex-1 text-white dark:text-gray-900 transition-colors">
                                                         <div className="font-medium">{task.title}</div>
-                                                        <div className="text-sm text-gray-500 line-clamp-2">{task.description}</div>
+                                                        <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{task.description}</div>
                                                     </label>
                                                 </div>
                                             )) : (
                                                 <div className="text-center py-4">
-                                                    <p className="text-gray-500">Нет доступных заданий для этого предмета</p>
+                                                    <p className="text-gray-400 dark:text-gray-600 transition-colors">Нет доступных заданий для этого предмета</p>
                                                 </div>
                                             )}
                                         </div>
@@ -731,7 +738,7 @@ const GamificationPanel: React.FC = () => {
                                     <div className="flex justify-end space-x-2">
                                         <button
                                             type="button"
-                                            className="px-4 py-2 border rounded"
+                                            className="px-4 py-2 border rounded border-gray-600 dark:border-gray-300 text-gray-300 dark:text-gray-700 hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors"
                                             onClick={() => {
                                                 setShowAssignTasksForm(false);
                                                 setSelectedTasks([]);
@@ -741,7 +748,7 @@ const GamificationPanel: React.FC = () => {
                                         </button>
                                         <button
                                             type="submit"
-                                            className="px-4 py-2 bg-blue-600 text-white rounded"
+                                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                                             disabled={selectedTasks.length === 0}
                                         >
                                             Назначить

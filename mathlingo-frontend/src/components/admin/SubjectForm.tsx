@@ -71,7 +71,7 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSubmit, onCancel }
 
     return (
         <div>
-            <h3 className="text-lg font-medium mb-4">
+            <h3 className="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">
                 {subject ? 'Редактирование раздела' : 'Создание нового раздела'}
             </h3>
 
@@ -79,7 +79,7 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSubmit, onCancel }
 
             <form onSubmit={handleSubmit}>
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Название раздела</label>
+                    <label className="block text-gray-700 dark:text-gray-300 mb-2">Название раздела</label>
                     <Input
                         type="text"
                         value={name}
@@ -90,7 +90,7 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSubmit, onCancel }
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Код раздела</label>
+                    <label className="block text-gray-700 dark:text-gray-300 mb-2">Код раздела</label>
                     <Input
                         type="text"
                         value={code}
@@ -99,15 +99,15 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSubmit, onCancel }
                         placeholder="Например: algebra, geometry"
                         disabled={!!subject} // Запрещаем изменение кода для существующего раздела
                     />
-                    {!!subject && <p className="text-sm text-gray-500 mt-1">Код существующего раздела нельзя изменить</p>}
+                    {!!subject && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Код существующего раздела нельзя изменить</p>}
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Описание</label>
+                    <label className="block text-gray-700 dark:text-gray-300 mb-2">Описание</label>
                     <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         rows={3}
                         placeholder="Введите описание раздела"
                     />
@@ -115,7 +115,7 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSubmit, onCancel }
 
                 <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label className="block text-gray-700 mb-2">Порядок отображения</label>
+                        <label className="block text-gray-700 dark:text-gray-300 mb-2">Порядок отображения</label>
                         <Input
                             type="number"
                             value={order}
@@ -124,7 +124,7 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSubmit, onCancel }
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-700 mb-2">Иконка (CSS-класс или SVG)</label>
+                        <label className="block text-gray-700 dark:text-gray-300 mb-2">Иконка (CSS-класс или SVG)</label>
                         <Input
                             type="text"
                             value={icon}
@@ -142,7 +142,7 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSubmit, onCancel }
                             onChange={(e) => setIsActive(e.target.checked)}
                             className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                         />
-                        <span className="ml-2 text-gray-700">Раздел активен</span>
+                        <span className="ml-2 text-gray-700 dark:text-gray-300">Раздел активен</span>
                     </label>
                 </div>
 

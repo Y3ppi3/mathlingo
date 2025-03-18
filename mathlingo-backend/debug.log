@@ -602,3 +602,59 @@
 ➡️ Вызван create_access_token:
    Данные: {'sub': 'y3ppi3.zz@gmail.com', 'role': 'admin'}
    Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ5M3BwaTMuenpAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyODIwOTE1fQ.r2GmUI7r8CfXbpCifUXkRtzpkeudiS0ZnL7Uz-WUWGw
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4MjU3NjZ9.sSKubbGJoa0CNkevhTvLzXPn3NsADdAJa8-u3r15MbM
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4MjU3ODh9.F4Pc4xYxVn7Y2Dto8oZChdq3aOM8cMYkZXG9f30rXUI
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'y3ppi3.zz@gmail.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ5M3BwaTMuenpAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyODI4OTc2fQ.qI_ClgVu-YJhpROiNyLhJdmYCm1dVRhpXl5Ae-vNhs8
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4MzA4MzR9.RxszOUe3E2CO7P3rcd88hEKH9fpDXxpjrF8JGscM2vM
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4MzExOTN9.YmpIPoUjudnyS_JhyZ3EubBx8Upp9ykvD9NEZ4UraUE
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4MzEyMTJ9.-1V_I_2VT4el6JIviHq8BR6uOY5Awtdlk4PO2Ldp7ZM
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4NDM2NDR9.bgf5ZBr7nZa92FYfMJJ7TCAMb6Nqr5PrHfHHeB9ArX4
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'y3ppi3.zz@gmail.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ5M3BwaTMuenpAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyODQzNjgyfQ.7XdaqI4eaSlYpiUeNKLn135gzjKcZk3un1ZkBvpQfFA
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'y3ppi3.zz@gmail.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ5M3BwaTMuenpAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyODQzODAyfQ.1oQfdWNt15thPI6g8Gui0MxGbybXj7d70OaK-2n0Nx8
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4NDM4NTJ9.Jp1ZqMhFNvBLQnc6mdEBeohIEGKHTL6Y8jsFjG3zBXg
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4NDM5OTB9.x4liYcIxDwI7Yd8cVvBeWHsKYuw9bR3yL8GQIoxnkzQ
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4OTUzOTF9.Oo1zTkJeacDFBrYWdXQ2F6G0h6xXq2iw2n1CR4aIMQ8
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'y3ppi3.zz@gmail.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ5M3BwaTMuenpAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyODk1NjYzfQ.NyowbqwFK89EktMF20CpjYc2KR2i5cQWpgN-LA7Da2E
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4OTkxNjN9.1P5mmdmIw1tRN8RNgR6Gt-vbfyWj5Kc3xsXkL71V9nE
