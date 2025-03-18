@@ -52,6 +52,7 @@ const GamificationPanel: React.FC = () => {
     const [locations, setLocations] = useState<MapLocation[]>([]);
     const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [assignedTasks, setAssignedTasks] = useState<Task[]>([]);
 
     // Состояния для выбранных элементов
     const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
@@ -90,6 +91,53 @@ const GamificationPanel: React.FC = () => {
 
     const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
 
+    const fetchAssignedTasks = async (groupId: number) => {
+        try {
+            // Retrieve token from localStorage explicitly
+            const token = localStorage.getItem('adminToken');
+
+            if (!token) {
+                console.error('No admin token found');
+                setAssignedTasks([]);
+                return;
+            }
+
+            const apiRoutes = [
+                `/admin/gamification/task-groups/${groupId}/tasks`,
+                `/admin/task-groups/${groupId}/tasks`,
+                `/admin/gamification/task-groups/${groupId}`,
+                `/admin/tasks?task_group_id=${groupId}`
+            ];
+
+            for (const route of apiRoutes) {
+                try {
+                    const response = await api.get(route, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    // Check if response contains tasks
+                    const tasksData = response.data || [];
+                    setAssignedTasks(tasksData);
+                    return;
+                } catch (routeError) {
+                    console.log(`Route ${route} failed:`, routeError);
+                    // Continue to next route
+                }
+            }
+
+            // If all routes fail
+            console.warn('Could not fetch assigned tasks for group', groupId);
+            setAssignedTasks([]);
+
+        } catch (error) {
+            console.error('Unexpected error in fetchAssignedTasks', error);
+            setAssignedTasks([]);
+        }
+    };
+
     // Загрузка данных
     useEffect(() => {
         fetchSubjects();
@@ -124,12 +172,29 @@ const GamificationPanel: React.FC = () => {
             setTaskGroups([]);
         }
         setSelectedTaskGroup(null);
+        setAssignedTasks([]); // Clear assigned tasks when location changes
     }, [selectedLocation]);
+
+    useEffect(() => {
+        if (selectedTaskGroup) {
+            fetchAssignedTasks(selectedTaskGroup);
+        } else {
+            setAssignedTasks([]);
+        }
+    }, [selectedTaskGroup]);
+
 
     // Функции загрузки данных
     const fetchSubjects = async () => {
         try {
-            const response = await api.get('/admin/subjects');
+            // Получаем токен авторизации
+            const token = localStorage.getItem('adminToken');
+
+            const response = await api.get('/admin/subjects', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             setSubjects(response.data);
         } catch (error) {
             console.error('Ошибка при загрузке предметов:', error);
@@ -139,7 +204,14 @@ const GamificationPanel: React.FC = () => {
 
     const fetchMaps = async (subjectId: number) => {
         try {
-            const response = await api.get(`/gamification/maps/${subjectId}`);
+            // Получаем токен авторизации
+            const token = localStorage.getItem('adminToken');
+
+            const response = await api.get(`/gamification/maps/${subjectId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             setMaps(response.data);
         } catch (error) {
             console.error('Ошибка при загрузке карт:', error);
@@ -150,27 +222,68 @@ const GamificationPanel: React.FC = () => {
 
     const fetchLocations = async (mapId: number) => {
         try {
-            const response = await api.get(`/admin/gamification/maps/${mapId}/locations`);
-            setLocations(response.data);
-        } catch (error) {
+            // Получаем токен авторизации
+            const token = localStorage.getItem('adminToken');
+
+            // Пробуем альтернативный путь API, если стандартный не работает
+            try {
+                const response = await api.get(`/admin/gamification/maps/${mapId}/locations`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setLocations(response.data);
+            } catch (error) {
+                console.log('Пробуем альтернативный путь API для локаций...');
+                // Попробуем альтернативный путь
+                const altResponse = await api.get(`/admin/maps/${mapId}/locations`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setLocations(altResponse.data);
+            }
+        } catch (error: unknown) {
             console.error('Ошибка при загрузке локаций:', error);
+            if (error instanceof Error) {
+                console.error('Детали ошибки:', error.message);
+            }
             setLocations([]);
         }
     };
 
     const fetchTaskGroups = async (locationId: number) => {
         try {
-            const response = await api.get(`/admin/gamification/locations/${locationId}/task-groups`);
-            setTaskGroups(response.data);
-        } catch (error) {
+            // Получаем токен авторизации
+            const token = localStorage.getItem('adminToken');
+
+            // Пробуем альтернативный путь API, если стандартный не работает
+            try {
+                const response = await api.get(`/admin/gamification/locations/${locationId}/task-groups`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setTaskGroups(response.data);
+            } catch (error) {
+                console.log('Пробуем альтернативный путь API для групп заданий...');
+                // Попробуем альтернативный путь
+                const altResponse = await api.get(`/admin/locations/${locationId}/task-groups`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setTaskGroups(altResponse.data);
+            }
+        } catch (error: unknown) {
             console.error('Ошибка при загрузке групп заданий:', error);
+            if (error instanceof Error) {
+                console.error('Детали ошибки:', error.message);
+            }
             setTaskGroups([]);
         }
     };
 
     const fetchTasks = async (subjectId: number) => {
         try {
-            const response = await api.get(`/admin/tasks?subject_id=${subjectId}`);
+            // Получаем токен авторизации
+            const token = localStorage.getItem('adminToken');
+
+            const response = await api.get(`/admin/tasks?subject_id=${subjectId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             setTasks(response.data);
         } catch (error) {
             console.error('Ошибка при загрузке заданий:', error);
@@ -256,16 +369,60 @@ const GamificationPanel: React.FC = () => {
         if (!selectedTaskGroup || selectedTasks.length === 0) return;
 
         try {
-            await api.post(`/admin/gamification/task-groups/${selectedTaskGroup}/assign-tasks`, {
-                task_ids: selectedTasks
+            // Получаем токен авторизации
+            const token = localStorage.getItem('adminToken');
+
+            // Выводим отладочную информацию, чтобы проверить данные
+            console.log('Отправка заданий:', {
+                taskGroupId: selectedTaskGroup,
+                selectedTasks: selectedTasks,
+                token: token ? token.substring(0, 10) + '...' : 'отсутствует'
             });
+
+            // Отправляем запрос с правильным форматом данных
+            await api.post(
+                `/admin/gamification/task-groups/${selectedTaskGroup}/assign-tasks`,
+                selectedTasks,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
 
             setShowAssignTasksForm(false);
             setSelectedTasks([]);
+
+            // Refresh the list of assigned tasks
+            fetchAssignedTasks(selectedTaskGroup);
+
             alert('Задания успешно назначены группе');
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Ошибка при назначении заданий:', error);
-            alert('Не удалось назначить задания');
+
+            // Расширенный вывод ошибки для отладки
+            if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as { response?: { status: number; data: any; headers: any } };
+                if (axiosError.response) {
+                    console.error('Детали ошибки:', {
+                        status: axiosError.response.status,
+                        data: axiosError.response.data,
+                        headers: axiosError.response.headers
+                    });
+                }
+            }
+
+            // Безопасное извлечение сообщения об ошибке
+            let errorMessage = 'Неизвестная ошибка';
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            } else if (typeof error === 'object' && error !== null && 'response' in error) {
+                const axiosError = error as { response?: { data?: { detail?: string } } };
+                errorMessage = axiosError.response?.data?.detail || errorMessage;
+            }
+
+            alert(`Не удалось назначить задания: ${errorMessage}`);
         }
     };
 
@@ -693,7 +850,9 @@ const GamificationPanel: React.FC = () => {
             {selectedTaskGroup && (
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
-                        <h2 className="text-lg font-semibold text-white dark:text-gray-900 transition-colors">5. Задания в группе</h2>
+                        <h2 className="text-lg font-semibold text-white dark:text-gray-900 transition-colors">
+                            5. Задания в группе
+                        </h2>
                         <button
                             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                             onClick={() => setShowAssignTasksForm(true)}
@@ -702,35 +861,82 @@ const GamificationPanel: React.FC = () => {
                         </button>
                     </div>
 
+                    {assignedTasks.length > 0 ? (
+                        <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-4 transition-colors">
+                            <ul className="space-y-2">
+                                {assignedTasks.map(task => (
+                                    <li
+                                        key={task.id}
+                                        className="p-3 border border-gray-700 dark:border-gray-300 rounded-lg transition-colors"
+                                    >
+                                        <div className="font-medium text-white dark:text-gray-900 transition-colors">
+                                            {task.title}
+                                        </div>
+                                        <div className="text-sm text-gray-400 dark:text-gray-600 transition-colors">
+                                            {task.description}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 bg-gray-800 dark:bg-gray-100 rounded-lg transition-colors">
+                            <p className="text-gray-400 dark:text-gray-600 transition-colors">
+                                Нет назначенных заданий в этой группе
+                            </p>
+                            <button
+                                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                onClick={() => setShowAssignTasksForm(true)}
+                            >
+                                Назначить задания
+                            </button>
+                        </div>
+                    )}
+
                     {/* Форма назначения заданий */}
                     {showAssignTasksForm && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                             <div className="bg-gray-800 dark:bg-gray-100 rounded-lg p-6 max-w-lg w-full max-h-screen overflow-auto transition-colors">
-                                <h3 className="text-xl font-semibold mb-4 text-white dark:text-gray-900 transition-colors">Назначить задания группе</h3>
+                                <h3 className="text-xl font-semibold mb-4 text-white dark:text-gray-900 transition-colors">
+                                    Назначить задания группе
+                                </h3>
                                 <form onSubmit={handleAssignTasks}>
                                     <div className="mb-4">
-                                        <label className="block mb-2 text-white dark:text-gray-900 transition-colors">Выберите задания:</label>
+                                        <label className="block mb-2 text-white dark:text-gray-900 transition-colors">
+                                            Выберите задания:
+                                        </label>
                                         <div className="max-h-96 overflow-y-auto border border-gray-600 dark:border-gray-300 rounded p-2 transition-colors">
-                                            {tasks.length > 0 ? tasks.map(task => (
-                                                <div
-                                                    key={task.id}
-                                                    className="p-2 border-b last:border-b-0 border-gray-700 dark:border-gray-300 flex items-start transition-colors"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        id={`task-${task.id}`}
-                                                        className="mt-1 mr-3"
-                                                        checked={selectedTasks.includes(task.id)}
-                                                        onChange={() => toggleTaskSelection(task.id)}
-                                                    />
-                                                    <label htmlFor={`task-${task.id}`} className="cursor-pointer flex-1 text-white dark:text-gray-900 transition-colors">
-                                                        <div className="font-medium">{task.title}</div>
-                                                        <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">{task.description}</div>
-                                                    </label>
-                                                </div>
-                                            )) : (
+                                            {tasks.length > 0 ? (
+                                                tasks.map(task => (
+                                                    <div
+                                                        key={task.id}
+                                                        className="p-2 border-b last:border-b-0 border-gray-700 dark:border-gray-300 flex items-start transition-colors"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`task-${task.id}`}
+                                                            className="mt-1 mr-3"
+                                                            checked={selectedTasks.includes(task.id)}
+                                                            onChange={() => toggleTaskSelection(task.id)}
+                                                        />
+                                                        <label
+                                                            htmlFor={`task-${task.id}`}
+                                                            className="cursor-pointer flex-1 text-white dark:text-gray-900 transition-colors"
+                                                        >
+                                                            <div className="font-medium">
+                                                                {task.title}
+                                                            </div>
+                                                            <div className="text-sm text-gray-400 dark:text-gray-600 line-clamp-2 transition-colors">
+                                                                {task.description}
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                ))
+                                            ) : (
                                                 <div className="text-center py-4">
-                                                    <p className="text-gray-400 dark:text-gray-600 transition-colors">Нет доступных заданий для этого предмета</p>
+                                                    <p className="text-gray-400 dark:text-gray-600 transition-colors">
+                                                        Нет доступных заданий для этого предмета
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>
