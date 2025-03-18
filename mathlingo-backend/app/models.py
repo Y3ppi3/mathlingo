@@ -85,7 +85,7 @@ class Task(Base):
     description = Column(String, nullable=True)
     subject = Column(String, nullable=False)  # Оставляем для обратной совместимости
     subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=True)  # Новое поле
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     # Связи
     owner = relationship("User", back_populates="tasks")

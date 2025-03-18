@@ -2,15 +2,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import Admin, Task, User, Subject
+from app.models import Admin, Task, User, Subject, AdventureMap, MapLocation, TaskGroup
 from app.schemas import (
     AdminCreate, AdminResponse, TaskCreate, TaskResponse, TaskUpdate,
     AdminLogin, UserResponse, SubjectCreate, SubjectUpdate, SubjectResponse)
 from app.auth import get_admin_current_user, create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
 
 
 # Регистрация администратора (можно сделать защищенным)
@@ -75,8 +79,48 @@ def create_task(
         db: Session = Depends(get_db),
         current_admin: Admin = Depends(get_admin_current_user)
 ):
-    db_task = Task(**task.dict())
+    # Look up the subject by code to get the subject_id
+    subject = db.query(Subject).filter(Subject.code == task.subject).first()
+
+    # Create a new task dict with all the task data
+    task_data = task.dict()
+
+    # If subject was found, set the subject_id
+    if subject:
+        task_data["subject_id"] = subject.id
+
+    # Create the task with the updated data
+    db_task = Task(**task_data)
     db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    return db_task
+
+
+@router.put("/tasks/{task_id}", response_model=TaskResponse)
+def update_task(
+        task_id: int,
+        task_update: TaskUpdate,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user)
+):
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Создаем словарь с данными для обновления
+    update_data = task_update.dict(exclude_unset=True)
+
+    # Если обновляется предмет, соответственно обновляем subject_id
+    if "subject" in update_data:
+        subject = db.query(Subject).filter(Subject.code == update_data["subject"]).first()
+        if subject:
+            update_data["subject_id"] = subject.id
+
+    # Обновляем поля задания
+    for key, value in update_data.items():
+        setattr(db_task, key, value)
+
     db.commit()
     db.refresh(db_task)
     return db_task
@@ -132,17 +176,19 @@ def get_all_users(
 
 @router.get("/subjects", response_model=List[SubjectResponse])
 def get_all_subjects(
-        skip: int = 0,
-        limit: int = 100,
-        db: Session = Depends(get_db),
-        current_admin: User = Depends(get_admin_current_user)
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_admin_current_user)
 ):
-    """Получение списка всех разделов математики"""
+    """Получение списка всех разделов математики с подсчетом заданий"""
     subjects = db.query(Subject).offset(skip).limit(limit).all()
 
-    # Подсчет количества заданий для каждого раздела
+    # Точный подсчет заданий для каждого раздела
     for subject in subjects:
-        subject.tasks_count = db.query(Task).filter(Task.subject_id == subject.id).count()
+        subject.tasks_count = db.query(Task).filter(
+            Task.subject_id == subject.id  # Используем subject_id
+        ).count()
 
     return subjects
 
@@ -228,3 +274,154 @@ def delete_subject(
     db.delete(db_subject)
     db.commit()
     return None
+
+
+@router.put("/users/{user_id}/status")
+def update_user_status(
+        user_id: int,
+        status_update: UserStatusUpdate,  # Используем модель Pydantic
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user)
+):
+    """Обновление статуса пользователя"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    user.is_active = status_update.is_active  # Используем is_active из модели
+    db.commit()
+    return {"message": f"Пользователь {'активирован' if status_update.is_active else 'деактивирован'} успешно"}
+
+
+@router.delete("/users/{user_id}")
+def delete_user(
+        user_id: int,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user)
+):
+    """Delete a user"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Optional: Handle related tasks
+    db.query(Task).filter(Task.owner_id == user_id).update({Task.owner_id: None})
+
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted successfully"}
+
+
+@router.delete("/subjects/{subject_id}")
+def delete_subject(
+        subject_id: int,
+        force: bool = False,
+        db: Session = Depends(get_db),
+        current_admin: User = Depends(get_admin_current_user)
+):
+    """Delete a subject with proper cascade deletion of dependent records"""
+    # First, check if the subject exists
+    db_subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not db_subject:
+        raise HTTPException(status_code=404, detail="Раздел не найден")
+
+    # Check for related records
+    related_maps = db.query(AdventureMap).filter(AdventureMap.subject_id == subject_id).all()
+
+    # If there are related maps and force is not True, return info about dependencies
+    if related_maps and not force:
+        return {
+            "status": "confirmation_required",
+            "detail": "Обнаружены связанные карты приключений",
+            "related_data": {
+                "maps_count": len(related_maps),
+                "map_details": [
+                    {"id": adventure_map.id, "name": adventure_map.name}
+                    for adventure_map in related_maps
+                ]
+            }
+        }
+
+    # If force=True, perform cascade deletion
+    if force and related_maps:
+        try:
+            # Process each related adventure map
+            for adventure_map in related_maps:
+                # Get all locations for this map
+                locations = db.query(MapLocation).filter(
+                    MapLocation.adventure_map_id == adventure_map.id
+                ).all()
+
+                # First, process each location to handle task groups
+                for location in locations:
+                    # Find all task groups for this location
+                    task_groups = db.query(TaskGroup).filter(
+                        TaskGroup.location_id == location.id
+                    ).all()
+
+                    # Process each task group
+                    for task_group in task_groups:
+                        # Unlink tasks from this group
+                        db.query(Task).filter(Task.task_group_id == task_group.id).update(
+                            {"task_group_id": None}, synchronize_session=False
+                        )
+                        # Delete the task group
+                        db.delete(task_group)
+
+                    # Commit after handling all task groups for this location
+                    db.commit()
+
+                # Now delete all locations for this map
+                for location in locations:
+                    db.delete(location)
+                db.commit()
+
+                # Delete the adventure map after its locations are handled
+                db.delete(adventure_map)
+                db.commit()
+
+            # Check for associated tasks with the subject
+            tasks_count = db.query(Task).filter(Task.subject_id == subject_id).count()
+            if tasks_count > 0:
+                # Update subject_id to NULL for associated tasks
+                db.query(Task).filter(Task.subject_id == subject_id).update(
+                    {"subject_id": None}, synchronize_session=False
+                )
+                db.commit()
+
+            # Finally delete the subject
+            db.delete(db_subject)
+            db.commit()
+
+            return {"status": "success", "detail": "Раздел и связанные данные успешно удалены"}
+
+        except Exception as e:
+            db.rollback()
+            print(f"Error in cascade deletion: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Ошибка при удалении: {str(e)}"
+            )
+
+    # If no related maps or force=True but no related maps
+    try:
+        # Check for associated tasks
+        tasks_count = db.query(Task).filter(Task.subject_id == subject_id).count()
+        if tasks_count > 0:
+            # Update subject_id to NULL for associated tasks
+            db.query(Task).filter(Task.subject_id == subject_id).update(
+                {"subject_id": None}, synchronize_session=False
+            )
+            db.commit()
+
+        # Delete the subject if there are no dependencies
+        db.delete(db_subject)
+        db.commit()
+        return {"status": "success", "detail": "Раздел успешно удален"}
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting subject: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Не удалось удалить раздел: {str(e)}"
+        )

@@ -40,16 +40,68 @@ const SubjectsPanel: React.FC = () => {
     };
 
     const handleDeleteSubject = async (id: number) => {
-        if (window.confirm('Вы уверены, что хотите удалить этот раздел?')) {
-            try {
-                await deleteSubject(id);
+        if (!window.confirm('Вы уверены, что хотите удалить этот раздел?')) {
+            return;
+        }
+
+        try {
+            setError('');
+            setLoading(true);
+
+            // First attempt without force flag
+            const response = await deleteSubject(id);
+
+            // Check if we need confirmation for cascade deletion
+            if (response && response.status === 'confirmation_required') {
+                const { maps_count, map_details } = response.related_data;
+
+                // Format the map details for display
+                const mapsList = map_details
+                    ? map_details.map((map: any) => `• ${map.name} (ID: ${map.id})`)
+                    : [];
+
+                const confirmMessage = `
+            ⚠️ ВНИМАНИЕ! У этого раздела есть связанные данные:
+
+            ${maps_count} связанных карт приключений:
+            ${mapsList.join('\n')}
+
+            Удаление приведет к каскадному удалению всех связанных данных:
+            - Карт приключений
+            - Локаций на картах
+            - Групп заданий в локациях
+            
+            Продолжить с каскадным удалением?
+            `;
+
+                if (window.confirm(confirmMessage)) {
+                    // Send the delete request with force=true
+                    const forceResponse = await deleteSubject(id, true);
+
+                    if (forceResponse && forceResponse.status === 'success') {
+                        // Success - remove from UI
+                        setSubjects(subjects.filter(subject => subject.id !== id));
+                    } else {
+                        // Handle unexpected response
+                        setError('Получен неожиданный ответ от сервера при удалении раздела.');
+                    }
+                }
+            } else if (response && response.status === 'success') {
+                // Regular deletion was successful
                 setSubjects(subjects.filter(subject => subject.id !== id));
-            } catch (err) {
-                console.error('Ошибка при удалении раздела:', err);
-                setError('Не удалось удалить раздел');
+            } else {
+                // Handle unexpected response
+                setError('Получен неожиданный ответ от сервера при удалении раздела.');
             }
+        } catch (err) {
+            console.error('Ошибка при удалении раздела:', err);
+            setError('Не удалось удалить раздел. Проверьте сетевое соединение или повторите позже.');
+        } finally {
+            setLoading(false);
         }
     };
+
+
 
     const handleFormClose = () => {
         setShowForm(false);
