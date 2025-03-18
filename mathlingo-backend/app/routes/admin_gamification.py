@@ -154,28 +154,38 @@ def delete_location(
             }
         }
 
-    # Каскадное удаление
+    try:
+        # Каскадное удаление
+        # Обновляем зависимые локации, чтобы они не ссылались на удаляемую
+        if dependent_locations_count > 0:
+            for dep_location in dependent_locations:
+                dep_location.unlocked_by_location_id = None
+            db.commit()
 
-    # Обновляем зависимые локации, чтобы они не ссылались на удаляемую
-    if dependent_locations_count > 0:
-        for dep_location in dependent_locations:
-            dep_location.unlocked_by_location_id = None
+        # Удаляем группы заданий и отвязываем от них задания
+        if task_groups_count > 0:
+            for task_group in task_groups:
+                # Отвязываем задания от группы
+                db.query(Task).filter(Task.task_group_id == task_group.id).update(
+                    {"task_group_id": None},
+                    synchronize_session=False
+                )
+                # После отвязки задания, удаляем группу
+                db.delete(task_group)
+            db.commit()
+
+        # Удаляем локацию
+        db.delete(location)
         db.commit()
 
-    # Удаляем группы заданий и отвязываем от них задания
-    if task_groups_count > 0:
-        for task_group in task_groups:
-            # Отвязываем задания от группы
-            db.query(Task).filter(Task.task_group_id == task_group.id).update({"task_group_id": None})
-            # Удаляем группу
-            db.delete(task_group)
-        db.commit()
-
-    # Удаляем локацию
-    db.delete(location)
-    db.commit()
-
-    return {"status": "success", "detail": "Локация и все связанные данные успешно удалены"}
+        return {"status": "success", "detail": "Локация и все связанные данные успешно удалены"}
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting location: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при удалении локации: {str(e)}"
+        )
 
 
 # --- Маршруты для управления группами заданий ---
@@ -250,8 +260,7 @@ def delete_task_group(
                             detail="Группа заданий не найдена")
 
     # Проверяем, есть ли задания в этой группе
-    tasks = db.query(Task).filter(Task.task_group_id == task_group_id).all()
-    tasks_count = len(tasks)
+    tasks_count = db.query(Task).filter(Task.task_group_id == task_group_id).count()
 
     # Если есть задания и нет флага force, запрашиваем подтверждение
     if tasks_count > 0 and not force:
@@ -263,17 +272,26 @@ def delete_task_group(
             }
         }
 
-    # Снимаем привязку заданий к группе
-    if tasks_count > 0:
-        for task in tasks:
-            task.task_group_id = None
+    try:
+        # Снимаем привязку заданий к группе
+        db.query(Task).filter(Task.task_group_id == task_group_id).update(
+            {"task_group_id": None},
+            synchronize_session=False
+        )
         db.commit()
 
-    # Удаляем группу заданий
-    db.delete(task_group)
-    db.commit()
+        # Удаляем группу заданий
+        db.delete(task_group)
+        db.commit()
 
-    return {"status": "success", "detail": "Группа заданий успешно удалена"}
+        return {"status": "success", "detail": "Группа заданий успешно удалена"}
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting task group: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при удалении группы заданий: {str(e)}"
+        )
 
 
 @router.post("/task-groups/{task_group_id}/assign-tasks")
@@ -410,48 +428,46 @@ def delete_adventure_map(
             }
 
         # If force=True or no locations, proceed with deletion
-        try:
-            # Step 1: For each location, first unlink and delete task groups
-            for location in locations:
-                # Find all task groups for this location
-                task_groups = db.query(TaskGroup).filter(
-                    TaskGroup.location_id == location.id
-                ).all()
+        # First handle dependent locations
+        for location in locations:
+            # Find all task groups for this location
+            task_groups = db.query(TaskGroup).filter(
+                TaskGroup.location_id == location.id
+            ).all()
 
-                # Process each task group
-                for task_group in task_groups:
-                    # Unlink tasks from this group
-                    db.query(Task).filter(Task.task_group_id == task_group.id).update(
-                        {"task_group_id": None}, synchronize_session=False
-                    )
-                    # Delete the task group
-                    db.delete(task_group)
+            # First unlink all tasks from these groups
+            for task_group in task_groups:
+                # Unlink tasks from task group
+                db.query(Task).filter(Task.task_group_id == task_group.id).update(
+                    {"task_group_id": None}, synchronize_session=False
+                )
+                # Now delete the task group
+                db.delete(task_group)
 
-                # Commit after processing all task groups for this location
-                db.commit()
-
-            # Step 2: Now all task groups are deleted, we can delete all locations
-            for location in locations:
-                db.delete(location)
-
-            # Commit after deleting all locations
+            # Commit after handling all task groups for this location
             db.commit()
 
-            # Step 3: Finally delete the adventure map
-            db.delete(adventure_map)
+            # Find dependent locations that reference this location
+            dependent_locations = db.query(MapLocation).filter(
+                MapLocation.unlocked_by_location_id == location.id
+            ).all()
+
+            # Update dependent locations to remove the reference
+            for dep_loc in dependent_locations:
+                dep_loc.unlocked_by_location_id = None
+
+            # Delete this location
+            db.delete(location)
             db.commit()
 
-            return {"status": "success", "detail": "Карта и связанные данные успешно удалены"}
+        # Delete the adventure map
+        db.delete(adventure_map)
+        db.commit()
 
-        except Exception as e:
-            db.rollback()
-            print(f"Error in cascade deletion: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Ошибка при удалении: {str(e)}"
-            )
+        return {"status": "success", "detail": "Карта и связанные данные успешно удалены"}
 
     except Exception as e:
+        db.rollback()
         print(f"Error deleting adventure map: {str(e)}")
         raise HTTPException(
             status_code=500,

@@ -177,16 +177,76 @@ export const updateSubject = async (id: number, subject: Partial<Subject>): Prom
 
 export const deleteSubject = async (id: number, force: boolean = false): Promise<any> => {
     try {
-        // Use axios directly to handle all response statuses as success
+        console.log(`Attempting to delete subject ${id} with force=${force}`);
+
         const response = await adminApi.delete(`/admin/subjects/${id}${force ? '?force=true' : ''}`);
-        return response.data;
-    } catch (error: any) {
-        // If we received a well-formed response, return it
-        if (error.response && error.response.data) {
-            return error.response.data;
+
+        console.log("Response status:", response.status);
+        console.log("Response data:", response.data);
+
+        if (response.status >= 400 ||
+            (response.data && response.data.detail &&
+                typeof response.data.detail === 'string' &&
+                response.data.detail.includes('связано'))) {
+
+            return {
+                success: false,
+                status: response.status,
+                data: response.data
+            };
         }
-        // Otherwise throw the error
-        throw error;
+
+        return {
+            success: true,
+            data: response.data
+        };
+    } catch (error: any) {
+        console.error("Delete operation threw an exception:", error);
+
+        if (error.response) {
+            return {
+                success: false,
+                status: error.response.status,
+                data: error.response.data
+            };
+        }
+
+        return {
+            success: false,
+            error: error.message || 'Unknown error'
+        };
+    }
+};
+
+// Alternative bypass method for subject deletion
+export const deleteSubjectBypass = async (id: number): Promise<any> => {
+    try {
+        console.log(`Attempting to bypass-delete subject ${id}`);
+
+        // Using the subject_operations endpoint that performs direct deletion
+        const response = await adminApi.delete(`/admin/subject-ops/${id}`);
+
+        console.log("Bypass delete response:", response.status, response.data);
+
+        return {
+            success: true,
+            data: response.data
+        };
+    } catch (error: any) {
+        console.error("Bypass delete error:", error);
+
+        if (error.response) {
+            return {
+                success: false,
+                status: error.response.status,
+                data: error.response.data
+            };
+        }
+
+        return {
+            success: false,
+            error: error.message || 'Unknown error'
+        };
     }
 };
 
@@ -215,6 +275,18 @@ export const deleteAdventureMap = async (mapId: number, force: boolean = false):
         return response.data;
     } catch (error: any) {
         // If we received a well-formed response, return it (for confirmation flow)
+        if (error.response && error.response.data) {
+            return error.response.data;
+        }
+        throw error;
+    }
+};
+
+export const deleteSubjectOperation = async (id: number): Promise<any> => {
+    try {
+        const response = await adminApi.delete(`/admin/subject-ops/${id}`);
+        return response.data;
+    } catch (error: any) {
         if (error.response && error.response.data) {
             return error.response.data;
         }

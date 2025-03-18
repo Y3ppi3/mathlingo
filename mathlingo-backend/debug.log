@@ -658,3 +658,35 @@
 ➡️ Вызван create_access_token:
    Данные: {'sub': 'test1@email.com'}
    Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI4OTkxNjN9.1P5mmdmIw1tRN8RNgR6Gt-vbfyWj5Kc3xsXkL71V9nE
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'y3ppi3.zz@gmail.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ5M3BwaTMuenpAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyOTA1Mjg0fQ.K37bhPHsu1sZrTwS6c71XUm_6MHQqE_riuk7Fw8WOcU
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'y3ppi3.zz@gmail.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ5M3BwaTMuenpAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyOTA3OTMyfQ.A6abEJb-HeBN4xWadHy-O2KAjQiGQfq79s_yPPjOej4
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'test1@email.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MUBlbWFpbC5jb20iLCJleHAiOjE3NDI5MDgxNTV9.77BZAtZC4IHkSa2jOyOlouHpmak5AlM-7bj1BNgsjyA
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'admin@mathlingo.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBtYXRobGluZ28uY29tIiwiZXhwIjoxNzQyOTA4MjA0fQ.M28qQEJFwJnp_eGkJMAHlW3KBN1b4zOSDKUKSEw3XZE
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'admin@mathlingo.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBtYXRobGluZ28uY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyOTEzMDgwfQ.TDHFxrV25GslmlufLYmnb3CvOtiWrWfberTjBDMSjOg
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'admin@mathlingo.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBtYXRobGluZ28uY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyOTEzNDkxfQ.BtZdtrigdzLUeU0s2amNdDmQgTvZIm8DyG7OUkttF8s
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'y3ppi3.zz@gmail.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ5M3BwaTMuenpAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQyOTE1ODEwfQ.ybu-IoAxLGPILinK_xcDdxMn6wBmj-1wlO1-lxIM02c
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'admin@mathlingo.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBtYXRobGluZ28uY29tIiwiZXhwIjoxNzQyOTE1OTA1fQ._nk77pzvlrASRbfjqeTvBdn9Ghtu5Xpvd6t780ZDrmk
