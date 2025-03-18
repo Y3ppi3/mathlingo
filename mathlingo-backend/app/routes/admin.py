@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
@@ -311,7 +312,7 @@ def delete_user(
     db.commit()
     return {"message": "User deleted successfully"}
 
-
+'''
 @router.delete("/subjects/{subject_id}")
 def delete_subject(
         subject_id: int,
@@ -320,108 +321,197 @@ def delete_subject(
         current_admin: User = Depends(get_admin_current_user)
 ):
     """Delete a subject with proper cascade deletion of dependent records"""
+    print(f"Attempting to delete subject {subject_id} with force={force}")
+
     # First, check if the subject exists
     db_subject = db.query(Subject).filter(Subject.id == subject_id).first()
     if not db_subject:
         raise HTTPException(status_code=404, detail="Раздел не найден")
 
-    # Check for related records
-    related_maps = db.query(AdventureMap).filter(AdventureMap.subject_id == subject_id).all()
+    # Print subject details for debugging
+    print(f"Subject found: {db_subject.name} (ID: {subject_id})")
 
-    # If there are related maps and force is not True, return info about dependencies
-    if related_maps and not force:
-        return {
+    # Check for related records - both maps and tasks
+    related_maps = db.query(AdventureMap).filter(AdventureMap.subject_id == subject_id).all()
+    related_tasks_count = db.query(Task).filter(Task.subject_id == subject_id).count()
+
+    print(f"Found {len(related_maps)} related maps and {related_tasks_count} related tasks")
+
+    # Check related dependencies and return confirmation request if not forced
+    if (related_maps or related_tasks_count > 0) and not force:
+        print("Dependencies found and force=False, returning confirmation request")
+        response = {
             "status": "confirmation_required",
-            "detail": "Обнаружены связанные карты приключений",
-            "related_data": {
-                "maps_count": len(related_maps),
-                "map_details": [
-                    {"id": adventure_map.id, "name": adventure_map.name}
-                    for adventure_map in related_maps
-                ]
-            }
+            "detail": "Обнаружены связанные данные",
+            "related_data": {}
         }
 
+        if related_maps:
+            response["related_data"]["maps_count"] = len(related_maps)
+            response["related_data"]["map_details"] = [
+                {"id": adventure_map.id, "name": adventure_map.name}
+                for adventure_map in related_maps
+            ]
+
+        if related_tasks_count > 0:
+            response["related_data"]["tasks_count"] = related_tasks_count
+
+        return response
+
     # If force=True, perform cascade deletion
-    if force and related_maps:
-        try:
-            # Process each related adventure map
-            for adventure_map in related_maps:
-                # Get all locations for this map
-                locations = db.query(MapLocation).filter(
-                    MapLocation.adventure_map_id == adventure_map.id
+    try:
+        print(f"Starting cascade deletion for subject {subject_id}")
+
+        # First unlink tasks from this subject (set subject_id to NULL)
+        if related_tasks_count > 0:
+            print(f"Unlinking {related_tasks_count} tasks from subject {subject_id}")
+            db.query(Task).filter(Task.subject_id == subject_id).update(
+                {"subject_id": None}, synchronize_session=False
+            )
+            db.commit()
+            print("Tasks unlinked successfully")
+
+        # Handle related adventure maps
+        for adventure_map in related_maps:
+            map_id = adventure_map.id
+            print(f"Processing map {map_id} for deletion")
+
+            # Get all locations for this map
+            locations = db.query(MapLocation).filter(
+                MapLocation.adventure_map_id == map_id
+            ).all()
+            print(f"Found {len(locations)} locations for map {map_id}")
+
+            # Process all locations to remove dependencies
+            for location in locations:
+                loc_id = location.id
+                print(f"Processing location {loc_id}")
+
+                # Update dependent locations first
+                dependent_locations = db.query(MapLocation).filter(
+                    MapLocation.unlocked_by_location_id == loc_id
                 ).all()
+                print(f"Found {len(dependent_locations)} dependent locations")
 
-                # First, process each location to handle task groups
-                for location in locations:
-                    # Find all task groups for this location
-                    task_groups = db.query(TaskGroup).filter(
-                        TaskGroup.location_id == location.id
-                    ).all()
+                for dep_location in dependent_locations:
+                    print(f"Unlinking dependent location {dep_location.id} from location {loc_id}")
+                    dep_location.unlocked_by_location_id = None
 
-                    # Process each task group
-                    for task_group in task_groups:
-                        # Unlink tasks from this group
-                        db.query(Task).filter(Task.task_group_id == task_group.id).update(
+                if dependent_locations:
+                    db.commit()
+                    print("Dependent locations updated successfully")
+
+                # Process task groups in this location
+                task_groups = db.query(TaskGroup).filter(
+                    TaskGroup.location_id == loc_id
+                ).all()
+                print(f"Found {len(task_groups)} task groups for location {loc_id}")
+
+                for task_group in task_groups:
+                    tg_id = task_group.id
+
+                    # Unlink tasks from this group
+                    linked_tasks_count = db.query(Task).filter(Task.task_group_id == tg_id).count()
+                    if linked_tasks_count > 0:
+                        print(f"Unlinking {linked_tasks_count} tasks from task group {tg_id}")
+                        db.query(Task).filter(Task.task_group_id == tg_id).update(
                             {"task_group_id": None}, synchronize_session=False
                         )
-                        # Delete the task group
-                        db.delete(task_group)
+                        db.commit()
 
-                    # Commit after handling all task groups for this location
+                    # Now delete the task group
+                    print(f"Deleting task group {tg_id}")
+                    db.delete(task_group)
+
+                if task_groups:
                     db.commit()
+                    print(f"All {len(task_groups)} task groups deleted successfully")
 
-                # Now delete all locations for this map
-                for location in locations:
-                    db.delete(location)
+            # Now process all locations again to delete them
+            for location in locations:
+                print(f"Deleting location {location.id}")
+                db.delete(location)
+
+            if locations:
                 db.commit()
+                print(f"All {len(locations)} locations deleted successfully")
 
-                # Delete the adventure map after its locations are handled
-                db.delete(adventure_map)
-                db.commit()
-
-            # Check for associated tasks with the subject
-            tasks_count = db.query(Task).filter(Task.subject_id == subject_id).count()
-            if tasks_count > 0:
-                # Update subject_id to NULL for associated tasks
-                db.query(Task).filter(Task.subject_id == subject_id).update(
-                    {"subject_id": None}, synchronize_session=False
-                )
-                db.commit()
-
-            # Finally delete the subject
-            db.delete(db_subject)
+            # Now delete the adventure map
+            print(f"Deleting adventure map {map_id}")
+            db.delete(adventure_map)
             db.commit()
+            print(f"Adventure map {map_id} deleted successfully")
 
-            return {"status": "success", "detail": "Раздел и связанные данные успешно удалены"}
+        # Finally delete the subject
+        print(f"Deleting subject {subject_id}")
+        db.delete(db_subject)
+        db.commit()
+        print(f"Subject {subject_id} deleted successfully")
 
-        except Exception as e:
-            db.rollback()
-            print(f"Error in cascade deletion: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Ошибка при удалении: {str(e)}"
-            )
+        return {"status": "success", "detail": "Раздел и связанные данные успешно удалены"}
 
-    # If no related maps or force=True but no related maps
+    except Exception as e:
+        db.rollback()
+        error_msg = f"Error in deletion: {str(e)}"
+        print(error_msg)
+        raise HTTPException(
+            status_code=500,
+            detail=error_msg
+        )
+'''
+
+
+@router.delete("/subjects/{subject_id}")
+def delete_subject(
+        subject_id: int,
+        force: bool = False,
+        db: Session = Depends(get_db),
+        current_admin: User = Depends(get_admin_current_user)
+):
+    """Удаление раздела с поддержкой параметра force для каскадного удаления"""
+    # Проверяем существование раздела
+    db_subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not db_subject:
+        raise HTTPException(status_code=404, detail="Раздел не найден")
+
+    # Проверяем наличие связанных заданий
+    tasks_count = db.query(Task).filter(Task.subject_id == subject_id).count()
+
+    # Если есть связанные задания и параметр force не установлен, возвращаем ошибку
+    if tasks_count > 0 and not force:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": f"Нельзя удалить раздел, так как с ним связано {tasks_count} заданий",
+                     "status": "confirmation_required",
+                     "related_data": {"tasks_count": tasks_count}}
+        )
+
     try:
-        # Check for associated tasks
-        tasks_count = db.query(Task).filter(Task.subject_id == subject_id).count()
+        # Если force=True или нет связанных заданий, выполняем удаление
+
+        # 1. Отвязываем все связанные задания
         if tasks_count > 0:
-            # Update subject_id to NULL for associated tasks
             db.query(Task).filter(Task.subject_id == subject_id).update(
                 {"subject_id": None}, synchronize_session=False
             )
             db.commit()
 
-        # Delete the subject if there are no dependencies
+        # 2. Отвязываем все связанные карты приключений (необходимо добавить импорт AdventureMap)
+        adventure_maps = db.query(AdventureMap).filter(AdventureMap.subject_id == subject_id).all()
+        for adventure_map in adventure_maps:
+            adventure_map.subject_id = None
+        if adventure_maps:
+            db.commit()
+
+        # 3. Удаляем раздел
         db.delete(db_subject)
         db.commit()
+
         return {"status": "success", "detail": "Раздел успешно удален"}
+
     except Exception as e:
         db.rollback()
-        print(f"Error deleting subject: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Не удалось удалить раздел: {str(e)}"
+            detail=f"Ошибка при удалении раздела: {str(e)}"
         )

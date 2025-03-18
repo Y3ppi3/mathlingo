@@ -1,6 +1,11 @@
 // src/components/admin/SubjectsPanel.tsx
 import React, { useEffect, useState } from 'react';
-import { fetchSubjects, deleteSubject, Subject } from '../../utils/adminApi';
+import {
+    fetchSubjects,
+    deleteSubject,
+    deleteSubjectBypass,
+    Subject
+} from '../../utils/adminApi';
 import Button from '../Button';
 import SubjectForm from './SubjectForm';
 
@@ -40,7 +45,8 @@ const SubjectsPanel: React.FC = () => {
     };
 
     const handleDeleteSubject = async (id: number) => {
-        if (!window.confirm('Вы уверены, что хотите удалить этот раздел?')) {
+        // Initial confirmation
+        if (!confirm('Вы уверены, что хотите удалить этот раздел?')) {
             return;
         }
 
@@ -48,60 +54,66 @@ const SubjectsPanel: React.FC = () => {
             setError('');
             setLoading(true);
 
-            // First attempt without force flag
-            const response = await deleteSubject(id);
+            // Try to delete without force first
+            const result = await deleteSubject(id, false);
+            console.log("Regular delete result:", result);
 
-            // Check if we need confirmation for cascade deletion
-            if (response && response.status === 'confirmation_required') {
-                const { maps_count, map_details } = response.related_data;
+            if (result.success) {
+                // Deletion succeeded
+                setSubjects(prevSubjects => prevSubjects.filter(subject => subject.id !== id));
+                return;
+            }
 
-                // Format the map details for display
-                const mapsList = map_details
-                    ? map_details.map((map: any) => `• ${map.name} (ID: ${map.id})`)
-                    : [];
+            // Handle the specific error about related tasks
+            if (result.data &&
+                result.data.detail &&
+                result.data.detail.includes('связано')) {
 
-                const confirmMessage = `
-            ⚠️ ВНИМАНИЕ! У этого раздела есть связанные данные:
-
-            ${maps_count} связанных карт приключений:
-            ${mapsList.join('\n')}
-
-            Удаление приведет к каскадному удалению всех связанных данных:
-            - Карт приключений
-            - Локаций на картах
-            - Групп заданий в локациях
-            
-            Продолжить с каскадным удалением?
-            `;
-
-                if (window.confirm(confirmMessage)) {
-                    // Send the delete request with force=true
-                    const forceResponse = await deleteSubject(id, true);
-
-                    if (forceResponse && forceResponse.status === 'success') {
-                        // Success - remove from UI
-                        setSubjects(subjects.filter(subject => subject.id !== id));
-                    } else {
-                        // Handle unexpected response
-                        setError('Получен неожиданный ответ от сервера при удалении раздела.');
-                    }
+                // Extract the number of tasks from the error message if possible
+                let tasksCount = '?';
+                const match = result.data.detail.match(/\\d+/);
+                if (match) {
+                    tasksCount = match[0];
                 }
-            } else if (response && response.status === 'success') {
-                // Regular deletion was successful
-                setSubjects(subjects.filter(subject => subject.id !== id));
+
+                // Ask for confirmation to force delete
+                const confirmForce = confirm(
+                    `Этот раздел имеет ${tasksCount} связанных заданий.\n\n` +
+                    `Хотите удалить раздел и отвязать связанные задания?\n\n` +
+                    `Внимание: Это действие нельзя отменить!`
+                );
+
+                if (!confirmForce) {
+                    // User canceled force deletion
+                    return;
+                }
+
+                // Since the regular force=true isn't working, use our bypass method
+                const bypassResult = await deleteSubjectBypass(id);
+                console.log("Bypass delete result:", bypassResult);
+
+                if (bypassResult.success) {
+                    // Bypass deletion succeeded
+                    setSubjects(prevSubjects => prevSubjects.filter(subject => subject.id !== id));
+                    return;
+                } else {
+                    // Bypass deletion failed
+                    setError(bypassResult.data?.detail || bypassResult.error || 'Не удалось выполнить удаление раздела');
+                }
             } else {
-                // Handle unexpected response
-                setError('Получен неожиданный ответ от сервера при удалении раздела.');
+                // Some other error
+                setError(result.data?.detail || result.error || 'Ошибка при удалении раздела');
             }
         } catch (err) {
-            console.error('Ошибка при удалении раздела:', err);
-            setError('Не удалось удалить раздел. Проверьте сетевое соединение или повторите позже.');
+            console.error('Exception in handleDeleteSubject:', err);
+            setError('Неожиданная ошибка при удалении раздела');
         } finally {
             setLoading(false);
         }
+
+        // Refresh the subjects list if there was an error
+        loadSubjects();
     };
-
-
 
     const handleFormClose = () => {
         setShowForm(false);
