@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.routes import users, tasks, admin, gamification
+from app.routes import users, tasks, admin, gamification, subjects
+from app.routes.admin_gamification import router as admin_gamification_router
 from app.models import User, Task
 from app.auth import get_current_user
 
@@ -30,7 +31,9 @@ app.add_middleware(
 app.include_router(admin.router)
 app.include_router(users.router, prefix="/api", tags=["users"])
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
+app.include_router(subjects.router, prefix="/api/subjects", tags=["subjects"])
 app.include_router(gamification.router, prefix="/gamification")
+app.include_router(admin_gamification_router)
 
 
 @app.get("/")

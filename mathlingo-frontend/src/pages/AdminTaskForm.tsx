@@ -70,21 +70,21 @@ const AdminTaskForm: React.FC = () => {
     };
 
     if (loading) {
-        return <div className="text-center py-10">Загрузка...</div>;
+        return <div className="text-center py-10 text-white dark:text-gray-900 transition-colors">Загрузка...</div>;
     }
 
     return (
-        <div className="container mx-auto p-4">
-            <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow">
-                <h1 className="text-2xl font-bold mb-6">
+        <div className="container mx-auto p-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 transition-colors">
+            <div className="max-w-2xl mx-auto bg-gray-800 dark:bg-gray-100 p-6 rounded-lg shadow transition-colors">
+                <h1 className="text-2xl font-bold mb-6 text-white dark:text-gray-900 transition-colors">
                     {isEditing ? 'Редактирование задания' : 'Создание нового задания'}
                 </h1>
 
-                {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
+                {error && <div className="bg-red-900/50 dark:bg-red-100 text-red-200 dark:text-red-700 p-3 rounded mb-4 transition-colors">{error}</div>}
 
                 <form onSubmit={handleSubmit}>
                     <div className="mb-4">
-                        <label className="block text-gray-700 mb-2">Название задания</label>
+                        <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Название задания</label>
                         <Input
                             type="text"
                             value={title}
@@ -95,12 +95,12 @@ const AdminTaskForm: React.FC = () => {
                     </div>
 
                     <div className="mb-4">
-                        <label className="block text-gray-700 mb-2">Предмет</label>
+                        <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Предмет</label>
                         <select
                             value={subject}
                             onChange={(e) => setSubject(e.target.value)}
                             required
-                            className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-2 border rounded bg-gray-700 border-gray-600 text-white dark:bg-gray-200 dark:border-gray-300 dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                         >
                             <option value="">Выберите предмет</option>
                             <option value="derivatives">Производные</option>
@@ -110,18 +110,18 @@ const AdminTaskForm: React.FC = () => {
                     </div>
 
                     <div className="mb-4">
-                        <label className="block text-gray-700 mb-2">Описание</label>
+                        <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Описание</label>
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-2 border rounded bg-gray-700 border-gray-600 text-white dark:bg-gray-200 dark:border-gray-300 dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                             rows={5}
                             placeholder="Введите описание задания"
                         />
                     </div>
 
                     <div className="mb-6">
-                        <label className="block text-gray-700 mb-2">ID пользователя (необязательно)</label>
+                        <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">ID пользователя (необязательно)</label>
                         <Input
                             type="number"
                             value={ownerId}

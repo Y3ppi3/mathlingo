@@ -63,20 +63,20 @@ const TasksPanel: React.FC = () => {
     };
 
     if (loading && tasks.length === 0) {
-        return <div className="text-center py-10">Загрузка...</div>;
+        return <div className="text-center py-10 text-white dark:text-gray-900 transition-colors">Загрузка...</div>;
     }
 
     return (
         <div>
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Управление заданиями</h2>
+                <h2 className="text-xl font-semibold text-white dark:text-gray-900 transition-colors">Управление заданиями</h2>
                 <Button onClick={handleAddTask}>Добавить задание</Button>
             </div>
 
-            {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
+            {error && <div className="bg-red-900/50 dark:bg-red-100 text-red-200 dark:text-red-700 p-3 rounded mb-4 transition-colors">{error}</div>}
 
             {showForm && (
-                <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+                <div className="mb-6 bg-gray-700 dark:bg-gray-200 p-4 rounded-lg transition-colors">
                     <TaskForm
                         task={editingTask}
                         onSubmit={handleFormSubmit}
@@ -85,48 +85,48 @@ const TasksPanel: React.FC = () => {
                 </div>
             )}
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+            <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow overflow-hidden transition-colors">
+                <table className="min-w-full divide-y divide-gray-700 dark:divide-gray-200 transition-colors">
+                    <thead className="bg-gray-700 dark:bg-gray-200 transition-colors">
                     <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Название</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Предмет</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Описание</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-700 uppercase tracking-wider transition-colors">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-700 uppercase tracking-wider transition-colors">Название</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-700 uppercase tracking-wider transition-colors">Предмет</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-700 uppercase tracking-wider transition-colors">Описание</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-700 uppercase tracking-wider transition-colors">Действия</th>
                     </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-gray-800 dark:bg-gray-100 divide-y divide-gray-700 dark:divide-gray-200 transition-colors">
                     {tasks.length === 0 ? (
                         <tr>
-                            <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                            <td colSpan={5} className="px-6 py-4 text-center text-gray-400 dark:text-gray-500 transition-colors">
                                 Заданий пока нет. Создайте первое задание!
                             </td>
                         </tr>
                     ) : (
                         tasks.map((task) => (
                             <tr key={task.id}>
-                                <td className="px-6 py-4 whitespace-nowrap">{task.id}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">{task.title}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-6 py-4 whitespace-nowrap text-white dark:text-gray-900 transition-colors">{task.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-white dark:text-gray-900 transition-colors">{task.title}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-white dark:text-gray-900 transition-colors">
                                     {task.subject === 'derivatives' && 'Производные'}
                                     {task.subject === 'integrals' && 'Интегралы'}
                                     {task.subject === 'probability' && 'Теория вероятности'}
                                     {!['derivatives', 'integrals', 'probability'].includes(task.subject) && task.subject}
                                 </td>
-                                <td className="px-6 py-4">
+                                <td className="px-6 py-4 text-white dark:text-gray-900 transition-colors">
                                     {task.description ? task.description.substring(0, 50) + (task.description.length > 50 ? '...' : '') : '—'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <button
                                         onClick={() => handleEditTask(task)}
-                                        className="text-blue-600 hover:text-blue-900 mr-4"
+                                        className="text-blue-400 dark:text-blue-600 hover:text-blue-300 dark:hover:text-blue-800 mr-4 transition-colors"
                                     >
                                         Редактировать
                                     </button>
                                     <button
                                         onClick={() => task.id && handleDeleteTask(task.id)}
-                                        className="text-red-600 hover:text-red-900"
+                                        className="text-red-400 dark:text-red-600 hover:text-red-300 dark:hover:text-red-800 transition-colors"
                                     >
                                         Удалить
                                     </button>

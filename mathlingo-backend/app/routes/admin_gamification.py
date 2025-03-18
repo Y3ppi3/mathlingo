@@ -6,7 +6,7 @@ from typing import List
 
 from app.database import get_db
 from app.models import (
-    Admin, User, Admin, Task, Subject,
+    Admin, User, Task, Subject,
     AdventureMap, MapLocation, TaskGroup,
     Achievement, UserProgress
 )
@@ -17,7 +17,28 @@ from app.schemas import (
     TaskGroupCreate, TaskGroupResponse
 )
 
-router = APIRouter(tags=["admin_gamification"])
+router = APIRouter(prefix="/admin/gamification", tags=["admin_gamification"])
+
+
+# --- Маршруты для управления картами приключений ---
+
+@router.post("/maps", response_model=AdventureMapResponse)
+def create_map(
+    map_data: AdventureMapCreate,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_admin_current_user)
+):
+    """Создать новую карту приключений"""
+    new_map = AdventureMap(
+        name=map_data.name,
+        description=map_data.description,
+        background_image=map_data.background_image,
+        subject_id=map_data.subject_id
+    )
+    db.add(new_map)
+    db.commit()
+    db.refresh(new_map)
+    return new_map
 
 
 # --- Маршруты для управления локациями ---
