@@ -690,3 +690,11 @@
 ➡️ Вызван create_access_token:
    Данные: {'sub': 'admin@mathlingo.com'}
    Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBtYXRobGluZ28uY29tIiwiZXhwIjoxNzQyOTE1OTA1fQ._nk77pzvlrASRbfjqeTvBdn9Ghtu5Xpvd6t780ZDrmk
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'admin@mathlingo.com', 'role': 'admin'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBtYXRobGluZ28uY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQzMDczMDYzfQ.vqBObBDpgsC-k8lonL8prnFnEe3S30NBBBPK_L1RXc8
+
+➡️ Вызван create_access_token:
+   Данные: {'sub': 'admin@mathlingo.com'}
+   Токен: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBtYXRobGluZ28uY29tIiwiZXhwIjoxNzQzMDczMTQ2fQ.gcTQeKpVj9qceVafxzFeKPzRA_7uK8sZ1WjO5Ypv4g0

@@ -10,6 +10,9 @@ import LogoutPage from "./pages/LogoutPage";
 import AdventureMapPage from "./pages/AdventureMapPage";
 import TaskSolverPage from "./pages/TaskSolverPage";
 import GamificationPanel from "./components/admin/GamificationPanel";
+// Импорт новых страниц для игровых механик
+import GameLauncherPage from "./pages/GameLauncherPage";
+import GamePage from "./pages/GamePage";
 
 // Импорт компонентов админ-панели
 import AdminLogin from "./pages/AdminLogin";
@@ -44,7 +47,7 @@ function AppRoutes() {
             />
             <Route path="/logout" element={<LogoutPage />} />
 
-            {/* Новые маршруты для геймификации */}
+            {/* Маршруты для геймификации */}
             <Route
                 path="/subject/:subjectId/map"
                 element={
@@ -58,6 +61,32 @@ function AppRoutes() {
                 element={
                     <ProtectedRoute>
                         <TaskSolverPage />
+                    </ProtectedRoute>
+                }
+            />
+
+            {/* Новые маршруты для игровых механик */}
+            <Route
+                path="/subject/:subjectId/games"
+                element={
+                    <ProtectedRoute>
+                        <GameLauncherPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/subject/:subjectId/games/:mechanicType"
+                element={
+                    <ProtectedRoute>
+                        <GameLauncherPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/subject/:subjectId/game/:gameId"
+                element={
+                    <ProtectedRoute>
+                        <GamePage />
                     </ProtectedRoute>
                 }
             />
@@ -80,7 +109,7 @@ function AppRoutes() {
                     </AdminProtectedRoute>
                 }
             />
-            {/* Новый маршрут для админ-панели геймификации */}
+            {/* Маршрут для админ-панели геймификации */}
             <Route
                 path="/admin/gamification"
                 element={
