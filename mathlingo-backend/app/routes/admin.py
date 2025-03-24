@@ -127,7 +127,7 @@ def update_task(
     return db_task
 
 
-# Обновление задания
+'''
 @router.put("/tasks/{task_id}", response_model=TaskResponse)
 def update_task(
         task_id: int,
@@ -145,6 +145,7 @@ def update_task(
     db.commit()
     db.refresh(db_task)
     return db_task
+'''
 
 
 # Удаление задания
@@ -312,157 +313,9 @@ def delete_user(
     db.commit()
     return {"message": "User deleted successfully"}
 
-'''
-@router.delete("/subjects/{subject_id}")
-def delete_subject(
-        subject_id: int,
-        force: bool = False,
-        db: Session = Depends(get_db),
-        current_admin: User = Depends(get_admin_current_user)
-):
-    """Delete a subject with proper cascade deletion of dependent records"""
-    print(f"Attempting to delete subject {subject_id} with force={force}")
-
-    # First, check if the subject exists
-    db_subject = db.query(Subject).filter(Subject.id == subject_id).first()
-    if not db_subject:
-        raise HTTPException(status_code=404, detail="Раздел не найден")
-
-    # Print subject details for debugging
-    print(f"Subject found: {db_subject.name} (ID: {subject_id})")
-
-    # Check for related records - both maps and tasks
-    related_maps = db.query(AdventureMap).filter(AdventureMap.subject_id == subject_id).all()
-    related_tasks_count = db.query(Task).filter(Task.subject_id == subject_id).count()
-
-    print(f"Found {len(related_maps)} related maps and {related_tasks_count} related tasks")
-
-    # Check related dependencies and return confirmation request if not forced
-    if (related_maps or related_tasks_count > 0) and not force:
-        print("Dependencies found and force=False, returning confirmation request")
-        response = {
-            "status": "confirmation_required",
-            "detail": "Обнаружены связанные данные",
-            "related_data": {}
-        }
-
-        if related_maps:
-            response["related_data"]["maps_count"] = len(related_maps)
-            response["related_data"]["map_details"] = [
-                {"id": adventure_map.id, "name": adventure_map.name}
-                for adventure_map in related_maps
-            ]
-
-        if related_tasks_count > 0:
-            response["related_data"]["tasks_count"] = related_tasks_count
-
-        return response
-
-    # If force=True, perform cascade deletion
-    try:
-        print(f"Starting cascade deletion for subject {subject_id}")
-
-        # First unlink tasks from this subject (set subject_id to NULL)
-        if related_tasks_count > 0:
-            print(f"Unlinking {related_tasks_count} tasks from subject {subject_id}")
-            db.query(Task).filter(Task.subject_id == subject_id).update(
-                {"subject_id": None}, synchronize_session=False
-            )
-            db.commit()
-            print("Tasks unlinked successfully")
-
-        # Handle related adventure maps
-        for adventure_map in related_maps:
-            map_id = adventure_map.id
-            print(f"Processing map {map_id} for deletion")
-
-            # Get all locations for this map
-            locations = db.query(MapLocation).filter(
-                MapLocation.adventure_map_id == map_id
-            ).all()
-            print(f"Found {len(locations)} locations for map {map_id}")
-
-            # Process all locations to remove dependencies
-            for location in locations:
-                loc_id = location.id
-                print(f"Processing location {loc_id}")
-
-                # Update dependent locations first
-                dependent_locations = db.query(MapLocation).filter(
-                    MapLocation.unlocked_by_location_id == loc_id
-                ).all()
-                print(f"Found {len(dependent_locations)} dependent locations")
-
-                for dep_location in dependent_locations:
-                    print(f"Unlinking dependent location {dep_location.id} from location {loc_id}")
-                    dep_location.unlocked_by_location_id = None
-
-                if dependent_locations:
-                    db.commit()
-                    print("Dependent locations updated successfully")
-
-                # Process task groups in this location
-                task_groups = db.query(TaskGroup).filter(
-                    TaskGroup.location_id == loc_id
-                ).all()
-                print(f"Found {len(task_groups)} task groups for location {loc_id}")
-
-                for task_group in task_groups:
-                    tg_id = task_group.id
-
-                    # Unlink tasks from this group
-                    linked_tasks_count = db.query(Task).filter(Task.task_group_id == tg_id).count()
-                    if linked_tasks_count > 0:
-                        print(f"Unlinking {linked_tasks_count} tasks from task group {tg_id}")
-                        db.query(Task).filter(Task.task_group_id == tg_id).update(
-                            {"task_group_id": None}, synchronize_session=False
-                        )
-                        db.commit()
-
-                    # Now delete the task group
-                    print(f"Deleting task group {tg_id}")
-                    db.delete(task_group)
-
-                if task_groups:
-                    db.commit()
-                    print(f"All {len(task_groups)} task groups deleted successfully")
-
-            # Now process all locations again to delete them
-            for location in locations:
-                print(f"Deleting location {location.id}")
-                db.delete(location)
-
-            if locations:
-                db.commit()
-                print(f"All {len(locations)} locations deleted successfully")
-
-            # Now delete the adventure map
-            print(f"Deleting adventure map {map_id}")
-            db.delete(adventure_map)
-            db.commit()
-            print(f"Adventure map {map_id} deleted successfully")
-
-        # Finally delete the subject
-        print(f"Deleting subject {subject_id}")
-        db.delete(db_subject)
-        db.commit()
-        print(f"Subject {subject_id} deleted successfully")
-
-        return {"status": "success", "detail": "Раздел и связанные данные успешно удалены"}
-
-    except Exception as e:
-        db.rollback()
-        error_msg = f"Error in deletion: {str(e)}"
-        print(error_msg)
-        raise HTTPException(
-            status_code=500,
-            detail=error_msg
-        )
-'''
-
 
 @router.delete("/subjects/{subject_id}")
-def delete_subject(
+def admin_delete_subject(
         subject_id: int,
         force: bool = False,
         db: Session = Depends(get_db),
