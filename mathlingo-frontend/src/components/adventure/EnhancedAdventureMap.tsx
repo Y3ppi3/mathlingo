@@ -1,4 +1,4 @@
-// src/components/adventure/EnhancedAdventureMap.tsx
+// Исправленный код для src/components/adventure/EnhancedAdventureMap.tsx
 import React, { useState, useEffect } from 'react';
 import { fetchMapData } from '../../utils/api';
 import EnhancedLocationWidget from './EnhancedLocationWidget';
@@ -66,8 +66,6 @@ const EnhancedAdventureMap: React.FC<EnhancedAdventureMapProps> = ({ subjectId }
     const [error, setError] = useState<string | null>(null);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
     const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
-    // Удаляем неиспользуемый navigate, так как передача происходит через
-    // пропсы к EnhancedLocationWidget, который уже использует свой navigate
 
     useEffect(() => {
         const loadMapData = async () => {
@@ -171,13 +169,13 @@ const EnhancedAdventureMap: React.FC<EnhancedAdventureMapProps> = ({ subjectId }
     if (error) return <div className="text-red-500 p-4">{error}</div>;
 
     return (
-        <div className="relative w-full h-96 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+        <div className="relative w-full h-96 bg-white dark:bg-gray-800 rounded-lg overflow-hidden transition-colors">
             {/* Фоновое изображение карты */}
             <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: 'url(/images/map-background.jpg)' }}></div>
 
             {/* Информационная панель с прогрессом */}
             {userProgress && (
-                <div className="absolute top-4 left-4 bg-white dark:bg-gray-800 bg-opacity-90 dark:bg-opacity-90 p-3 rounded-lg shadow-lg">
+                <div className="absolute top-4 left-4 bg-white dark:bg-gray-800 bg-opacity-90 dark:bg-opacity-90 p-3 rounded-lg shadow-lg transition-colors">
                     <div className="flex items-center space-x-3">
                         <div className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
                             Уровень {userProgress.level}
@@ -210,7 +208,7 @@ const EnhancedAdventureMap: React.FC<EnhancedAdventureMapProps> = ({ subjectId }
                             className="w-full h-full object-contain"
                         />
                     </div>
-                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-1 text-xs font-bold">
+                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-1 text-xs font-bold text-gray-800 dark:text-gray-200 transition-colors">
                         {location.name}
                     </div>
 
@@ -218,12 +216,12 @@ const EnhancedAdventureMap: React.FC<EnhancedAdventureMapProps> = ({ subjectId }
                     {location.unlocked && location.gameMechanics.length > 0 && (
                         <div className="absolute -top-2 -right-2 flex">
                             {location.gameMechanics.slice(0, 2).map((mechanic, index) => (
-                                <div key={mechanic.id} className="w-6 h-6 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-md" style={{ marginLeft: index > 0 ? '-0.5rem' : '0' }}>
+                                <div key={mechanic.id} className="w-6 h-6 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-md transition-colors" style={{ marginLeft: index > 0 ? '-0.5rem' : '0' }}>
                                     <span>{mechanic.icon}</span>
                                 </div>
                             ))}
                             {location.gameMechanics.length > 2 && (
-                                <div className="w-6 h-6 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-md" style={{ marginLeft: '-0.5rem' }}>
+                                <div className="w-6 h-6 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-md transition-colors" style={{ marginLeft: '-0.5rem' }}>
                                     <span>+{location.gameMechanics.length - 2}</span>
                                 </div>
                             )}

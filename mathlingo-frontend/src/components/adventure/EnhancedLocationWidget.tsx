@@ -22,7 +22,6 @@ interface TaskGroupInfo {
 }
 
 interface LocationWidgetProps {
-    // Удаляем неиспользуемый параметр locationId
     locationName: string;
     locationDescription: string;
     subjectId: number;
@@ -62,12 +61,12 @@ const EnhancedLocationWidget: React.FC<LocationWidgetProps> = ({
                 &times;
             </button>
 
-            <h3 className="text-xl font-bold mb-2">{locationName}</h3>
+            <h3 className="text-xl font-bold mb-2 text-gray-800 dark:text-white">{locationName}</h3>
             <p className="text-gray-600 dark:text-gray-300 mb-6">{locationDescription}</p>
 
             {/* Секция игровых механик */}
             <div className="mb-6">
-                <h4 className="text-lg font-semibold mb-3">Игровые механики:</h4>
+                <h4 className="text-lg font-semibold mb-3 text-gray-800 dark:text-white">Игровые механики:</h4>
                 {gameMechanics.length > 0 ? (
                     <div className="space-y-3">
                         {gameMechanics.map((mechanic) => (
@@ -78,7 +77,7 @@ const EnhancedLocationWidget: React.FC<LocationWidgetProps> = ({
                             >
                                 <div className="flex items-center mb-2">
                                     <span className="text-2xl mr-2">{mechanic.icon}</span>
-                                    <h5 className="font-medium">{mechanic.name}</h5>
+                                    <h5 className="font-medium text-gray-800 dark:text-white">{mechanic.name}</h5>
                                 </div>
                                 <p className="text-xs text-gray-600 dark:text-gray-300">{mechanic.description}</p>
                             </div>
@@ -102,7 +101,7 @@ const EnhancedLocationWidget: React.FC<LocationWidgetProps> = ({
             </div>
 
             {/* Секция заданий */}
-            <h4 className="text-lg font-semibold mb-2">Задания:</h4>
+            <h4 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Задания:</h4>
             {taskGroups.length > 0 ? (
                 <div className="space-y-3">
                     {taskGroups.map((group) => (
@@ -116,12 +115,12 @@ const EnhancedLocationWidget: React.FC<LocationWidgetProps> = ({
                             onClick={() => startTaskGroup(group.id)}
                         >
                             <div className="flex justify-between items-center">
-                                <h5 className="font-medium">{group.name}</h5>
-                                <span className="text-xs px-2 py-1 rounded bg-blue-200 dark:bg-blue-700">
+                                <h5 className="font-medium text-gray-800 dark:text-white">{group.name}</h5>
+                                <span className="text-xs px-2 py-1 rounded bg-blue-200 dark:bg-blue-700 text-blue-800 dark:text-white">
                                     {group.reward_points} очков
                                 </span>
                             </div>
-                            <p className="text-xs mt-1">{group.description}</p>
+                            <p className="text-xs mt-1 text-gray-700 dark:text-gray-300">{group.description}</p>
                             <div className="flex items-center mt-2">
                                 <div className="flex">
                                     {Array.from({ length: 5 }).map((_, i) => (
@@ -137,7 +136,7 @@ const EnhancedLocationWidget: React.FC<LocationWidgetProps> = ({
                                         </span>
                                     ))}
                                 </div>
-                                <span className="text-xs ml-2">
+                                <span className="text-xs ml-2 text-gray-600 dark:text-gray-300">
                                     {group.tasks.length} задани{group.tasks.length === 1 ? 'е' : 'й'}
                                 </span>
                             </div>
@@ -145,7 +144,7 @@ const EnhancedLocationWidget: React.FC<LocationWidgetProps> = ({
                     ))}
                 </div>
             ) : (
-                <p className="text-sm text-gray-500">В этой локации пока нет доступных заданий.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">В этой локации пока нет доступных заданий.</p>
             )}
         </div>
     );

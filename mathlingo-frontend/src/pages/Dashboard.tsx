@@ -62,13 +62,18 @@ const Dashboard = () => {
 
         const fetchSubjects = async () => {
             try {
-                const response = await fetch(`${API_URL}/api/subjects`, {
+                const response = await fetch(`${API_URL}/api/subjects/`, {
                     method: "GET",
                     credentials: "include",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
                 });
 
+                // Обработка ошибок
                 if (!response.ok) {
+                    const errorData = await response.text();
+                    console.error("Ошибка загрузки:", errorData);
                     throw new Error("Не удалось загрузить предметы");
                 }
 
@@ -76,7 +81,7 @@ const Dashboard = () => {
                 setSubjects(data);
             } catch (err) {
                 console.error("Ошибка при загрузке предметов:", err);
-                // Не устанавливаем ошибку глобально, чтобы пользователь мог видеть хотя бы свой профиль
+                setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
             }
         };
 

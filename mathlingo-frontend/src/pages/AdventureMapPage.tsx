@@ -41,9 +41,9 @@ const AdventureMapPage: React.FC = () => {
     }, [subjectId]);
 
     if (loading) return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="min-h-screen bg-gray-900 dark:bg-white">
             <Navbar />
-            <div className="container mx-auto px-4 py-8">
+            <div className="container mx-auto px-4 py-8 mt-16">
                 <div className="flex justify-center items-center h-96">
                     <div className="text-lg text-gray-500">Загрузка...</div>
                 </div>
@@ -52,10 +52,10 @@ const AdventureMapPage: React.FC = () => {
     );
 
     if (error || !subject) return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="min-h-screen bg-gray-900 dark:bg-white">
             <Navbar />
-            <div className="container mx-auto px-4 py-8">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
+            <div className="container mx-auto px-4 py-8 mt-16">
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
                     <h2 className="text-xl text-red-500 mb-4">{error || 'Предмет не найден'}</h2>
                     <button
                         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -69,10 +69,10 @@ const AdventureMapPage: React.FC = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="min-h-screen bg-gray-900 dark:bg-white">
             <Navbar />
-            <div className="container mx-auto px-4 py-8">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            <div className="container mx-auto px-4 py-8 mt-16">
+                <div className="bg-gray-800 dark:bg-white rounded-lg shadow-lg p-6">
                     <div className="flex items-center mb-6">
                         {subject.icon && (
                             <img
@@ -83,13 +83,13 @@ const AdventureMapPage: React.FC = () => {
                         )}
                         <div>
                             <h1 className="text-2xl font-bold">{subject.name}</h1>
-                            <p className="text-gray-500 dark:text-gray-400">{subject.description}</p>
+                            <p className="text-gray-400 dark:text-gray-500">{subject.description}</p>
                         </div>
                     </div>
 
                     <div className="mb-8">
                         <h2 className="text-xl font-semibold mb-4">Ваше приключение</h2>
-                        <p className="text-gray-600 dark:text-gray-300 mb-4">
+                        <p className="text-gray-300 dark:text-gray-600 mb-4">
                             Пройдите через различные локации, выполняя увлекательные задания по математике.
                             Накапливайте очки и открывайте новые части карты!
                         </p>
@@ -98,9 +98,9 @@ const AdventureMapPage: React.FC = () => {
                         <AdventureMap subjectId={parseInt(subjectId!)} />
                     </div>
 
-                    <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                    <div className="mt-8 p-4 bg-blue-900 dark:bg-blue-50 rounded-lg">
                         <h3 className="text-lg font-semibold mb-2">Как играть?</h3>
-                        <ol className="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
+                        <ol className="list-decimal list-inside space-y-2 text-gray-300 dark:text-gray-700">
                             <li>Нажмите на доступную локацию на карте (яркие иконки)</li>
                             <li>Выберите группу заданий, которую хотите пройти</li>
                             <li>Решайте задания одно за другим, зарабатывая очки</li>

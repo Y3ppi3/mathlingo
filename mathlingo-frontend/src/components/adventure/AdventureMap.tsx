@@ -103,9 +103,10 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
     if (error) return <div className="text-red-500 p-4">{error}</div>;
 
     return (
-        <div className="relative w-full h-96 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+        <div className="relative w-full h-96 bg-gray-800 dark:bg-white rounded-lg overflow-hidden adventure-map">
             {/* Фоновое изображение карты */}
-            <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: 'url(/images/map-background.jpg)' }}></div>
+            <div className="absolute inset-0 bg-cover bg-center"
+                 style={{backgroundImage: 'url(/images/map-background.jpg)'}}></div>
 
             {/* Локации на карте */}
             {locations.map((location) => (
@@ -128,7 +129,8 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                             className="w-full h-full object-contain"
                         />
                     </div>
-                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-1 text-xs font-bold">
+                    <div
+                        className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-1 text-xs font-bold text-gray-800 dark:text-gray-200">
                         {location.name}
                     </div>
                 </div>
@@ -136,7 +138,8 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
 
             {/* Боковая панель с информацией о выбранной локации */}
             {selectedLocation && (
-                <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white dark:bg-gray-900 bg-opacity-90 dark:bg-opacity-90 p-4 shadow-lg">
+                <div
+                    className="absolute right-0 top-0 bottom-0 w-1/3 bg-white dark:bg-gray-900 bg-opacity-90 dark:bg-opacity-90 p-4 shadow-lg">
                     <button
                         className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                         onClick={() => setSelectedLocation(null)}
@@ -144,10 +147,10 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                         &times;
                     </button>
 
-                    <h3 className="text-xl font-bold mb-2">{selectedLocation.name}</h3>
-                    <p className="text-sm mb-4">{selectedLocation.description}</p>
+                    <h3 className="text-xl font-bold mb-2 text-gray-800 dark:text-white">{selectedLocation.name}</h3>
+                    <p className="text-sm mb-4 text-gray-600 dark:text-gray-300">{selectedLocation.description}</p>
 
-                    <h4 className="text-lg font-semibold mb-2">Задания:</h4>
+                    <h4 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Задания:</h4>
                     {selectedLocation.taskGroups.length > 0 ? (
                         <div className="space-y-3">
                             {selectedLocation.taskGroups.map((group) => (
@@ -161,15 +164,16 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                                     onClick={() => startTaskGroup(group.id)}
                                 >
                                     <div className="flex justify-between items-center">
-                                        <h5 className="font-medium">{group.name}</h5>
-                                        <span className="text-xs px-2 py-1 rounded bg-blue-200 dark:bg-blue-700">
-                      {group.reward_points} очков
-                    </span>
+                                        <h5 className="font-medium text-gray-800 dark:text-white">{group.name}</h5>
+                                        <span
+                                            className="text-xs px-2 py-1 rounded bg-blue-200 dark:bg-blue-700 text-blue-800 dark:text-white">
+                                          {group.reward_points} очков
+                                        </span>
                                     </div>
-                                    <p className="text-xs mt-1">{group.description}</p>
+                                    <p className="text-xs mt-1 text-gray-600 dark:text-gray-300">{group.description}</p>
                                     <div className="flex items-center mt-2">
                                         <div className="flex">
-                                            {Array.from({ length: 5 }).map((_, i) => (
+                                            {Array.from({length: 5}).map((_, i) => (
                                                 <span
                                                     key={i}
                                                     className={`w-4 h-4 ${
@@ -178,19 +182,20 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                                                             : 'text-gray-300 dark:text-gray-600'
                                                     }`}
                                                 >
-                          ★
-                        </span>
+                                                  ★
+                                                </span>
                                             ))}
                                         </div>
-                                        <span className="text-xs ml-2">
-                      {group.tasks.length} задани{group.tasks.length === 1 ? 'е' : 'й'}
-                    </span>
+                                        <span className="text-xs ml-2 text-gray-600 dark:text-gray-300">
+                                          {group.tasks.length} задани{group.tasks.length === 1 ? 'е' : 'й'}
+                                        </span>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-500">В этой локации пока нет доступных заданий.</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">В этой локации пока нет доступных
+                            заданий.</p>
                     )}
                 </div>
             )}
