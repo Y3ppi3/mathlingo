@@ -15,12 +15,6 @@ body {
     color: var(--text-primary);
 }
 
-/* Принудительные стили для контейнеров карты и прочих элементов */
-.dark .adventure-map {
-    background-color: var(--bg-secondary) !important;
-    color: var(--text-primary) !important;
-}
-
 .adventure-map {
     background-color: white !important;
     color: black !important;

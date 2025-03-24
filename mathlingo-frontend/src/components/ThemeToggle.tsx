@@ -53,26 +53,25 @@ function ThemeToggle() {
                 {/* Фон переключателя */}
                 <div
                     className="
-            w-12 h-6
-            bg-gray-300
-            dark:bg-gray-600
-            peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500
-            rounded-full peer
-            transition-colors
-            peer-checked:bg-indigo-500
-          "
+                    w-12 h-6
+                    rounded-full peer
+                    transition-colors
+                    peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500
+                    bg-gray-300 peer-checked:bg-indigo-500
+                  "
                 ></div>
                 {/* Ползунок */}
                 <div
                     className="
-            absolute left-1 top-1
-            w-4 h-4
-            bg-white
-            rounded-full
-            border border-gray-300 dark:border-gray-500
-            transition-all
-            peer-checked:translate-x-6
-          "
+                    absolute left-1 top-1
+                    w-4 h-4
+                    bg-white
+                    rounded-full
+                    border border-gray-300
+                    transition-all
+                    peer-checked:translate-x-6
+                    peer-checked:border-white
+                  "
                 ></div>
             </label>
             <SunIcon

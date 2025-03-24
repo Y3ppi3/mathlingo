@@ -198,7 +198,7 @@ const GameLauncherPage: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+            <div className="min-h-screen bg-gray-900 dark:bg-gray-100">
                 <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16">
                     <div className="flex justify-center items-center h-96">
@@ -211,7 +211,7 @@ const GameLauncherPage: React.FC = () => {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+            <div className="min-h-screen bg-gray-900 dark:bg-gray-100">
                 <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16">
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
@@ -226,10 +226,10 @@ const GameLauncherPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="min-h-screen bg-gray-900 dark:bg-gray-100">
             <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                <div className="bg-gray-800 dark:bg-white rounded-lg shadow-lg p-6">
                     <div className="mb-6">
                         <Button
                             variant="outline"
@@ -239,7 +239,7 @@ const GameLauncherPage: React.FC = () => {
                             ← Вернуться к карте
                         </Button>
 
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        <h1 className="text-2xl font-bold text-white dark:text-gray-900">
                             {mechanicType
                                 ? `Игры типа "${mechanicType}" по теме "${subjectName}"`
                                 : `Игры по теме "${subjectName}"`}
@@ -258,7 +258,7 @@ const GameLauncherPage: React.FC = () => {
                             {/* Сгруппированные игры */}
                             {gameGroups.map((group) => (
                                 <div key={group.type} className="mb-8">
-                                    <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">{group.title}</h2>
+                                    <h2 className="text-xl font-semibold mb-4 text-gray-200 dark:text-gray-800">{group.title}</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {group.games.map((game) => (
                                             <div
@@ -266,19 +266,19 @@ const GameLauncherPage: React.FC = () => {
                                                 className={`
                                                     p-6 rounded-lg cursor-pointer transition-all transform hover:scale-105
                                                     ${selectedGame?.id === game.id
-                                                    ? 'bg-indigo-100 dark:bg-indigo-900 border-2 border-indigo-500'
-                                                    : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:shadow-lg'}
+                                                    ? 'bg-indigo-900 dark:bg-indigo-100 border-2 border-indigo-500'
+                                                    : 'bg-gray-700 dark:bg-gray-50 border border-gray-600 dark:border-gray-200 hover:shadow-lg'}
                                                 `}
                                                 onClick={() => handleGameSelect(game)}
                                             >
                                                 <div className="flex items-center mb-3">
                                                     <div className="text-3xl mr-3">{game.icon}</div>
-                                                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{game.title}</h3>
+                                                    <h3 className="text-xl font-semibold text-white dark:text-gray-900">{game.title}</h3>
                                                 </div>
-                                                <p className="text-gray-600 dark:text-gray-300 mb-4">{game.description}</p>
+                                                <p className="text-gray-300 dark:text-gray-600 mb-4">{game.description}</p>
                                                 <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-500 dark:text-gray-400">Сложность: {Array(game.difficulty).fill('★').join('')}</span>
-                                                    <span className="text-gray-500 dark:text-gray-400">~{game.estimatedTime} мин</span>
+                                                    <span className="text-gray-400 dark:text-gray-500">Сложность: {Array(game.difficulty).fill('★').join('')}</span>
+                                                    <span className="text-gray-400 dark:text-gray-500">~{game.estimatedTime} мин</span>
                                                 </div>
                                             </div>
                                         ))}
