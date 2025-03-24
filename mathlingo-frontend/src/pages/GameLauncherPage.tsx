@@ -16,6 +16,13 @@ interface GameInfo {
     estimatedTime: number; // в минутах
 }
 
+// Интерфейс для групп игр по механике
+interface GameMechanicGroup {
+    title: string;
+    type: string;
+    games: GameInfo[];
+}
+
 const GameLauncherPage: React.FC = () => {
     const { subjectId, mechanicType } = useParams<{ subjectId: string, mechanicType: string }>();
     const navigate = useNavigate();
@@ -25,6 +32,7 @@ const GameLauncherPage: React.FC = () => {
     const [subjectName, setSubjectName] = useState('');
     const [games, setGames] = useState<GameInfo[]>([]);
     const [selectedGame, setSelectedGame] = useState<GameInfo | null>(null);
+    const [gameGroups, setGameGroups] = useState<GameMechanicGroup[]>([]);
 
     useEffect(() => {
         const fetchSubjectAndGames = async () => {
@@ -32,19 +40,29 @@ const GameLauncherPage: React.FC = () => {
 
             try {
                 setLoading(true);
-                
+
                 // Загружаем информацию о предмете
                 const subjectResponse = await api.get(`/api/subjects/${subjectId}`);
                 setSubjectName(subjectResponse.data.name);
-                
+
+                // Определяем тему с более надежной проверкой
+                // Для отладки всегда показываем правильную тему в консоли
+                let subjectTheme: 'derivatives' | 'integrals';
+
+                // Используем имя предмета для более надежного определения темы
+                const subjectNameLower = subjectResponse.data.name.toLowerCase();
+                if (subjectNameLower.includes('производн') ||
+                    subjectNameLower.includes('дифференц') ||
+                    subjectId === '1') {
+                    subjectTheme = 'derivatives';
+                    console.log(`Определена тема: ПРОИЗВОДНЫЕ (id: ${subjectId})`);
+                } else {
+                    subjectTheme = 'integrals';
+                    console.log(`Определена тема: ИНТЕГРАЛЫ (id: ${subjectId})`);
+                }
+
                 // Здесь в реальном приложении вы бы загружали список игр с сервера
                 // Сейчас просто имитируем это с локальными данными
-                
-                // Определяем тему (производные или интегралы) на основе subjectId
-                // В реальном приложении это бы приходило с сервера
-                const subjectTheme = subjectId === '1' ? 'derivatives' : 'integrals';
-                
-                // Фильтруем игры по механике, если указана
                 const availableGames: GameInfo[] = [
                     {
                         id: 'deriv-fall',
@@ -87,31 +105,71 @@ const GameLauncherPage: React.FC = () => {
                         estimatedTime: 15
                     }
                 ];
-                
-                // Фильтруем игры по теме и механике
+
+                // Фильтруем игры по теме
                 let filteredGames = availableGames.filter(game => game.subject === subjectTheme);
-                
+
+                // Проверяем, что есть игры для этой темы
+                if (filteredGames.length === 0) {
+                    console.warn(`Нет игр для темы ${subjectTheme}!`);
+                } else {
+                    console.log(`Найдено ${filteredGames.length} игр для темы ${subjectTheme}`);
+                }
+
+                // Если указан тип механики, дополнительно фильтруем
                 if (mechanicType) {
                     const mechanicMap: Record<string, string> = {
                         'fall': 'падение',
                         'builder': 'сборка',
                         'lab': 'лаборатория'
                     };
-                    
+
                     const mappedMechanicType = mechanicMap[mechanicType] as 'падение' | 'сборка' | 'лаборатория';
-                    
+
                     if (mappedMechanicType) {
                         filteredGames = filteredGames.filter(game => game.mechanicType === mappedMechanicType);
                     }
                 }
-                
+
+                // Группируем игры по типу механики
+                const groupedGames: GameMechanicGroup[] = [];
+
+                // Создаем группы для каждого типа механики
+                const mechanicTypes = [...new Set(filteredGames.map(game => game.mechanicType))];
+
+                mechanicTypes.forEach(type => {
+                    const gamesInGroup = filteredGames.filter(game => game.mechanicType === type);
+
+                    let title = '';
+                    switch(type) {
+                        case 'падение':
+                            title = 'Игры на быструю реакцию';
+                            break;
+                        case 'сборка':
+                            title = 'Игры на конструирование';
+                            break;
+                        case 'лаборатория':
+                            title = 'Исследовательские игры';
+                            break;
+                        default:
+                            title = 'Другие игры';
+                    }
+
+                    groupedGames.push({
+                        title,
+                        type,
+                        games: gamesInGroup
+                    });
+                });
+
                 setGames(filteredGames);
-                
+                setGameGroups(groupedGames);
+
                 // Если есть только одна игра, сразу выбираем её
                 if (filteredGames.length === 1) {
                     setSelectedGame(filteredGames[0]);
                 }
-                
+
             } catch (err) {
                 console.error('Ошибка при загрузке данных:', err);
                 setError('Не удалось загрузить данные. Попробуйте позже.');
@@ -129,7 +187,7 @@ const GameLauncherPage: React.FC = () => {
 
     const handleStartGame = () => {
         if (!selectedGame) return;
-        
+
         // Переходим на соответствующую страницу игры
         navigate(`/subject/${subjectId}/game/${selectedGame.id}`);
     };
@@ -180,10 +238,10 @@ const GameLauncherPage: React.FC = () => {
                         >
                             ← Вернуться к карте
                         </Button>
-                        
+
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {mechanicType 
-                                ? `Игры типа "${mechanicType}" по теме "${subjectName}"` 
+                            {mechanicType
+                                ? `Игры типа "${mechanicType}" по теме "${subjectName}"`
                                 : `Игры по теме "${subjectName}"`}
                         </h1>
                     </div>
@@ -197,30 +255,36 @@ const GameLauncherPage: React.FC = () => {
                         </div>
                     ) : (
                         <div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                                {games.map((game) => (
-                                    <div
-                                        key={game.id}
-                                        className={`
-                                            p-6 rounded-lg cursor-pointer transition-all transform hover:scale-105
-                                            ${selectedGame?.id === game.id 
-                                                ? 'bg-indigo-100 dark:bg-indigo-900 border-2 border-indigo-500' 
-                                                : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:shadow-lg'}
-                                        `}
-                                        onClick={() => handleGameSelect(game)}
-                                    >
-                                        <div className="flex items-center mb-3">
-                                            <div className="text-3xl mr-3">{game.icon}</div>
-                                            <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{game.title}</h3>
-                                        </div>
-                                        <p className="text-gray-600 dark:text-gray-300 mb-4">{game.description}</p>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">Сложность: {Array(game.difficulty).fill('★').join('')}</span>
-                                            <span className="text-gray-500 dark:text-gray-400">~{game.estimatedTime} мин</span>
-                                        </div>
+                            {/* Сгруппированные игры */}
+                            {gameGroups.map((group) => (
+                                <div key={group.type} className="mb-8">
+                                    <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">{group.title}</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {group.games.map((game) => (
+                                            <div
+                                                key={game.id}
+                                                className={`
+                                                    p-6 rounded-lg cursor-pointer transition-all transform hover:scale-105
+                                                    ${selectedGame?.id === game.id
+                                                    ? 'bg-indigo-100 dark:bg-indigo-900 border-2 border-indigo-500'
+                                                    : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:shadow-lg'}
+                                                `}
+                                                onClick={() => handleGameSelect(game)}
+                                            >
+                                                <div className="flex items-center mb-3">
+                                                    <div className="text-3xl mr-3">{game.icon}</div>
+                                                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{game.title}</h3>
+                                                </div>
+                                                <p className="text-gray-600 dark:text-gray-300 mb-4">{game.description}</p>
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-gray-500 dark:text-gray-400">Сложность: {Array(game.difficulty).fill('★').join('')}</span>
+                                                    <span className="text-gray-500 dark:text-gray-400">~{game.estimatedTime} мин</span>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
+                                </div>
+                            ))}
 
                             <div className="flex justify-center">
                                 <Button

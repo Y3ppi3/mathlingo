@@ -1,20 +1,16 @@
 // routes.tsx
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { JSX } from "react";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import LogoutPage from "./pages/LogoutPage";
-// Импорт компонентов для геймификации
 import AdventureMapPage from "./pages/AdventureMapPage";
-import TaskSolverPage from "./pages/TaskSolverPage";
 import GamificationPanel from "./components/admin/GamificationPanel";
-// Импорт новых страниц для игровых механик
 import GameLauncherPage from "./pages/GameLauncherPage";
 import GamePage from "./pages/GamePage";
 
-// Импорт компонентов админ-панели
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminTaskForm from "./pages/AdminTaskForm";
@@ -29,6 +25,16 @@ function AdminProtectedRoute({ children }: { children: JSX.Element }) {
     }
 
     return children;
+}
+
+// Компонент для перенаправления с task-group на games
+function TaskGroupRedirect() {
+    const location = useLocation();
+    // Извлекаем subjectId из URL
+    const subjectId = location.pathname.split('/')[2];
+
+    // Перенаправляем на страницу игр с правильным subjectId
+    return <Navigate to={`/subject/${subjectId}/games`} replace />;
 }
 
 function AppRoutes() {
@@ -60,7 +66,7 @@ function AppRoutes() {
                 path="/subject/:subjectId/task-group/:taskGroupId"
                 element={
                     <ProtectedRoute>
-                        <TaskSolverPage />
+                        <TaskGroupRedirect />
                     </ProtectedRoute>
                 }
             />

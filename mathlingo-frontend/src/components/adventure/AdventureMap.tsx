@@ -95,8 +95,10 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
         }
     };
 
-    const startTaskGroup = (taskGroupId: number) => {
-        navigate(`/subject/${subjectId}/task-group/${taskGroupId}`);
+    // ИСПРАВЛЕНО: переход на страницу с играми вместо заданий
+    const openGamesPage = () => {
+        // Переходим на страницу с играми для текущего предмета
+        navigate(`/subject/${subjectId}/games`);
     };
 
     if (loading) return <div className="flex justify-center items-center h-96">Загрузка карты приключений...</div>;
@@ -150,18 +152,27 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                     <h3 className="text-xl font-bold mb-2 text-gray-800 dark:text-white">{selectedLocation.name}</h3>
                     <p className="text-sm mb-4 text-gray-600 dark:text-gray-300">{selectedLocation.description}</p>
 
+                    {/* ИСПРАВЛЕНО: добавлена кнопка для перехода на страницу с играми */}
+                    <div className="mb-6">
+                        <button
+                            className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                            onClick={openGamesPage}
+                        >
+                            Открыть игры
+                        </button>
+                    </div>
+
                     <h4 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Задания:</h4>
                     {selectedLocation.taskGroups.length > 0 ? (
                         <div className="space-y-3">
                             {selectedLocation.taskGroups.map((group) => (
                                 <div
                                     key={group.id}
-                                    className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                                    className={`p-3 rounded-lg transition-colors ${
                                         group.completed
                                             ? 'bg-green-100 dark:bg-green-900'
                                             : 'bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800'
                                     }`}
-                                    onClick={() => startTaskGroup(group.id)}
                                 >
                                     <div className="flex justify-between items-center">
                                         <h5 className="font-medium text-gray-800 dark:text-white">{group.name}</h5>
