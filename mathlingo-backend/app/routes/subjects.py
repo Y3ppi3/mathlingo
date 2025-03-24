@@ -7,7 +7,7 @@ from app.models import Subject
 from app.schemas import SubjectResponse
 from app.auth import get_current_user
 
-router = APIRouter()
+router = APIRouter(tags=["subjects"])
 
 @router.get("/", response_model=List[SubjectResponse])
 def get_subjects(

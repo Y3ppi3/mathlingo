@@ -189,10 +189,30 @@ export const fetchMapData = async (subjectId: number) => {
 // API для групп заданий
 export const fetchTaskGroup = async (groupId: number) => {
     try {
-        const response = await api.get(`/gamification/task-groups/${groupId}`);
+        // Меняем метод на POST, так как бэкенд не принимает GET запросы
+        const response = await api.post(`/gamification/task-groups/${groupId}/data`);
         return response.data;
     } catch (error) {
         console.error('Ошибка при получении группы заданий:', error);
+
+        // Дополнительная обработка для более подробной диагностики
+        if (axios.isAxiosError(error)) {
+            const statusCode = error.response?.status;
+            const errorMessage = error.response?.data?.detail || error.message;
+            console.error(`Код ошибки: ${statusCode}, Сообщение: ${errorMessage}`);
+
+            // Если ошибка 405 (метод не разрешен), пробуем альтернативный путь
+            if (statusCode === 405) {
+                try {
+                    console.log('Пробуем альтернативный путь...');
+                    const altResponse = await api.get(`/api/games/${groupId}`);
+                    return altResponse.data;
+                } catch (altError) {
+                    console.error('Альтернативный запрос также не сработал:', altError);
+                }
+            }
+        }
+
         throw error;
     }
 };

@@ -7,6 +7,7 @@ import DerivFall from '../components/games/DerivFall';
 import IntegralBuilder from '../components/games/IntegralBuilder';
 import MathLab from '../components/games/MathLab';
 import RewardPopup from '../components/adventure/RewardPopup';
+import { mockGameData } from '../utils/gameMockData';
 
 const GamePage: React.FC = () => {
     const { subjectId, gameId } = useParams<{ subjectId: string, gameId: string }>();
@@ -29,38 +30,11 @@ const GamePage: React.FC = () => {
         // для получения информации об игре
         const loadGameInfo = () => {
             setLoading(true);
-            
+
             try {
-                // Имитация загрузки данных об игре
-                const gameData = {
-                    'deriv-fall': {
-                        title: 'DerivFall',
-                        description: 'Находите производные падающих выражений!',
-                        difficulty: 3,
-                        rewardPoints: 100
-                    },
-                    'integral-builder': {
-                        title: 'IntegralBuilder',
-                        description: 'Соберите правильные интегралы!',
-                        difficulty: 4,
-                        rewardPoints: 150
-                    },
-                    'math-lab-derivatives': {
-                        title: 'MathLab: Производные',
-                        description: 'Изучайте функции и их производные!',
-                        difficulty: 3,
-                        rewardPoints: 120
-                    },
-                    'math-lab-integrals': {
-                        title: 'MathLab: Интегралы',
-                        description: 'Изучайте функции и их интегралы!',
-                        difficulty: 4,
-                        rewardPoints: 150
-                    }
-                };
-                
-                if (gameId && gameId in gameData) {
-                    setGameInfo(gameData[gameId as keyof typeof gameData]);
+                // Используем заглушки из mockGameData
+                if (gameId && gameId in mockGameData) {
+                    setGameInfo(mockGameData[gameId as keyof typeof mockGameData]);
                 } else {
                     setError('Игра не найдена');
                 }
@@ -71,7 +45,7 @@ const GamePage: React.FC = () => {
                 setLoading(false);
             }
         };
-        
+
         loadGameInfo();
     }, [gameId]);
 
@@ -79,7 +53,7 @@ const GamePage: React.FC = () => {
         setScore(finalScore);
         setMaxScore(finalMaxScore);
         setGameCompleted(true);
-        
+
         // В реальном приложении здесь был бы запрос к серверу для сохранения результатов
         console.log(`Игра завершена. Счет: ${finalScore}/${finalMaxScore}`);
     };
@@ -90,7 +64,7 @@ const GamePage: React.FC = () => {
 
     const renderGame = () => {
         if (!gameId) return null;
-        
+
         switch (gameId) {
             case 'deriv-fall':
                 return (
@@ -100,7 +74,7 @@ const GamePage: React.FC = () => {
                         onComplete={handleGameComplete}
                     />
                 );
-                
+
             case 'integral-builder':
                 return (
                     <IntegralBuilder
@@ -109,7 +83,7 @@ const GamePage: React.FC = () => {
                         onComplete={handleGameComplete}
                     />
                 );
-                
+
             case 'math-lab-derivatives':
                 return (
                     <MathLab
@@ -118,7 +92,7 @@ const GamePage: React.FC = () => {
                         onComplete={handleGameComplete}
                     />
                 );
-                
+
             case 'math-lab-integrals':
                 return (
                     <MathLab
@@ -127,7 +101,7 @@ const GamePage: React.FC = () => {
                         onComplete={handleGameComplete}
                     />
                 );
-                
+
             default:
                 return (
                     <div className="bg-white dark:bg-gray-800 p-8 rounded-lg text-center">
@@ -187,7 +161,7 @@ const GamePage: React.FC = () => {
                                 Выйти из игры
                             </Button>
                         </div>
-                        
+
                         <div className="h-[calc(100vh-200px)] max-h-[800px]">
                             {renderGame()}
                         </div>

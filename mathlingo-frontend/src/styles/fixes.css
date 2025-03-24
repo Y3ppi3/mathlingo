@@ -1,0 +1,27 @@
+/* src/styles/fixes.css */
+.dark {
+    --bg-primary: rgb(17, 24, 39); /* bg-gray-900 */
+    --bg-secondary: rgb(31, 41, 55); /* bg-gray-800 */
+    --text-primary: rgb(243, 244, 246); /* text-gray-100 */
+}
+
+body {
+    background-color: var(--bg-primary, white);
+    color: var(--text-primary, black);
+}
+
+.dark body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Принудительные стили для контейнеров карты и прочих элементов */
+.dark .adventure-map {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.adventure-map {
+    background-color: white !important;
+    color: black !important;
+}
