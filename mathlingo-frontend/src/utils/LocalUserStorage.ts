@@ -1,4 +1,4 @@
-// src/utils/LocalUserStorage.ts - исправленная версия
+// src/utils/LocalUserStorage.ts
 
 interface UserData {
     id: number;
@@ -7,129 +7,168 @@ interface UserData {
     avatarId?: number;
 }
 
+// Унифицируем имена констант (было две разных)
 const USER_STORAGE_KEY = 'mathlingo_user_data';
-const USER_DATA_SYNC_EVENT = 'mathlingo_user_data_sync';
+const UPDATE_LOCK_KEY = 'mathlingo_update_lock';
+
+export const USER_EVENTS = {
+    DATA_UPDATED: 'userDataUpdated',
+    AUTH_CHANGED: 'authStatusChanged'
+};
 
 /**
  * Получение данных пользователя из localStorage
  */
 export const getLocalUserData = (): UserData | null => {
-    const userDataString = localStorage.getItem(USER_STORAGE_KEY);
-    if (!userDataString) return null;
-
     try {
-        return JSON.parse(userDataString);
+        // Атомарное получение данных
+        const rawData = localStorage.getItem(USER_STORAGE_KEY);
+        if (!rawData) return null;
+
+        return JSON.parse(rawData);
     } catch (e) {
         console.error('Ошибка при парсинге данных пользователя из localStorage:', e);
         return null;
     }
 };
 
+// Функция-псевдоним для совместимости с другими компонентами
+export const getUserData = getLocalUserData;
+
 /**
- * Сохранение данных пользователя в localStorage
+ * Получение блокировки для предотвращения гонки состояний
  */
-export const saveLocalUserData = (userData: UserData): void => {
+function acquireLock(): boolean {
+    if (localStorage.getItem(UPDATE_LOCK_KEY)) {
+        return false;
+    }
+
+    localStorage.setItem(UPDATE_LOCK_KEY, Date.now().toString());
+    return true;
+}
+
+/**
+ * Освобождение блокировки
+ */
+function releaseLock() {
+    localStorage.removeItem(UPDATE_LOCK_KEY);
+}
+
+export const saveLocalUserData = (userData: UserData): boolean => {
     try {
-        // Базовые проверки
-        if (!userData.id || !userData.username || !userData.email) {
-            console.error('Попытка сохранить неполные данные пользователя:', userData);
-            return;
-        }
+        // Сохраняем только неконфиденциальные данные
+        const safeData = {
+            username: userData.username,
+            avatarId: userData.avatarId
+            // НЕ сохраняем ID и email
+        };
 
-        // Сохраняем данные в localStorage
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+        // Использовать sessionStorage вместо localStorage
+        sessionStorage.setItem('user_display_data', JSON.stringify(safeData));
 
-        // Отправляем событие синхронизации для текущей вкладки
+        // Уведомить компоненты о изменении данных
         window.dispatchEvent(new CustomEvent('userDataUpdated', {
-            detail: userData
+            detail: userData // Для компонентов можно передавать полные данные
         }));
 
-        // Всегда сохраняем отдельные поля, даже если avatarId равен null
-        localStorage.setItem('user_username', userData.username);
-        localStorage.setItem('user_id', userData.id.toString());
-        localStorage.setItem('user_email', userData.email);
-        localStorage.setItem('user_avatar_id', userData.avatarId?.toString() || '');
-
-        console.log('✅ Данные пользователя сохранены:', userData);
+        return true;
     } catch (e) {
         console.error('Ошибка при сохранении данных пользователя:', e);
+        return false;
     }
 };
+
+// Получение только отображаемых данных
+export const getDisplayUserData = () => {
+    try {
+        const data = sessionStorage.getItem('user_display_data');
+        return data ? JSON.parse(data) : null;
+    } catch (e) {
+        return null;
+    }
+};
+
+// Псевдоним для saveLocalUserData
+export const saveUserData = saveLocalUserData;
 
 /**
  * Обновление данных пользователя в localStorage
  */
 export const updateLocalUserData = (data: Partial<UserData>): UserData | null => {
     try {
-        // Получаем текущие данные
-        let currentData = getLocalUserData();
+        // Блокировка для предотвращения параллельных обновлений
+        if (!acquireLock()) {
+            console.warn('🔒 Обновление данных уже выполняется, пропускаем');
+            return null;
+        }
 
-        // Если данные отсутствуют в объекте, пробуем собрать из отдельных полей
-        if (!currentData) {
-            console.log('Данные пользователя не найдены в объекте, проверяем отдельные поля...');
+        try {
+            // Получаем текущие данные
+            let currentData = getLocalUserData();
 
-            // Проверяем отдельные поля в localStorage
-            const savedId = localStorage.getItem('user_id');
-            const savedUsername = localStorage.getItem('user_username');
-            const savedEmail = localStorage.getItem('user_email');
-            const savedAvatarId = localStorage.getItem('user_avatar_id');
+            // Восстановление из отдельных полей, если нет объекта
+            if (!currentData) {
+                const savedId = localStorage.getItem('user_id');
+                const savedUsername = localStorage.getItem('user_username');
+                const savedEmail = localStorage.getItem('user_email');
+                const savedAvatarId = localStorage.getItem('user_avatar_id');
 
-            // Если есть отдельные поля, восстанавливаем данные из них
-            if (savedId && savedUsername && savedEmail) {
-                currentData = {
-                    id: parseInt(savedId),
-                    username: savedUsername,
-                    email: savedEmail,
-                    avatarId: savedAvatarId ? parseInt(savedAvatarId) : undefined
-                };
-                console.log('Восстановлены данные пользователя из отдельных полей:', currentData);
-            } else if (data.id && data.username && data.email) {
-                // Если у нас есть все необходимые данные в аргументе
-                currentData = {
-                    id: data.id,
-                    username: data.username,
-                    email: data.email,
-                    avatarId: data.avatarId
-                };
-                console.log('Создан новый объект пользователя из переданных данных:', currentData);
-            } else {
-                console.error('Не удалось получить текущие данные пользователя для обновления');
-                return null;
+                if (savedId && savedUsername && savedEmail) {
+                    currentData = {
+                        id: parseInt(savedId),
+                        username: savedUsername,
+                        email: savedEmail,
+                        avatarId: savedAvatarId ? parseInt(savedAvatarId) : undefined
+                    };
+                } else if (data.id && data.username && data.email) {
+                    currentData = {
+                        id: data.id,
+                        username: data.username,
+                        email: data.email,
+                        avatarId: data.avatarId
+                    };
+                } else {
+                    console.error('❌ Не удалось получить текущие данные пользователя');
+                    return null;
+                }
             }
+
+            // Правильная обработка avatarId (null vs undefined)
+            const updatedData: UserData = {
+                id: data.id ?? currentData.id,
+                username: data.username ?? currentData.username,
+                email: data.email ?? currentData.email,
+                avatarId: data.avatarId !== undefined ? data.avatarId : currentData.avatarId
+            };
+
+            // Атомарное сохранение данных без использования Promise.all
+            // Это избавит от возможных гонок состояний
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedData));
+            localStorage.setItem('user_id', updatedData.id.toString());
+            localStorage.setItem('user_username', updatedData.username);
+            localStorage.setItem('user_email', updatedData.email);
+            localStorage.setItem('user_avatar_id', updatedData.avatarId?.toString() || '');
+
+            // Отправляем событие только один раз после всех обновлений
+            window.dispatchEvent(new CustomEvent('userDataUpdated', {
+                detail: updatedData
+            }));
+
+            return updatedData;
+        } finally {
+            // Всегда освобождаем блокировку
+            releaseLock();
         }
-
-        // Создаем обновленный объект, явно сохраняя все поля
-        const updatedData: UserData = {
-            id: currentData.id,
-            username: data.username !== undefined ? data.username : currentData.username,
-            email: data.email !== undefined ? data.email : currentData.email,
-            avatarId: data.avatarId !== undefined ? data.avatarId : currentData.avatarId
-        };
-
-        // Логируем изменения для отладки
-        console.log('Обновление данных пользователя:');
-        if (data.username !== undefined && data.username !== currentData.username) {
-            console.log(`- Имя: ${currentData.username} -> ${data.username}`);
-        }
-        if (data.avatarId !== undefined && data.avatarId !== currentData.avatarId) {
-            console.log(`- Аватар: ${currentData.avatarId} -> ${data.avatarId}`);
-        }
-
-        // Сохраняем обновленные данные
-        saveLocalUserData(updatedData);
-
-        // Дополнительно отправляем событие для компонентов, которые могут слушать изменения
-        window.dispatchEvent(new CustomEvent('userDataUpdated', {
-            detail: updatedData
-        }));
-
-        return updatedData;
     } catch (e) {
-        console.error('Ошибка при обновлении данных пользователя:', e);
+        console.error('❌ Ошибка при обновлении данных пользователя:', e);
+        releaseLock(); // Освобождаем блокировку даже при ошибке
         return null;
     }
 };
 
+/**
+ * Синхронизация данных между вкладками
+ */
 export const initUserDataSync = (): void => {
     // Прослушиваем события хранилища (изменения localStorage в других вкладках)
     window.addEventListener('storage', (event) => {
@@ -171,11 +210,28 @@ export const initUserDataSync = (): void => {
 /**
  * Удаление данных пользователя из localStorage
  */
-export const clearLocalUserData = (): void => {
-    localStorage.removeItem(USER_STORAGE_KEY);
-    localStorage.removeItem('user_username');
-    localStorage.removeItem('user_id');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('user_avatar_id');
-    console.log('Данные пользователя удалены из localStorage');
+export const clearLocalUserData = (): boolean => {
+    // Получаем блокировку для атомарной операции
+    if (!acquireLock()) {
+        console.warn('Не удалось получить блокировку для очистки данных');
+        return false;
+    }
+
+    try {
+        localStorage.removeItem(USER_STORAGE_KEY);
+        localStorage.removeItem('user_username');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('user_email');
+        localStorage.removeItem('user_avatar_id');
+        console.log('Данные пользователя удалены из localStorage');
+
+        // Уведомляем о выходе
+        window.dispatchEvent(new CustomEvent(USER_EVENTS.AUTH_CHANGED, {
+            detail: { isAuthenticated: false }
+        }));
+
+        return true;
+    } finally {
+        releaseLock();
+    }
 };

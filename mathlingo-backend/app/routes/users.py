@@ -26,9 +26,10 @@ def login_user(user: UserLogin, response: Response, db: Session = Depends(get_db
     response.set_cookie(
         key="token",
         value=access_token,
-        httponly=True,        # Кука недоступна для JS
-        secure=False,         # Для разработки на HTTP; в продакшене ставь True и используй HTTPS
-        samesite="lax",       # Lowercase 'lax' to match standard
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=86400,
         path="/"
     )
 
@@ -106,6 +107,9 @@ def update_user_profile(
     """Обновление данных профиля пользователя"""
     changes_made = False
 
+    print(f"Запрос на обновление профиля: {data.dict()}")
+    print(f"Текущий пользователь: {user.id}, {user.username}")
+
     # Проверка и обновление имени пользователя (только если оно указано в запросе)
     if hasattr(data, 'username') and data.username is not None:
         if data.username != user.username:
@@ -146,6 +150,8 @@ def update_user_profile(
         print("Изменения сохранены в базе данных")
     else:
         print("Нет изменений для сохранения")
+
+    print(f"Обновлённые данные: username={user.username}, avatar_id={user.avatar_id}")
 
     # Возвращаем обновленные данные в формате, совместимом с /api/me
     return {

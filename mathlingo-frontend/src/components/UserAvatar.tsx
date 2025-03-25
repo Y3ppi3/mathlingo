@@ -8,8 +8,30 @@ interface UserAvatarProps {
     onClick?: () => void;
 }
 
+// Перемещаем функцию getRandomColor за пределы компонента
+// чтобы она не создавалась заново при каждом рендере
+const getRandomColor = (name: string) => {
+    // Проверка на undefined/null
+    if (!name) {
+        return 'bg-gray-500'; // Возвращаем цвет по умолчанию
+    }
+
+    const colors = [
+        'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+        'bg-red-500', 'bg-purple-500', 'bg-pink-500',
+        'bg-indigo-500', 'bg-teal-500'
+    ];
+
+    // Теперь безопасно вызываем split()
+    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+    return colors[index];
+};
+
+// Функция для формирования URL аватарки
+const getAvatarUrl = (id: number) => `/avatars/${id}.png`;
+
 const UserAvatar: React.FC<UserAvatarProps> = ({
-                                                   username,
+                                                   username = '',
                                                    avatarId,
                                                    size = 'md',
                                                    onClick
@@ -22,26 +44,18 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     };
 
     // Получаем первую букву имени пользователя
-    const initial = username ? username.charAt(0).toUpperCase() : '?';
+    const initial = (username && username.length > 0)
+        ? username.charAt(0).toUpperCase()
+        : '?';
 
-    // Генерируем цвет на основе имени пользователя
-    const getRandomColor = (name: string) => {
-        const colors = [
-            'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
-            'bg-red-500', 'bg-purple-500', 'bg-pink-500',
-            'bg-indigo-500', 'bg-teal-500'
-        ];
-        const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
-        return colors[index];
-    };
-
-    // Функция для формирования URL аватарки
-    const getAvatarUrl = (id: number) => `/avatars/${id}.png`;
+    // Получаем цвет на основе имени пользователя
+    // Теперь эта функция используется после её объявления
+    const colorClass = username ? getRandomColor(username) : 'bg-gray-500';
 
     return (
         <div
             className={`${sizeClasses[size]} rounded-full flex items-center justify-center text-white font-medium cursor-pointer ${
-                avatarId ? '' : getRandomColor(username)
+                avatarId ? '' : colorClass
             }`}
             onClick={onClick}
         >

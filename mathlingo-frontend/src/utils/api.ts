@@ -1,8 +1,12 @@
-// src/utils/api.ts (объединенный)
+// src/utils/api.ts
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+// Хранение CSRF-токена
+let csrfToken: string | null = null;
+
+// Создаем экземпляр API
 export const api = axios.create({
     baseURL: API_URL,
     withCredentials: true, // Для передачи cookies
@@ -11,8 +15,9 @@ export const api = axios.create({
     },
 });
 
-// Интерцептор для добавления токенов
+// Интерцептор для добавления токенов и CSRF
 api.interceptors.request.use((config) => {
+    // Добавляем авторизационные токены
     const adminToken = localStorage.getItem('adminToken');
     const userToken = localStorage.getItem('token');
 
@@ -22,8 +27,53 @@ api.interceptors.request.use((config) => {
         config.headers['Authorization'] = `Bearer ${userToken}`;
     }
 
+    // Добавляем CSRF-токен для методов, изменяющих данные
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method?.toUpperCase() || '')) {
+        if (csrfToken) {
+            config.headers['X-CSRF-Token'] = csrfToken;
+            console.log('Отправляем CSRF-токен:', csrfToken);
+        } else {
+            console.warn('CSRF-токен отсутствует для запроса:', config.url);
+        }
+    }
+
     return config;
 });
+
+// Перехватчик для извлечения CSRF-токена из ответов
+api.interceptors.response.use(
+    (response) => {
+        // Получаем CSRF-токен из заголовка
+        const newCsrfToken = response.headers['x-csrf-token'];
+        if (newCsrfToken) {
+            csrfToken = newCsrfToken;
+            console.log('Получен новый CSRF-токен:', newCsrfToken);
+        }
+        return response;
+    },
+    (error) => {
+        // Для 403 ошибок, связанных с CSRF
+        if (error.response && error.response.status === 403 &&
+            error.response.data?.detail?.includes('CSRF')) {
+            console.error('CSRF ошибка:', error.response.data.detail);
+
+            // Можно попробовать получить новый токен
+            api.get('/api/me').catch(() => {});
+        }
+        return Promise.reject(error);
+    }
+);
+
+// Функция для принудительного обновления CSRF-токена
+export const refreshCsrfToken = async () => {
+    try {
+        await api.get('/api/me');
+        return true;
+    } catch (error) {
+        console.error('Не удалось обновить CSRF-токен:', error);
+        return false;
+    }
+};
 
 // --- Функции для обычных пользователей ---
 
@@ -163,6 +213,8 @@ export const fetchAllUsers = async () => {
         throw error;
     }
 };
+
+// --- Функции для карт и геймификации ---
 
 export const fetchMapData = async (subjectId: number) => {
     try {
