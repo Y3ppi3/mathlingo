@@ -141,33 +141,15 @@ export function useUser() {
     }, [fetchUser]);
 
     // Функция для обновления данных пользователя
-    const updateUserProfile = async (data: {username?: string, avatarId?: number | undefined}) => {
+    const updateUserProfile = async (data: {username?: string, avatarId?: number | null}) => {
         if (!user) {
             throw new Error("Пользователь не авторизован");
         }
 
         try {
             console.log("📝 Отправка обновления профиля:", data);
-
             const API_URL = import.meta.env.VITE_API_URL;
 
-            // В режиме разработки сразу обновляем локальные данные
-            if (process.env.NODE_ENV === 'development') {
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                // Обновляем локальные данные
-                const updatedUser = updateLocalUserData(data);
-                if (updatedUser) {
-                    console.log("✅ Локальные данные обновлены:", updatedUser);
-                    setUser(updatedUser);
-                } else {
-                    console.error("❌ Не удалось обновить локальные данные");
-                }
-
-                return { success: true };
-            }
-
-            // В производственном режиме отправляем запрос на сервер
             const response = await fetch(`${API_URL}/api/me/update`, {
                 method: "PUT",
                 credentials: "include",
@@ -180,28 +162,8 @@ export function useUser() {
                 throw new Error(errorData.detail || "Не удалось обновить профиль");
             }
 
-            // Получаем обновленные данные пользователя
-            try {
-                const userData = await response.json();
-                setUser(userData);
-
-                // Сохраняем обновленные данные в localStorage
-                updateLocalUserData(userData);
-            } catch (error) {
-                // Если не удалось получить данные из ответа, повторно запрашиваем
-                console.error("Ошибка при обработке ответа:", error);
-                const refreshResponse = await fetch(`${API_URL}/api/me`, {
-                    method: "GET",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                });
-
-                if (refreshResponse.ok) {
-                    const userData = await refreshResponse.json();
-                    setUser(userData);
-                    updateLocalUserData(userData);
-                }
-            }
+            // После успешного обновления всегда запрашиваем актуальные данные
+            await refreshUserData();
 
             return { success: true };
         } catch (err) {

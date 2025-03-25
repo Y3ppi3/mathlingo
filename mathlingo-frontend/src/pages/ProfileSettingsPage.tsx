@@ -58,7 +58,7 @@ const ProfileSettingsPage: React.FC = () => {
             }
 
             // Подготавливаем данные для обновления, строго указывая, что обновляется
-            const updateData: {username?: string, avatarId?: number} = {};
+            const updateData: {username?: string, avatarId?: number | null} = {};
 
             if (avatarId === null && user?.avatarId !== undefined) {
                 updateData.avatarId = undefined; // Если пользователь удалил аватар
@@ -66,12 +66,10 @@ const ProfileSettingsPage: React.FC = () => {
 
             // Включаем только те поля, которые были изменены
             if (username !== user?.username) {
-                console.log(`Изменение имени пользователя: ${user?.username} -> ${username}`);
                 updateData.username = username;
             }
 
             if (avatarId !== user?.avatarId) {
-                console.log(`Изменение аватара: ${user?.avatarId || 'нет'} -> ${avatarId || 'нет'}`);
                 updateData.avatarId = avatarId;
             }
 

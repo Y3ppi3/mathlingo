@@ -30,7 +30,7 @@ export const getLocalUserData = (): UserData | null => {
  */
 export const saveLocalUserData = (userData: UserData): void => {
     try {
-        // Проверяем, что данные валидны перед сохранением
+        // Базовые проверки
         if (!userData.id || !userData.username || !userData.email) {
             console.error('Попытка сохранить неполные данные пользователя:', userData);
             return;
@@ -44,13 +44,11 @@ export const saveLocalUserData = (userData: UserData): void => {
             detail: userData
         }));
 
-        // Также сохраняем ключевые поля отдельно для надежности
+        // Всегда сохраняем отдельные поля, даже если avatarId равен null
         localStorage.setItem('user_username', userData.username);
         localStorage.setItem('user_id', userData.id.toString());
         localStorage.setItem('user_email', userData.email);
-        if (userData.avatarId !== undefined) {
-            localStorage.setItem('user_avatar_id', userData.avatarId?.toString() || '');
-        }
+        localStorage.setItem('user_avatar_id', userData.avatarId?.toString() || '');
 
         console.log('✅ Данные пользователя сохранены:', userData);
     } catch (e) {
