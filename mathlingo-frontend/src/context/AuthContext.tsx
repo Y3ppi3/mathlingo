@@ -31,9 +31,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const navigate = useNavigate();
 
-    // Проверка аутентификации при загрузке компонента
     useEffect(() => {
         const checkAuth = async () => {
+            // Сначала проверяем localStorage на наличие данных пользователя
+            // для быстрого восстановления состояния
+            const hasUserData = localStorage.getItem('user_username') !== null &&
+                localStorage.getItem('user_id') !== null;
+
+            if (hasUserData) {
+                // Если есть данные пользователя, считаем его авторизованным
+                // без лишнего запроса к API
+                console.log("✅ Найдены локальные данные пользователя, устанавливаем isAuthenticated=true");
+                setIsAuthenticated(true);
+            }
+
+            // Всё равно запускаем полную проверку для синхронизации с сервером
             const result = await refreshAuth();
             console.log(`Проверка аутентификации: ${result ? 'авторизован' : 'не авторизован'}`);
         };
@@ -44,15 +56,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Функция обновления статуса аутентификации
     const refreshAuth = async (): Promise<boolean> => {
         try {
-            // Проверяем наличие токена в localStorage для оптимизации запросов
+            // Проверяем наличие данных пользователя в localStorage
+            const hasUserData = localStorage.getItem('user_username') !== null &&
+                localStorage.getItem('user_id') !== null;
+
+            // Проверяем наличие токена в localStorage
             const token = localStorage.getItem(AUTH_TOKEN_KEY);
 
-            // Если в режиме разработки и нет токена, считаем неавторизованным
-            if (process.env.NODE_ENV === 'development' && !token) {
+            // Если нет ни токена, ни данных пользователя - считаем неавторизованным
+            if (!token && !hasUserData) {
+                console.log("❌ Нет токена и данных пользователя, устанавливаем isAuthenticated=false");
                 setIsAuthenticated(false);
                 return false;
             }
 
+            // Делаем запрос к API для проверки актуальности сессии
             const response = await fetch(`${API_URL}/api/me`, {
                 method: "GET",
                 credentials: "include",
@@ -60,29 +78,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (response.ok) {
-                // Получаем информацию о пользователе
+                // Получаем актуальные данные пользователя
                 const userData = await response.json();
 
-                // В режиме разработки сохраняем данные в localStorage
-                if (process.env.NODE_ENV === 'development') {
-                    saveLocalUserData(userData);
+                // Обновляем localStorage
+                localStorage.setItem('user_username', userData.username);
+                localStorage.setItem('user_id', userData.id.toString());
+                localStorage.setItem('user_email', userData.email);
+                if (userData.avatarId !== undefined) {
+                    localStorage.setItem('user_avatar_id', userData.avatarId?.toString() || '');
                 }
 
-                // Сохраняем токен для оптимизации запросов
-                if (token) {
-                    localStorage.setItem(AUTH_TOKEN_KEY, token);
-                }
-
+                // Устанавливаем статус аутентификации
                 setIsAuthenticated(true);
+
+                // Событие для обновления данных пользователя в других компонентах
+                window.dispatchEvent(new CustomEvent('userDataUpdated', {
+                    detail: userData
+                }));
+
                 return true;
             } else {
-                // Если запрос не успешен, удаляем токен и считаем неавторизованным
+                // В режиме разработки, если нет ответа от сервера,
+                // но есть данные в localStorage - считаем авторизованным
+                if (process.env.NODE_ENV === 'development' && hasUserData) {
+                    console.log("⚠️ Сервер недоступен, но есть локальные данные, сохраняем авторизацию");
+                    setIsAuthenticated(true);
+                    return true;
+                }
+
+                // Иначе сбрасываем авторизацию
                 localStorage.removeItem(AUTH_TOKEN_KEY);
                 setIsAuthenticated(false);
                 return false;
             }
         } catch (error) {
-            console.error("Ошибка проверки авторизации:", error);
+            console.error("❌ Ошибка проверки авторизации:", error);
+
+            // В режиме разработки, если есть данные пользователя,
+            // сохраняем авторизацию даже при ошибке
+            if (process.env.NODE_ENV === 'development' &&
+                localStorage.getItem('user_username') !== null) {
+                console.log("⚠️ Ошибка проверки авторизации, но есть локальные данные");
+                setIsAuthenticated(true);
+                return true;
+            }
+
             setIsAuthenticated(false);
             return false;
         }

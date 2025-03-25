@@ -1,5 +1,5 @@
-// src/hooks/useUser.ts
-import { useState, useEffect } from 'react';
+// src/hooks/useUser.ts - улучшенная версия
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getLocalUserData, updateLocalUserData } from '../utils/LocalUserStorage';
 
@@ -16,70 +16,70 @@ export function useUser() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Получаем URL аватарки по ID
-    const getAvatarUrl = (avatarId?: number) => {
-        return avatarId ? `/avatars/${avatarId}.png` : undefined;
-    };
+    // Функция получения данных пользователя, которая будет вызываться при
+    // монтировании компонента и при обновлении пользовательских данных
+    const fetchUser = useCallback(async () => {
+        if (!isAuthenticated) {
+            setUser(null);
+            setLoading(false);
+            return;
+        }
 
-    useEffect(() => {
-        const fetchUser = async () => {
-            if (!isAuthenticated) {
-                setUser(null);
+        try {
+            setLoading(true);
+            const API_URL = import.meta.env.VITE_API_URL;
+
+            // Сначала проверяем отдельные поля в localStorage (более надежный способ)
+            const savedUsername = localStorage.getItem('user_username');
+            const savedId = localStorage.getItem('user_id');
+            const savedEmail = localStorage.getItem('user_email');
+            const savedAvatarId = localStorage.getItem('user_avatar_id');
+
+            if (savedId && savedUsername && savedEmail) {
+                const localUser: User = {
+                    id: parseInt(savedId),
+                    username: savedUsername,
+                    email: savedEmail,
+                    avatarId: savedAvatarId ? parseInt(savedAvatarId) : undefined
+                };
+
+                console.log('✅ Данные пользователя загружены из отдельных полей localStorage:', localUser);
+                setUser(localUser);
+                setError(null);
                 setLoading(false);
                 return;
             }
 
+            // Затем проверяем полный объект в localStorage
+            const localUserData = getLocalUserData();
+            if (localUserData) {
+                console.log('✅ Данные пользователя загружены из localStorage:', localUserData);
+                setUser(localUserData);
+                setError(null);
+                setLoading(false);
+                return;
+            }
+
+            // Если не нашли данные в localStorage, пробуем получить с сервера
             try {
-                setLoading(true);
-                const API_URL = import.meta.env.VITE_API_URL;
+                const response = await fetch(`${API_URL}/api/me`, {
+                    method: "GET",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                });
 
-                // Проверяем локальное хранилище в режиме разработки
-                if (process.env.NODE_ENV === 'development') {
-                    const localUserData = getLocalUserData();
-                    if (localUserData) {
-                        console.log('Данные пользователя загружены из локального хранилища:', localUserData);
-                        setUser(localUserData);
-                        setError(null);
-                        setLoading(false);
-                        return;
-                    }
-                }
+                if (response.ok) {
+                    const userData = await response.json();
+                    setUser(userData);
 
-                // Если локальных данных нет или мы не в режиме разработки, запрашиваем с сервера
-                try {
-                    const response = await fetch(`${API_URL}/api/me`, {
-                        method: "GET",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                    });
+                    // Сохраняем полученные данные в localStorage
+                    updateLocalUserData(userData);
 
-                    if (response.ok) {
-                        const userData = await response.json();
-                        setUser(userData);
-                        setError(null);
-                    } else {
-                        // Попытка использовать временные тестовые данные в режиме разработки
-                        if (process.env.NODE_ENV === 'development') {
-                            console.log('Используем тестовые данные пользователя');
-                            const testUser = {
-                                id: 1,
-                                username: "Тестовый пользователь",
-                                email: "test@example.com",
-                                avatarId: 1
-                            };
-                            setUser(testUser);
-                            // Сохраняем в локальное хранилище
-                            updateLocalUserData(testUser);
-                            setError(null);
-                        } else {
-                            setUser(null);
-                            setError('Не удалось загрузить данные пользователя');
-                        }
-                    }
-                } catch (err) {
-                    // Если не можем подключиться к серверу в режиме разработки, создаем тестового пользователя
+                    setError(null);
+                } else {
+                    // Если сервер недоступен в режиме разработки, используем тестовые данные
                     if (process.env.NODE_ENV === 'development') {
-                        console.log('Не удалось подключиться к серверу, используем тестовые данные');
+                        console.log('⚠️ Сервер недоступен, используем тестовые данные');
                         const testUser = {
                             id: 1,
                             username: "Тестовый пользователь",
@@ -87,49 +87,87 @@ export function useUser() {
                             avatarId: 1
                         };
                         setUser(testUser);
-                        // Сохраняем в локальное хранилище
+
+                        // Сохраняем тестовые данные в localStorage
                         updateLocalUserData(testUser);
+
                         setError(null);
                     } else {
                         setUser(null);
-                        setError('Произошла ошибка при загрузке данных пользователя');
-                        console.error(err);
+                        setError('Не удалось загрузить данные пользователя');
                     }
                 }
-            } finally {
-                setLoading(false);
-            }
-        };
+            } catch (err) {
+                console.error('❌ Ошибка API:', err);
 
-        fetchUser();
+                // В режиме разработки используем тестовые данные при ошибке
+                if (process.env.NODE_ENV === 'development') {
+                    const testUser = {
+                        id: 1,
+                        username: "Тестовый пользователь",
+                        email: "test@example.com",
+                        avatarId: 1
+                    };
+                    setUser(testUser);
+                    updateLocalUserData(testUser);
+                    setError(null);
+                } else {
+                    setError('Произошла ошибка при загрузке данных пользователя');
+                }
+            }
+        } finally {
+            setLoading(false);
+        }
     }, [isAuthenticated]);
 
+    // Подписываемся на событие обновления данных пользователя
+    useEffect(() => {
+        const handleUserDataUpdate = (event: Event) => {
+            const customEvent = event as CustomEvent<User>;
+            setUser(customEvent.detail);
+        };
+
+        window.addEventListener('userDataUpdated', handleUserDataUpdate);
+
+        return () => {
+            window.removeEventListener('userDataUpdated', handleUserDataUpdate);
+        };
+    }, []);
+
+    // Загружаем данные пользователя при монтировании компонента
+    // и при изменении статуса аутентификации
+    useEffect(() => {
+        fetchUser();
+    }, [fetchUser]);
+
     // Функция для обновления данных пользователя
-    const updateUserProfile = async (data: {username?: string, avatarId?: number}) => {
+    const updateUserProfile = async (data: {username?: string, avatarId?: number | undefined}) => {
         if (!user) {
             throw new Error("Пользователь не авторизован");
         }
 
         try {
+            console.log("📝 Отправка обновления профиля:", data);
+
             const API_URL = import.meta.env.VITE_API_URL;
 
-            console.log("Отправка обновления профиля:", data);
-
-            // Для тестирования, добавим задержку, чтобы имитировать запрос к серверу
-            // и сразу обновим локальные данные
+            // В режиме разработки сразу обновляем локальные данные
             if (process.env.NODE_ENV === 'development') {
                 await new Promise(resolve => setTimeout(resolve, 500));
 
-                // В режиме разработки обновляем данные без фактического API запроса
-                // Это временное решение пока backend не готов
+                // Обновляем локальные данные
                 const updatedUser = updateLocalUserData(data);
-                console.log("Локальное обновление пользователя:", updatedUser);
-                setUser(updatedUser);
+                if (updatedUser) {
+                    console.log("✅ Локальные данные обновлены:", updatedUser);
+                    setUser(updatedUser);
+                } else {
+                    console.error("❌ Не удалось обновить локальные данные");
+                }
 
                 return { success: true };
             }
 
-            // Реальный API запрос (будет использоваться, когда backend будет готов)
+            // В производственном режиме отправляем запрос на сервер
             const response = await fetch(`${API_URL}/api/me/update`, {
                 method: "PUT",
                 credentials: "include",
@@ -142,29 +180,39 @@ export function useUser() {
                 throw new Error(errorData.detail || "Не удалось обновить профиль");
             }
 
-            // Принудительно обновляем пользователя из серверного ответа или делаем новый запрос
+            // Получаем обновленные данные пользователя
             try {
                 const userData = await response.json();
                 setUser(userData);
-            } catch (e) {
-                // Если не удалось получить данные из ответа, делаем новый запрос для получения обновленных данных
-                const userResponse = await fetch(`${API_URL}/api/me`, {
+
+                // Сохраняем обновленные данные в localStorage
+                updateLocalUserData(userData);
+            } catch (error) {
+                // Если не удалось получить данные из ответа, повторно запрашиваем
+                console.error("Ошибка при обработке ответа:", error);
+                const refreshResponse = await fetch(`${API_URL}/api/me`, {
                     method: "GET",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
                 });
 
-                if (userResponse.ok) {
-                    const userData = await userResponse.json();
+                if (refreshResponse.ok) {
+                    const userData = await refreshResponse.json();
                     setUser(userData);
+                    updateLocalUserData(userData);
                 }
             }
 
             return { success: true };
         } catch (err) {
-            console.error("Ошибка при обновлении профиля:", err);
+            console.error("❌ Ошибка при обновлении профиля:", err);
             throw err;
         }
+    };
+
+    // Получаем URL аватарки по ID
+    const getAvatarUrl = (avatarId?: number) => {
+        return avatarId ? `/avatars/${avatarId}.png` : undefined;
     };
 
     return {
@@ -172,6 +220,7 @@ export function useUser() {
         loading,
         error,
         getAvatarUrl,
-        updateUserProfile
+        updateUserProfile,
+        refreshUserData: fetchUser // Экспортируем функцию обновления для использования извне
     };
 }

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 
 interface AvatarSelectorProps {
-    selectedAvatar: number | null;
+    selectedAvatar: number | undefined; // Изменено с number | null
     onSelect: (avatarId: number) => void;
 }
 
@@ -25,7 +25,7 @@ const AvatarSelector: React.FC<AvatarSelectorProps> = ({ selectedAvatar, onSelec
         <div className="relative">
             {/* Выбранная аватарка с кнопкой изменения */}
             <div className="flex items-center space-x-4 mb-3">
-                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-indigo-500 flex items-center justify-center bg-gray-200 dark:bg-gray-700">
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-indigo-500 flex items-center justify-center bg-gray-700 dark:bg-gray-200">
                     {selectedAvatar ? (
                         <img
                             src={getAvatarUrl(selectedAvatar)}
@@ -48,9 +48,9 @@ const AvatarSelector: React.FC<AvatarSelectorProps> = ({ selectedAvatar, onSelec
             {/* Модальное окно с выбором аватарок */}
             {isOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-xl w-full max-h-[80vh] overflow-auto">
+                    <div className="bg-gray-800 dark:bg-white rounded-lg p-6 max-w-xl w-full max-h-[80vh] overflow-auto">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                            <h3 className="text-lg font-medium text-white dark:text-gray-900">
                                 Выберите аватарку
                             </h3>
                             <button
