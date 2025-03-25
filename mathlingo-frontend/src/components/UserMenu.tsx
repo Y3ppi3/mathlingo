@@ -68,8 +68,16 @@ const UserMenu: React.FC<UserMenuProps> = ({
             {/* Настройки */}
             <div className="py-1 border-b border-gray-700 dark:border-gray-200">
                 <Link
+                    to="/dashboard"
+                    className="block px-4 py-2 text-sm text-gray-300 dark:text-gray-700 hover:bg-gray-700 dark:hover:bg-gray-100"
+                    onClick={onClose}
+                >
+                    Домашняя страница
+                </Link>
+
+                <Link
                     to="/profile/settings"
-                    className="block px-4 py-2 text-sm text-gray-300 dark:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="block px-4 py-2 text-sm text-gray-300 dark:text-gray-700 hover:bg-gray-700 dark:hover:bg-gray-100"
                     onClick={onClose}
                 >
                     Настройки профиля
@@ -79,7 +87,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
                         onLogout();
                         onClose();
                     }}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-400 dark:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="block w-full text-left px-4 py-2 text-sm text-red-400 dark:text-red-600 hover:bg-gray-700 dark:hover:bg-gray-100"
                 >
                     Выйти
                 </button>

@@ -1,5 +1,5 @@
-// Обновленный Navbar.tsx
-import React, { useState } from 'react';
+// src/components/Navbar.tsx
+import { useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logo.png";
@@ -11,6 +11,16 @@ function Navbar() {
     const { isAuthenticated, logout } = useAuth();
     const { user, loading } = useUser();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    // Ключ для принудительного обновления компонента UserMenu при изменении пользовательских данных
+    const [menuKey, setMenuKey] = useState(Date.now());
+
+    // Добавляем эффект, который будет обновлять ключ при изменении данных пользователя
+    useEffect(() => {
+        if (user) {
+            setMenuKey(Date.now());
+        }
+    }, [user]);
 
     const toggleMenu = () => {
         setIsMenuOpen(!isMenuOpen);
@@ -50,7 +60,7 @@ function Navbar() {
 
                                 {!loading && user && (
                                     <UserMenu
-                                        key={`user-menu-${user.username}-${user.avatarId}`}
+                                        key={`menu-${menuKey}`}
                                         isOpen={isMenuOpen}
                                         onClose={() => setIsMenuOpen(false)}
                                         username={user.username}
