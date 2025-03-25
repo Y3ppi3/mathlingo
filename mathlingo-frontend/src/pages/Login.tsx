@@ -1,7 +1,8 @@
-// Login.tsx
+// src/pages/Login.tsx (обновленный)
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { saveLocalUserData } from "../utils/LocalUserStorage";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -20,6 +21,32 @@ const Login = () => {
 
         try {
             console.log("Отправка запроса на API:", `${API_URL}/api/login/`);
+
+            if (process.env.NODE_ENV === 'development') {
+                // В режиме разработки можно использовать тестовые данные
+                console.log('Режим разработки: имитируем вход без реального API запроса');
+
+                // Задержка для имитации запроса
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Создаем тестового пользователя (имя из электронной почты)
+                const username = email.split('@')[0] || "Пользователь";
+                const testUser = {
+                    id: 1,
+                    username: username,
+                    email: email,
+                    avatarId: Math.floor(Math.random() * 29) + 1 // Случайная аватарка
+                };
+
+                // Сохраняем данные и выполняем вход
+                saveLocalUserData(testUser);
+                await login(testUser);
+                navigate("/dashboard");
+
+                return;
+            }
+
+            // Реальный запрос к API для production
             const response = await fetch(`${API_URL}/api/login/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -34,7 +61,11 @@ const Login = () => {
                 throw new Error(errorData.detail || "Неверный email или пароль");
             }
 
-            await login(); // Убедимся, что login полностью выполнится перед навигацией
+            // Получаем данные пользователя из ответа
+            const userData = await response.json();
+
+            // Выполняем вход
+            await login(userData);
             navigate("/dashboard");
         } catch (err: unknown) {
             console.error("❌ Ошибка при входе:", err);

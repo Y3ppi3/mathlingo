@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import AdventureMap from '../components/adventure/AdventureMap';
 import { api } from '../utils/api';
+import '../styles/adventure-map.css'; // Импортируем новые стили
 
 interface Subject {
     id: number;
@@ -55,7 +56,7 @@ const AdventureMapPage: React.FC = () => {
         <div className="min-h-screen bg-gray-900 dark:bg-white">
             <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
-                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
+                <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg p-6 text-center">
                     <h2 className="text-xl text-red-500 mb-4">{error || 'Предмет не найден'}</h2>
                     <button
                         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -73,6 +74,7 @@ const AdventureMapPage: React.FC = () => {
             <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
                 <div className="bg-gray-800 dark:bg-white rounded-lg shadow-lg p-6">
+                    {/* Шапка страницы */}
                     <div className="flex items-center mb-6">
                         {subject.icon && (
                             <img
@@ -82,24 +84,26 @@ const AdventureMapPage: React.FC = () => {
                             />
                         )}
                         <div>
-                            <h1 className="text-2xl font-bold">{subject.name}</h1>
+                            <h1 className="text-2xl font-bold text-white dark:text-gray-900">{subject.name}</h1>
                             <p className="text-gray-400 dark:text-gray-500">{subject.description}</p>
                         </div>
                     </div>
 
                     <div className="mb-8">
-                        <h2 className="text-xl font-semibold mb-4">Ваше приключение</h2>
+                        <h2 className="text-xl font-semibold mb-4 text-white dark:text-gray-900">Ваше приключение</h2>
                         <p className="text-gray-300 dark:text-gray-600 mb-4">
                             Пройдите через различные локации, выполняя увлекательные задания по математике.
                             Накапливайте очки и открывайте новые части карты!
                         </p>
 
-                        {/* Карта приключений */}
-                        <AdventureMap subjectId={parseInt(subjectId!)} />
+                        {/* Карта приключений с исправленными стилями */}
+                        <div className="adventure-map-wrapper">
+                            <AdventureMap subjectId={parseInt(subjectId!)} />
+                        </div>
                     </div>
 
-                    <div className="mt-8 p-4 bg-blue-900 dark:bg-blue-50 rounded-lg">
-                        <h3 className="text-lg font-semibold mb-2">Как играть?</h3>
+                    <div className="mt-8 p-4 bg-blue-900/80 dark:bg-blue-50 rounded-lg">
+                        <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900">Как играть?</h3>
                         <ol className="list-decimal list-inside space-y-2 text-gray-300 dark:text-gray-700">
                             <li>Нажмите на доступную локацию на карте (яркие иконки)</li>
                             <li>Выберите группу заданий, которую хотите пройти</li>

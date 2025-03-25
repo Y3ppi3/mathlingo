@@ -56,6 +56,7 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+    const [mapName, setMapName] = useState<string>('');
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -63,6 +64,9 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
             try {
                 setLoading(true);
                 const data = await fetchMapData(subjectId) as MapResponse;
+
+                // Сохраняем имя карты
+                setMapName(data.map.name || 'Карта приключений');
 
                 // Преобразуем данные, учитывая прогресс пользователя
                 const processedLocations = data.map.locations.map((loc) => ({
@@ -95,7 +99,6 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
         }
     };
 
-    // ИСПРАВЛЕНО: переход на страницу с играми вместо заданий
     const openGamesPage = () => {
         // Переходим на страницу с играми для текущего предмета
         navigate(`/subject/${subjectId}/games`);
@@ -105,112 +108,141 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
     if (error) return <div className="text-red-500 p-4">{error}</div>;
 
     return (
-        <div className="relative w-full h-96 bg-gray-800 dark:bg-white rounded-lg overflow-hidden">
-            {/* Фоновое изображение карты с адаптивным слоем затемнения */}
-            <div className="absolute inset-0 bg-cover bg-center"
-                 style={{backgroundImage: 'url(/images/map-background.jpg)'}}></div>
+        <div className="flex flex-col space-y-4">
+            <h2 className="text-xl font-semibold text-white dark:text-gray-900 transition-colors">
+                {mapName}
+            </h2>
 
-            {/* Слой затемнения (разный для светлой/темной темы) */}
-            <div className="absolute inset-0 bg-black/10 dark:bg-black/10 transition-colors"></div>
-
-
-
-            {/* Локации на карте */}
-            {locations.map((location) => (
+            {/* Основной контейнер карты с увеличенной высотой */}
+            <div className="relative w-full h-[600px] bg-gray-800 dark:bg-gray-100 rounded-lg overflow-hidden shadow-lg">
+                {/* Фоновое изображение карты */}
                 <div
-                    key={location.id}
-                    className={`absolute cursor-pointer transition-all duration-300 ${
-                        location.unlocked ? 'opacity-100 hover:scale-110' : 'opacity-50 filter grayscale'
-                    } ${location.completed ? 'ring-2 ring-green-500' : ''}`}
-                    style={{
-                        left: `${location.position_x}%`,
-                        top: `${location.position_y}%`,
-                        transform: 'translate(-50%, -50%)'
-                    }}
-                    onClick={() => handleLocationClick(location)}
-                >
-                    <div className="w-12 h-12 flex items-center justify-center">
-                        <img
-                            src={location.icon_url || '/images/default-location.svg'}
-                            alt={location.name}
-                            className="w-full h-full object-contain"
-                        />
-                    </div>
-                    <div
-                        className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-1 text-xs font-bold text-gray-200 dark:text-gray-800">
-                        {location.name}
-                    </div>
-                </div>
-            ))}
+                    className="absolute inset-0 bg-cover bg-center z-0"
+                    style={{backgroundImage: 'url(/images/map-background.jpg)'}}
+                ></div>
 
-            {/* Боковая панель с информацией о выбранной локации */}
-            {selectedLocation && (
-                <div
-                    className="absolute right-0 top-0 bottom-0 w-1/3 bg-gray-800 dark:bg-white bg-opacity-90 dark:bg-opacity-90 p-4 shadow-lg">
-                    <button
-                        className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        onClick={() => setSelectedLocation(null)}
-                    >
-                        &times;
-                    </button>
+                {/* Слой затемнения */}
+                <div className="absolute inset-0 bg-black/20 dark:bg-black/5 z-10"></div>
 
-                    <h3 className="text-xl font-bold mb-2 text-white dark:text-gray-800">{selectedLocation.name}</h3>
-                    <p className="text-sm mb-4 text-gray-600 dark:text-gray-800">{selectedLocation.description}</p>
-
-                    {/* ИСПРАВЛЕНО: добавлена кнопка для перехода на страницу с играми */}
-                    <div className="mb-6">
-                        <button
-                            className="w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
-                            onClick={openGamesPage}
+                {/* Контейнер для локаций - предотвращает перекрытие элементами боковой панели */}
+                <div className="absolute inset-0 z-20">
+                    {/* Локации на карте */}
+                    {locations.map((location) => (
+                        <div
+                            key={location.id}
+                            className={`absolute cursor-pointer transition-all duration-300 ${
+                                location.unlocked ? 'opacity-100 hover:scale-110' : 'opacity-50 filter grayscale'
+                            } ${location.completed ? 'ring-2 ring-green-500' : ''}`}
+                            style={{
+                                left: `${location.position_x}%`,
+                                top: `${location.position_y}%`,
+                                transform: 'translate(-50%, -50%)',
+                                zIndex: selectedLocation?.id === location.id ? 40 : 30
+                            }}
+                            onClick={() => handleLocationClick(location)}
                         >
-                            Открыть игры
-                        </button>
-                    </div>
-
-                    <h4 className="text-lg font-semibold mb-2 text-white dark:text-gray-800">Задания:</h4>
-                    {selectedLocation.taskGroups.length > 0 ? (
-                        <div className="space-y-3">
-                            {selectedLocation.taskGroups.map((group) => (
-                                // Исправленная версия секции с карточками заданий
-                                <div
-                                    key={group.id}
-                                    className="p-3 rounded-lg transition-colors bg-gray-700 hover:bg-gray-600 dark:bg-gray-100 dark:hover:bg-gray-200 border border-gray-600 dark:border-gray-200"
-                                >
-                                    <div className="flex justify-between items-center">
-                                        <h5 className="font-medium text-gray-100 dark:text-gray-800">{group.name}</h5>
-                                        <span className="text-xs px-2 py-1 rounded bg-indigo-600 text-white">
-                                            {group.reward_points} очков
-                                        </span>
-                                    </div>
-                                    <p className="text-xs mt-1 text-gray-300 dark:text-gray-500">{group.description}</p>
-                                    <div className="flex items-center mt-2">
-                                        <div className="flex">
-                                            {Array.from({length: 5}).map((_, i) => (
-                                                <span
-                                                    key={i}
-                                                    className={`w-4 h-4 ${
-                                                        i < group.difficulty
-                                                            ? 'text-yellow-400'  // Ярче для лучшей видимости
-                                                            : 'text-gray-600'    // Темнее для неактивных
-                                                    }`}
-                                                >
-                                                    ★
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <span className="text-xs ml-2 text-gray-300 dark:text-gray-500">
-                                            {group.tasks.length} задани{group.tasks.length === 1 ? 'е' : 'й'}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
+                            <div className="w-12 h-12 flex items-center justify-center bg-gray-900/20 dark:bg-white/20 rounded-full p-1 shadow-lg">
+                                <img
+                                    src={location.icon_url || '/images/default-location.svg'}
+                                    alt={location.name}
+                                    className="w-10 h-10 object-contain"
+                                />
+                            </div>
+                            {/* Добавляем прозрачный элемент, чтобы увеличить высоту метки и избежать накладывания текста */}
+                            <div style={{ height: '25px' }}></div>
+                            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-2 text-xs font-bold text-white dark:text-gray-800 bg-gray-900/95 dark:bg-white/95 px-2 py-1 rounded whitespace-nowrap" style={{
+                                maxWidth: "none",  // Убираем ограничение ширины
+                                zIndex: 35,        // Увеличиваем z-index чтобы метка была поверх других элементов
+                                textShadow: "0px 0px 2px rgba(0,0,0,0.5)",  // Добавляем тень для лучшей видимости
+                                boxShadow: "0px 1px 3px rgba(0,0,0,0.3)"    // Добавляем тень для метки
+                            }}>
+                                {location.name}
+                            </div>
                         </div>
-                    ) : (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">В этой локации пока нет доступных
-                            заданий.</p>
-                    )}
+                    ))}
                 </div>
-            )}
+
+                {/* Информационная панель с выбранной локацией */}
+                {selectedLocation && (
+                    <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gray-800/95 dark:bg-white/95 p-4 shadow-lg z-50 overflow-y-auto">
+                        <button
+                            className="absolute top-2 right-2 text-gray-400 hover:text-white dark:text-gray-600 dark:hover:text-gray-900 z-10"
+                            onClick={() => setSelectedLocation(null)}
+                        >
+                            ✕
+                        </button>
+
+                        <h3 className="text-xl font-bold mb-2 text-white dark:text-gray-800">{selectedLocation.name}</h3>
+                        <p className="text-sm mb-4 text-gray-300 dark:text-gray-600">{selectedLocation.description}</p>
+
+                        <div className="mb-6">
+                            <button
+                                className="w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                                onClick={openGamesPage}
+                            >
+                                Открыть игры
+                            </button>
+                        </div>
+
+                        <h4 className="text-lg font-semibold mb-2 text-white dark:text-gray-800">Задания:</h4>
+                        {selectedLocation.taskGroups.length > 0 ? (
+                            <div className="space-y-3">
+                                {selectedLocation.taskGroups.map((group) => (
+                                    <div
+                                        key={group.id}
+                                        className="p-3 rounded-lg transition-colors bg-gray-700 hover:bg-gray-600 dark:bg-gray-100 dark:hover:bg-gray-200 border border-gray-600 dark:border-gray-200"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <h5 className="font-medium text-gray-100 dark:text-gray-800">{group.name}</h5>
+                                            <span className="text-xs px-2 py-1 rounded bg-indigo-600 text-white">
+                                                {group.reward_points} очков
+                                            </span>
+                                        </div>
+                                        <p className="text-xs mt-1 text-gray-300 dark:text-gray-500">{group.description}</p>
+                                        <div className="flex items-center mt-2">
+                                            <div className="flex">
+                                                {Array.from({length: 5}).map((_, i) => (
+                                                    <span
+                                                        key={i}
+                                                        className={`w-4 h-4 ${
+                                                            i < group.difficulty
+                                                                ? 'text-yellow-400'  // Ярче для лучшей видимости
+                                                                : 'text-gray-600'    // Темнее для неактивных
+                                                        }`}
+                                                    >
+                                                        ★
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            <span className="text-xs ml-2 text-gray-300 dark:text-gray-500">
+                                                {group.tasks.length} задани{group.tasks.length === 1 ? 'е' : 'й'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-400 dark:text-gray-500">В этой локации пока нет доступных заданий.</p>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Легенда карты */}
+            <div className="flex justify-center gap-6 bg-gray-800/70 dark:bg-gray-100/70 p-2 rounded">
+                <div className="flex items-center">
+                    <div className="w-4 h-4 bg-gray-900/20 dark:bg-white/20 rounded-full mr-2"></div>
+                    <span className="text-xs text-gray-300 dark:text-gray-700">Заблокированная локация</span>
+                </div>
+                <div className="flex items-center">
+                    <div className="w-4 h-4 bg-indigo-500/50 rounded-full mr-2"></div>
+                    <span className="text-xs text-gray-300 dark:text-gray-700">Доступная локация</span>
+                </div>
+                <div className="flex items-center">
+                    <div className="w-4 h-4 bg-green-500/50 ring-2 ring-green-500 rounded-full mr-2"></div>
+                    <span className="text-xs text-gray-300 dark:text-gray-700">Завершенная локация</span>
+                </div>
+            </div>
         </div>
     );
 };
