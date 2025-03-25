@@ -1,6 +1,8 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Body
 from sqlalchemy.orm import Session
+from typing import Optional
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models import User
@@ -79,5 +81,41 @@ def get_current_user_info(user: User = Depends(get_current_user)):
     return {
         "id": user.id,
         "username": user.username,
-        "email": user.email
+        "email": user.email,
+        "avatarId": user.avatar_id
     }
+
+
+# Схема для обновления профиля
+class UserProfileUpdate(BaseModel):
+    username: Optional[str] = None
+    avatarId: Optional[int] = None
+
+
+@router.put("/me/update")
+def update_user_profile(
+        data: UserProfileUpdate,
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """Обновление данных профиля пользователя"""
+
+    # Проверка уникальности имени пользователя, если оно было изменено
+    if data.username and data.username != user.username:
+        existing_user = db.query(User).filter(User.username == data.username).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Имя пользователя уже занято")
+
+        user.username = data.username
+
+    # Обновление аватарки
+    if data.avatarId is not None:
+        # Проверка валидности ID аватарки
+        if data.avatarId > 0 and data.avatarId <= 29:  # Предполагаем, что у нас 29 аватарок
+            user.avatar_id = data.avatarId
+        else:
+            raise HTTPException(status_code=400, detail="Недопустимый ID аватарки")
+
+    db.commit()
+
+    return {"message": "Профиль успешно обновлен"}

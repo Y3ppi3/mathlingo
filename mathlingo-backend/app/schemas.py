@@ -56,9 +56,14 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     created_at: datetime
+    avatarId: Optional[int] = None
 
     class Config:
-        from_attributes = True  # Для корректного преобразования SQLAlchemy -> Pydantic
+        from_attributes = True
+
+        field_customization = {
+            "avatar_id": "avatarId"  # Имя в БД: имя в JSON
+        }
 
 
 class UserRegisterResponse(UserResponse):

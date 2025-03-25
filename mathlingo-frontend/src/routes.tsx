@@ -1,4 +1,4 @@
-// routes.tsx
+// routes.tsx (обновленный)
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { JSX } from "react";
 import Home from "./pages/Home";
@@ -10,6 +10,8 @@ import AdventureMapPage from "./pages/AdventureMapPage";
 import GamificationPanel from "./components/admin/GamificationPanel";
 import GameLauncherPage from "./pages/GameLauncherPage";
 import GamePage from "./pages/GamePage";
+import ProfilePage from "./pages/ProfilePage";
+import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -52,6 +54,24 @@ function AppRoutes() {
                 }
             />
             <Route path="/logout" element={<LogoutPage />} />
+
+            {/* Профиль пользователя */}
+            <Route
+                path="/profile"
+                element={
+                    <ProtectedRoute>
+                        <ProfilePage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/profile/settings"
+                element={
+                    <ProtectedRoute>
+                        <ProfileSettingsPage />
+                    </ProtectedRoute>
+                }
+            />
 
             {/* Маршруты для геймификации */}
             <Route

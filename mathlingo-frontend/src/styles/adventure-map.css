@@ -1,0 +1,78 @@
+/* src/styles/adventure-map.css */
+
+.adventure-map-wrapper {
+    /* Обеспечивает корректное отображение карты и устраняет проблемы с наслоением */
+    position: relative;
+    width: 100%;
+    margin-bottom: 2rem;
+}
+
+/* Исправляет проблему с z-index */
+.adventure-map-wrapper * {
+    z-index: auto;
+}
+
+/* Обеспечивает правильное позиционирование локаций */
+.adventure-map-wrapper .relative {
+    position: relative;
+    isolation: isolate;  /* Создает новый контекст наложения */
+}
+
+/* Стили для фона карты */
+.adventure-map-wrapper .bg-cover {
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+}
+
+/* Исправляет проблему видимости элементов в темном режиме */
+.dark .adventure-map-wrapper .text-white {
+    color: #f3f4f6 !important;
+}
+
+.dark .adventure-map-wrapper .bg-gray-800 {
+    background-color: #1f2937 !important;
+}
+
+/* Обеспечивает видимость названий локаций */
+.adventure-map-wrapper .whitespace-nowrap {
+    white-space: nowrap;
+    max-width: none;
+}
+
+/* Исправляет проблему с переполнением названий локаций */
+.adventure-map-wrapper [style*="transform: translate"] {
+    max-width: none !important;    /* Убираем ограничение ширины */
+    white-space: nowrap !important; /* Запрещаем перенос текста */
+    overflow: visible !important;  /* Разрешаем выход за границы контейнера */
+    pointer-events: none;         /* Предотвращаем перехват событий мыши метками */
+}
+
+/* Делаем текст внутри меток кликабельным */
+.adventure-map-wrapper [style*="transform: translate"] * {
+    pointer-events: auto;
+}
+
+/* Увеличиваем расстояние между локациями и метками */
+.adventure-map-wrapper .location-label {
+    margin-top: 5px !important;
+}
+
+/* Обеспечивает правильную видимость информационной панели */
+.adventure-map-wrapper [class*="absolute right-0"] {
+    z-index: 50 !important;
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Исправляет проблему с отображением иконок локаций */
+.adventure-map-wrapper .w-12.h-12 {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(30, 41, 59, 0.2);
+    border-radius: 50%;
+    padding: 4px;
+}
+
+.dark .adventure-map-wrapper .w-12.h-12 {
+    background: rgba(255, 255, 255, 0.2);
+}
