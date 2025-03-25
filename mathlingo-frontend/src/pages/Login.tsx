@@ -21,7 +21,7 @@ const Login = () => {
 
         try {
             console.log("Отправка запроса на API:", `${API_URL}/api/login/`);
-            
+
             // Реальный запрос к API для production
             const response = await fetch(`${API_URL}/api/login/`, {
                 method: "POST",

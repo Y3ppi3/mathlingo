@@ -86,10 +86,15 @@ def get_current_user_info(user: User = Depends(get_current_user)):
     }
 
 
-# Схема для обновления профиля
 class UserProfileUpdate(BaseModel):
     username: Optional[str] = None
     avatarId: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+        field_customization = {
+            "avatarId": "avatar_id"  # Имя в JSON: имя в БД
+        }
 
 
 @router.put("/me/update")
@@ -100,7 +105,7 @@ def update_user_profile(
 ):
     """Обновление данных профиля пользователя"""
 
-    # Проверка уникальности имени пользователя, если оно было изменено
+    # Проверка уникальности имени пользователя
     if data.username and data.username != user.username:
         existing_user = db.query(User).filter(User.username == data.username).first()
         if existing_user:
@@ -109,13 +114,25 @@ def update_user_profile(
         user.username = data.username
 
     # Обновление аватарки
-    if data.avatarId is not None:
-        # Проверка валидности ID аватарки
-        if data.avatarId > 0 and data.avatarId <= 29:  # Предполагаем, что у нас 29 аватарок
-            user.avatar_id = data.avatarId
+    if hasattr(data, 'avatarId'):
+        if data.avatarId is not None:
+            # Проверка валидности ID аватарки
+            if data.avatarId > 0 and data.avatarId <= 29:  # Убедитесь, что диапазон правильный
+                user.avatar_id = data.avatarId
+            else:
+                raise HTTPException(status_code=400, detail="Недопустимый ID аватарки")
         else:
-            raise HTTPException(status_code=400, detail="Недопустимый ID аватарки")
+            # Если avatarId равен None, удаляем аватарку
+            user.avatar_id = None
 
     db.commit()
+    db.refresh(user)  # Обновляем объект пользователя
 
-    return {"message": "Профиль успешно обновлен"}
+    # Возвращаем обновленные данные в формате, совместимом с /api/me
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "avatarId": user.avatar_id,
+        "message": "Профиль успешно обновлен"
+    }
