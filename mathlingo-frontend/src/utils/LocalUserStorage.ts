@@ -62,10 +62,40 @@ export const saveLocalUserData = (userData: UserData): void => {
 export const updateLocalUserData = (data: Partial<UserData>): UserData | null => {
     try {
         // Получаем текущие данные
-        const currentData = getLocalUserData();
+        let currentData = getLocalUserData();
+
+        // Если данные отсутствуют в объекте, пробуем собрать из отдельных полей
         if (!currentData) {
-            console.error('Не удалось получить текущие данные пользователя для обновления');
-            return null;
+            console.log('Данные пользователя не найдены в объекте, проверяем отдельные поля...');
+
+            // Проверяем отдельные поля в localStorage
+            const savedId = localStorage.getItem('user_id');
+            const savedUsername = localStorage.getItem('user_username');
+            const savedEmail = localStorage.getItem('user_email');
+            const savedAvatarId = localStorage.getItem('user_avatar_id');
+
+            // Если есть отдельные поля, восстанавливаем данные из них
+            if (savedId && savedUsername && savedEmail) {
+                currentData = {
+                    id: parseInt(savedId),
+                    username: savedUsername,
+                    email: savedEmail,
+                    avatarId: savedAvatarId ? parseInt(savedAvatarId) : undefined
+                };
+                console.log('Восстановлены данные пользователя из отдельных полей:', currentData);
+            } else if (data.id && data.username && data.email) {
+                // Если у нас есть все необходимые данные в аргументе
+                currentData = {
+                    id: data.id,
+                    username: data.username,
+                    email: data.email,
+                    avatarId: data.avatarId
+                };
+                console.log('Создан новый объект пользователя из переданных данных:', currentData);
+            } else {
+                console.error('Не удалось получить текущие данные пользователя для обновления');
+                return null;
+            }
         }
 
         // Создаем обновленный объект, явно сохраняя все поля
