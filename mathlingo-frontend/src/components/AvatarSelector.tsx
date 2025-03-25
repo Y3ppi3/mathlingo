@@ -10,7 +10,7 @@ const AvatarSelector: React.FC<AvatarSelectorProps> = ({ selectedAvatar, onSelec
     const [isOpen, setIsOpen] = useState(false);
 
     // Общее количество доступных аватарок
-    const TOTAL_AVATARS = 29;
+    const TOTAL_AVATARS = 18;
 
     // Формирование URL аватарки по её номеру
     const getAvatarUrl = (avatarId: number) => `/avatars/${avatarId}.png`;

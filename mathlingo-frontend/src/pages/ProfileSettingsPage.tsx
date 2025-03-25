@@ -1,5 +1,4 @@
-// src/pages/ProfileSettingsPage.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useUser } from '../hooks/useUser';
@@ -8,115 +7,191 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 
 const ProfileSettingsPage: React.FC = () => {
-    const { user, loading, error, updateUserProfile, refreshUserData } = useUser();
+    const { user, loading, error, refreshUserData } = useUser();
     const navigate = useNavigate();
     const isMounted = useRef(true);
 
-    const [username, setUsername] = useState('');
-    const [avatarId, setAvatarId] = useState<number | null>(null);
+    // Состояния формы
+    const [formData, setFormData] = useState({
+        username: '',
+        avatarId: undefined as number | undefined
+    });
+
+    // Состояние для хранения оригинальных данных при загрузке
+    const [originalData, setOriginalData] = useState({
+        username: '',
+        avatarId: undefined as number | undefined
+    });
+
     const [formError, setFormError] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+    const [formKey, setFormKey] = useState(Date.now()); // Ключ для полного пересоздания формы
 
-    // Приоритет данным из формы для предотвращения потери изменений
-    const [hasFormChanges, setHasFormChanges] = useState(false);
-
-
+    // Инициализация начальных данных
     useEffect(() => {
-        if (user && !hasFormChanges) {
-            setUsername(user.username);
-            if (user.avatarId !== undefined) {
-                setAvatarId(user.avatarId);
-            }
-        }
-    }, [user, hasFormChanges]);
+        if (user) {
+            const userData = {
+                username: user.username,
+                avatarId: user.avatarId
+            };
 
+            setFormData(userData);
+            setOriginalData(userData);
+
+            console.log("Инициализация данных пользователя:", userData);
+        }
+    }, [user]);
+
+    // Вычисляем, есть ли изменения в форме
+    const hasFormChanges = useCallback(() => {
+        return formData.username !== originalData.username ||
+            formData.avatarId !== originalData.avatarId;
+    }, [formData, originalData]);
+
+    // Эффект для очистки
     useEffect(() => {
         return () => {
-            isMounted.current = false; // При размонтировании компонента
+            isMounted.current = false;
         };
     }, []);
 
-    // Загружаем данные пользователя в форму
+    // Обработчики изменения формы
     const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setUsername(e.target.value);
-        setHasFormChanges(true);
+        setFormData(prev => ({
+            ...prev,
+            username: e.target.value
+        }));
     };
 
     const handleAvatarSelect = (id: number) => {
-        setAvatarId(id);
-        setHasFormChanges(true);
+        setFormData(prev => ({
+            ...prev,
+            avatarId: id
+        }));
     };
 
+    // Полная перезагрузка формы и данных пользователя
+    const resetFormWithFreshData = async () => {
+        if (!isMounted.current) return;
+
+        // Сначала перезагрузим данные пользователя с сервера
+        try {
+            console.log("Перезагрузка данных пользователя...");
+            const freshUser = await refreshUserData();
+
+            if (freshUser) {
+                const freshData = {
+                    username: freshUser.username,
+                    avatarId: freshUser.avatarId
+                };
+
+                console.log("Получены свежие данные:", freshData);
+
+                // Сбрасываем форму с новыми данными
+                setFormData(freshData);
+                setOriginalData(freshData);
+
+                // Генерируем новый ключ для полного пересоздания формы
+                setFormKey(Date.now());
+
+                console.log("Форма сброшена с новыми данными");
+            }
+        } catch (err) {
+            console.error("Ошибка при обновлении данных пользователя:", err);
+        }
+    };
+
+    // Обработчик отправки формы
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log("🔍 Форма отправлена, начинаем обработку");
+
+        const changes = hasFormChanges();
+        console.log("Текущее состояние изменений:", changes, {
+            form: formData,
+            original: originalData
+        });
 
         if (!isMounted.current) return;
+
+        if (!changes) {
+            console.log("Нет изменений для сохранения");
+            setSuccessMessage('Нет изменений для сохранения.');
+            return;
+        }
 
         setFormError('');
         setSuccessMessage('');
         setIsSaving(true);
 
         try {
-            // Валидация данных перед отправкой
-            if (!username.trim()) {
+            if (!formData.username.trim()) {
+                console.log("❌ Пустое имя пользователя");
                 setFormError('Имя пользователя не может быть пустым');
                 setIsSaving(false);
                 return;
             }
 
-            // Создаем пустой объект для обновления
             const updateData: {username?: string, avatarId?: number | null} = {};
 
-            // Добавляем username только если он изменился
-            if (username !== user?.username) {
-                updateData.username = username;
+            // Добавляем только изменившиеся поля
+            if (formData.username !== originalData.username) {
+                updateData.username = formData.username;
+                console.log(`Имя изменилось: "${originalData.username}" -> "${formData.username}"`);
             }
 
-            // ВАЖНО: Проверяем изменение аватарки правильно
-            // Используем строгое сравнение для проверки изменения аватарки
-            if (user?.avatarId !== avatarId) {
-                // Включаем в запрос avatarId ТОЛЬКО если он изменился
-                updateData.avatarId = avatarId;
-                console.log(`Аватар изменился: ${user?.avatarId} -> ${avatarId}`);
-            } else {
-                console.log('Аватар не изменился, не включаем в запрос');
+            if (formData.avatarId !== originalData.avatarId) {
+                // null или конкретное значение
+                updateData.avatarId = formData.avatarId ?? null;
+                console.log(`Аватар изменился: ${originalData.avatarId} -> ${formData.avatarId}`);
             }
 
-            // Проверяем, есть ли изменения для отправки
-            if (Object.keys(updateData).length === 0) {
-                setSuccessMessage('Нет изменений для сохранения.');
-                setIsSaving(false);
-                return;
+            console.log('Отправляем данные:', updateData);
+
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+            const response = await fetch(`${API_URL}/api/me/update`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updateData),
+                credentials: 'include',
+            });
+
+            console.log(`Статус ответа: ${response.status}`);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Ошибка от сервера:', errorText);
+                throw new Error(errorText || 'Не удалось обновить профиль');
             }
 
-            console.log('Отправка запроса на обновление профиля:', updateData);
+            const responseData = await response.json();
+            console.log('Получены данные от сервера:', responseData);
 
-            // Отправляем данные на сервер
-            const result = await updateUserProfile(updateData);
-            console.log('Результат обновления профиля:', result);
+            // Обновляем данные в localStorage
+            localStorage.setItem('user_username', responseData.username);
+            localStorage.setItem('user_id', responseData.id.toString());
+            localStorage.setItem('user_email', responseData.email);
+            localStorage.setItem('user_avatar_id', responseData.avatarId?.toString() || '');
 
-            if (!isMounted.current) return;
+            // Устанавливаем сообщение об успехе
+            setSuccessMessage('Настройки профиля успешно сохранены!');
 
-            if (result.success) {
-                setSuccessMessage('Настройки профиля успешно сохранены!');
+            // Отправляем событие для других компонентов
+            window.dispatchEvent(new CustomEvent('userDataUpdated', {
+                detail: responseData
+            }));
 
-                // Если сервер вернул обновленные данные, используем их
-                if (result.data) {
-                    setUsername(result.data.username);
-                    setAvatarId(result.data.avatarId);
-                } else {
-                    // Иначе запрашиваем обновление через API
-                    await refreshUserData();
-                }
+            // Полностью обновляем форму и данные пользователя
+            await resetFormWithFreshData();
 
-                // Сбрасываем флаг изменений
-                setHasFormChanges(false);
-            }
         } catch (err) {
-            if (!isMounted.current) return;
-            setFormError('Не удалось сохранить изменения. Попробуйте позже.');
-            console.error(err);
+            console.error('Ошибка при сохранении:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Неизвестная ошибка';
+            setFormError(`Не удалось сохранить изменения: ${errorMessage}`);
         } finally {
             if (isMounted.current) {
                 setIsSaving(false);
@@ -124,6 +199,7 @@ const ProfileSettingsPage: React.FC = () => {
         }
     };
 
+    // Отображение состояния загрузки
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-900 dark:bg-white">
@@ -137,6 +213,7 @@ const ProfileSettingsPage: React.FC = () => {
         );
     }
 
+    // Отображение ошибки
     if (error || !user) {
         return (
             <div className="min-h-screen bg-gray-900 dark:bg-white">
@@ -152,6 +229,9 @@ const ProfileSettingsPage: React.FC = () => {
             </div>
         );
     }
+
+    // Определяем, есть ли изменения для кнопки
+    const isFormChanged = hasFormChanges();
 
     return (
         <div className="min-h-screen bg-gray-900 dark:bg-white">
@@ -180,16 +260,21 @@ const ProfileSettingsPage: React.FC = () => {
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="max-w-xl">
+                    {/* Используем ключ для полного пересоздания формы при обновлении данных */}
+                    <form key={formKey} onSubmit={handleSubmit} className="max-w-xl">
                         <div className="mb-6">
                             <h2 className="text-lg font-semibold mb-3 text-white dark:text-gray-900">Основная информация</h2>
 
                             <div className="mb-4">
-                                <label className="block mb-2 text-gray-300 dark:text-gray-700">Имя пользователя</label>
+                                <label htmlFor="username-field" className="block mb-2 text-gray-300 dark:text-gray-700">
+                                    Имя пользователя
+                                </label>
                                 <Input
+                                    id="username-field"
+                                    name="username"
                                     type="text"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
+                                    value={formData.username}
+                                    onChange={handleUsernameChange}
                                     required
                                 />
                             </div>
@@ -199,8 +284,8 @@ const ProfileSettingsPage: React.FC = () => {
                             <h2 className="text-lg font-semibold mb-3 text-white dark:text-gray-900">Аватар</h2>
 
                             <AvatarSelector
-                                selectedAvatar={avatarId}
-                                onSelect={setAvatarId}
+                                selectedAvatar={formData.avatarId}
+                                onSelect={handleAvatarSelect}
                             />
 
                             <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
@@ -226,12 +311,17 @@ const ProfileSettingsPage: React.FC = () => {
                             >
                                 Отмена
                             </Button>
-                            <Button
+
+                            <button
                                 type="submit"
-                                disabled={isSaving}
+                                disabled={isSaving || !isFormChanged}
+                                className={`px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+                                ${isFormChanged
+                                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white focus:ring-indigo-500'
+                                    : 'bg-gray-400 cursor-not-allowed text-white'}`}
                             >
                                 {isSaving ? 'Сохранение...' : 'Сохранить изменения'}
-                            </Button>
+                            </button>
                         </div>
                     </form>
                 </div>

@@ -188,9 +188,8 @@ export function useUser() {
 
             console.error("❌ Ошибка при обновлении профиля:", err);
             throw err;
-        } finally {
-            controller.abort();
         }
+        // Удаляем блок finally с вызовом controller.abort()
     };
 
     // Подписываемся на обновления данных
