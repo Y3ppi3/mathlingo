@@ -1,5 +1,5 @@
 // src/pages/ProfileSettingsPage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useUser } from '../hooks/useUser';
@@ -8,9 +8,9 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 
 const ProfileSettingsPage: React.FC = () => {
-    // Используем refreshUserData из хука useUser для обновления данных после сохранения
     const { user, loading, error, updateUserProfile, refreshUserData } = useUser();
     const navigate = useNavigate();
+    const isMounted = useRef(true);
 
     const [username, setUsername] = useState('');
     const [avatarId, setAvatarId] = useState<number | null>(null);
@@ -31,6 +31,12 @@ const ProfileSettingsPage: React.FC = () => {
         }
     }, [user, hasFormChanges]);
 
+    useEffect(() => {
+        return () => {
+            isMounted.current = false; // При размонтировании компонента
+        };
+    }, []);
+
     // Загружаем данные пользователя в форму
     const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setUsername(e.target.value);
@@ -45,6 +51,8 @@ const ProfileSettingsPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (!isMounted.current) return;
+
         setFormError('');
         setSuccessMessage('');
         setIsSaving(true);
@@ -57,23 +65,25 @@ const ProfileSettingsPage: React.FC = () => {
                 return;
             }
 
-            // Подготавливаем данные для обновления, строго указывая, что обновляется
+            // Создаем пустой объект для обновления
             const updateData: {username?: string, avatarId?: number | null} = {};
 
-            if (avatarId === null && user?.avatarId !== undefined) {
-                updateData.avatarId = undefined; // Если пользователь удалил аватар
-            }
-
-            // Включаем только те поля, которые были изменены
+            // Добавляем username только если он изменился
             if (username !== user?.username) {
                 updateData.username = username;
             }
 
-            if (avatarId !== user?.avatarId) {
+            // ВАЖНО: Проверяем изменение аватарки правильно
+            // Используем строгое сравнение для проверки изменения аватарки
+            if (user?.avatarId !== avatarId) {
+                // Включаем в запрос avatarId ТОЛЬКО если он изменился
                 updateData.avatarId = avatarId;
+                console.log(`Аватар изменился: ${user?.avatarId} -> ${avatarId}`);
+            } else {
+                console.log('Аватар не изменился, не включаем в запрос');
             }
 
-            // Если нет изменений, показываем сообщение
+            // Проверяем, есть ли изменения для отправки
             if (Object.keys(updateData).length === 0) {
                 setSuccessMessage('Нет изменений для сохранения.');
                 setIsSaving(false);
@@ -86,23 +96,31 @@ const ProfileSettingsPage: React.FC = () => {
             const result = await updateUserProfile(updateData);
             console.log('Результат обновления профиля:', result);
 
+            if (!isMounted.current) return;
+
             if (result.success) {
                 setSuccessMessage('Настройки профиля успешно сохранены!');
 
-                // Принудительно обновляем данные пользователя
-                await refreshUserData();
+                // Если сервер вернул обновленные данные, используем их
+                if (result.data) {
+                    setUsername(result.data.username);
+                    setAvatarId(result.data.avatarId);
+                } else {
+                    // Иначе запрашиваем обновление через API
+                    await refreshUserData();
+                }
 
-                // Показываем сообщение и сбрасываем флаг изменений
+                // Сбрасываем флаг изменений
                 setHasFormChanges(false);
-
-                // Проверка успешного обновления
-                console.log("Текущие данные в localStorage:", localStorage.getItem('user_username'));
             }
         } catch (err) {
+            if (!isMounted.current) return;
             setFormError('Не удалось сохранить изменения. Попробуйте позже.');
             console.error(err);
         } finally {
-            setIsSaving(false);
+            if (isMounted.current) {
+                setIsSaving(false);
+            }
         }
     };
 

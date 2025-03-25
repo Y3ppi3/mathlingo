@@ -104,29 +104,48 @@ def update_user_profile(
         db: Session = Depends(get_db)
 ):
     """Обновление данных профиля пользователя"""
+    changes_made = False
 
-    # Проверка уникальности имени пользователя
-    if data.username and data.username != user.username:
-        existing_user = db.query(User).filter(User.username == data.username).first()
-        if existing_user:
-            raise HTTPException(status_code=400, detail="Имя пользователя уже занято")
+    # Проверка и обновление имени пользователя (только если оно указано в запросе)
+    if hasattr(data, 'username') and data.username is not None:
+        if data.username != user.username:
+            existing_user = db.query(User).filter(User.username == data.username).first()
+            if existing_user:
+                raise HTTPException(status_code=400, detail="Имя пользователя уже занято")
 
-        user.username = data.username
+            user.username = data.username
+            changes_made = True
+            print(f"Имя пользователя обновлено: {data.username}")
 
-    # Обновление аватарки
+    # Обновление аватарки - только если поле явно присутствует в запросе
     if hasattr(data, 'avatarId'):
+        avatar_changed = False
+
         if data.avatarId is not None:
             # Проверка валидности ID аватарки
-            if data.avatarId > 0 and data.avatarId <= 29:  # Убедитесь, что диапазон правильный
-                user.avatar_id = data.avatarId
+            if data.avatarId > 0 and data.avatarId <= 29:
+                if user.avatar_id != data.avatarId:
+                    user.avatar_id = data.avatarId
+                    avatar_changed = True
+                    print(f"Аватар обновлен: {data.avatarId}")
             else:
                 raise HTTPException(status_code=400, detail="Недопустимый ID аватарки")
         else:
-            # Если avatarId равен None, удаляем аватарку
-            user.avatar_id = None
+            # Если avatarId равен None и у пользователя есть аватарка, удаляем ее
+            if user.avatar_id is not None:
+                user.avatar_id = None
+                avatar_changed = True
+                print("Аватар удален")
 
-    db.commit()
-    db.refresh(user)  # Обновляем объект пользователя
+        changes_made = changes_made or avatar_changed
+
+    # Если изменения были внесены, сохраняем их
+    if changes_made:
+        db.commit()
+        db.refresh(user)
+        print("Изменения сохранены в базе данных")
+    else:
+        print("Нет изменений для сохранения")
 
     # Возвращаем обновленные данные в формате, совместимом с /api/me
     return {
@@ -134,5 +153,5 @@ def update_user_profile(
         "username": user.username,
         "email": user.email,
         "avatarId": user.avatar_id,
-        "message": "Профиль успешно обновлен"
+        "message": "Профиль успешно обновлен" if changes_made else "Нет изменений для сохранения"
     }
