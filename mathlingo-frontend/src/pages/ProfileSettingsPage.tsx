@@ -5,6 +5,7 @@ import { useUser } from '../hooks/useUser';
 import AvatarSelector from '../components/AvatarSelector';
 import Button from '../components/Button';
 import Input from '../components/Input';
+import { fetchWithRetry } from '../utils/fetchUtils';
 
 const ProfileSettingsPage: React.FC = () => {
     const { user, loading, error, refreshUserData } = useUser();
@@ -75,9 +76,16 @@ const ProfileSettingsPage: React.FC = () => {
     const resetFormWithFreshData = async () => {
         if (!isMounted.current) return;
 
-        // Сначала перезагрузим данные пользователя с сервера
         try {
-            console.log("Перезагрузка данных пользователя...");
+            // Устанавливаем флаг, что идет обновление формы
+            const updatingFormFlag = 'updating_profile_form';
+            if (sessionStorage.getItem(updatingFormFlag)) {
+                console.log('🔄 Обновление формы уже выполняется, пропускаем');
+                return;
+            }
+
+            sessionStorage.setItem(updatingFormFlag, '1');
+
             const freshUser = await refreshUserData();
 
             if (freshUser) {
@@ -86,37 +94,25 @@ const ProfileSettingsPage: React.FC = () => {
                     avatarId: freshUser.avatarId
                 };
 
-                console.log("Получены свежие данные:", freshData);
-
-                // Сбрасываем форму с новыми данными
+                // Атомарное обновление состояния формы
                 setFormData(freshData);
                 setOriginalData(freshData);
-
-                // Генерируем новый ключ для полного пересоздания формы
                 setFormKey(Date.now());
-
-                console.log("Форма сброшена с новыми данными");
             }
+
+            // Очищаем флаг
+            sessionStorage.removeItem(updatingFormFlag);
         } catch (err) {
-            console.error("Ошибка при обновлении данных пользователя:", err);
+            console.error("❌ Ошибка при обновлении данных формы:", err);
+            sessionStorage.removeItem('updating_profile_form');
         }
     };
 
     // Обработчик отправки формы
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("🔍 Форма отправлена, начинаем обработку");
 
-        const changes = hasFormChanges();
-        console.log("Текущее состояние изменений:", changes, {
-            form: formData,
-            original: originalData
-        });
-
-        if (!isMounted.current) return;
-
-        if (!changes) {
-            console.log("Нет изменений для сохранения");
+        if (!hasFormChanges()) {
             setSuccessMessage('Нет изменений для сохранения.');
             return;
         }
@@ -126,80 +122,50 @@ const ProfileSettingsPage: React.FC = () => {
         setIsSaving(true);
 
         try {
-            if (!formData.username.trim()) {
-                console.log("❌ Пустое имя пользователя");
-                setFormError('Имя пользователя не может быть пустым');
-                setIsSaving(false);
-                return;
-            }
-
+            // Создаём объект только с измененными данными
             const updateData: {username?: string, avatarId?: number | null} = {};
 
-            // Добавляем только изменившиеся поля
             if (formData.username !== originalData.username) {
                 updateData.username = formData.username;
-                console.log(`Имя изменилось: "${originalData.username}" -> "${formData.username}"`);
             }
 
             if (formData.avatarId !== originalData.avatarId) {
-                // null или конкретное значение
                 updateData.avatarId = formData.avatarId ?? null;
-                console.log(`Аватар изменился: ${originalData.avatarId} -> ${formData.avatarId}`);
             }
-
-            console.log('Отправляем данные:', updateData);
 
             const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+            // Использовать fetch с учетом CSRF-защиты
             const response = await fetch(`${API_URL}/api/me/update`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
                 },
                 body: JSON.stringify(updateData),
-                credentials: 'include',
+                credentials: 'include', // Отправлять куки
             });
 
-            console.log(`Статус ответа: ${response.status}`);
-
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Ошибка от сервера:', errorText);
-                throw new Error(errorText || 'Не удалось обновить профиль');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || 'Не удалось обновить профиль');
             }
 
             const responseData = await response.json();
-            console.log('Получены данные от сервера:', responseData);
 
-            // Обновляем данные в localStorage
-            localStorage.setItem('user_username', responseData.username);
-            localStorage.setItem('user_id', responseData.id.toString());
-            localStorage.setItem('user_email', responseData.email);
-            localStorage.setItem('user_avatar_id', responseData.avatarId?.toString() || '');
+            // НЕ сохраняем данные в localStorage
 
-            // Устанавливаем сообщение об успехе
-            setSuccessMessage('Настройки профиля успешно сохранены!');
+            setSuccessMessage(responseData.message || 'Профиль успешно обновлен!');
 
-            // Отправляем событие для других компонентов
-            window.dispatchEvent(new CustomEvent('userDataUpdated', {
-                detail: responseData
-            }));
-
-            // Полностью обновляем форму и данные пользователя
-            await resetFormWithFreshData();
-
+            // Обновить состояние формы с новыми данными
+            await refreshUserData();
         } catch (err) {
             console.error('Ошибка при сохранении:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Неизвестная ошибка';
-            setFormError(`Не удалось сохранить изменения: ${errorMessage}`);
+            setFormError(`Не удалось сохранить изменения: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`);
         } finally {
-            if (isMounted.current) {
-                setIsSaving(false);
-            }
+            setIsSaving(false);
         }
-    };
-
-    // Отображение состояния загрузки
+    };    // Отображение состояния загрузки
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-900 dark:bg-white">
