@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+// src/components/games/DerivFall.tsx
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Button from '../Button';
 
 // Интерфейс для задачи на производную
@@ -17,6 +18,94 @@ interface DerivFallProps {
   problemsSource?: DerivativeProblem[];
   onComplete?: (score: number, maxScore: number) => void;
 }
+
+// Стандартные задачи для использования если источник не предоставлен
+const DEFAULT_PROBLEMS: DerivativeProblem[] = [
+  {
+    id: "d1",
+    problem: "y'(x) = x³",
+    options: ["3x²", "3x⁴", "4x³", "x²"],
+    answer: "3x²",
+    difficulty: "medium"
+  },
+  {
+    id: "d2",
+    problem: "y'(x) = x⁷",
+    options: ["7x⁶", "6x⁵", "7x⁸", "x⁶"],
+    answer: "7x⁶",
+    difficulty: "medium"
+  },
+  {
+    id: "d3",
+    problem: "y'(x) = x⁻²",
+    options: ["-2x⁻³", "2/x³", "-2/x³", "-x⁻³"],
+    answer: "-2x⁻³",
+    difficulty: "hard"
+  },
+  {
+    id: "d4",
+    problem: "y'(x) = √x",
+    options: ["1/(2√x)", "2√x", "1/2√x", "√x/2"],
+    answer: "1/(2√x)",
+    difficulty: "hard"
+  },
+  {
+    id: "d5",
+    problem: "y'(x) = (5x+2)⁻³",
+    options: ["-15(5x+2)⁻⁴", "-3(5x+2)⁻⁴", "-5(5x+2)⁻⁴", "-15(5x+2)⁻²"],
+    answer: "-15(5x+2)⁻⁴",
+    difficulty: "hard"
+  },
+  {
+    id: "d6",
+    problem: "y'(x) = sin(x)",
+    options: ["cos(x)", "-sin(x)", "tan(x)", "sec²(x)"],
+    answer: "cos(x)",
+    difficulty: "easy"
+  },
+  {
+    id: "d7",
+    problem: "y'(x) = e^x",
+    options: ["e^x", "xe^x", "e^(x-1)", "ln(x)e^x"],
+    answer: "e^x",
+    difficulty: "easy"
+  },
+  {
+    id: "d8",
+    problem: "y'(x) = ln(x)",
+    options: ["1/x", "ln(x)/x", "x^(-1)", "1/ln(x)"],
+    answer: "1/x",
+    difficulty: "medium"
+  },
+  {
+    id: "d9",
+    problem: "y'(x) = cos(x)",
+    options: ["-sin(x)", "sin(x)", "-cos(x)", "tan(x)"],
+    answer: "-sin(x)",
+    difficulty: "easy"
+  },
+  {
+    id: "d10",
+    problem: "y'(x) = tan(x)",
+    options: ["sec²(x)", "-csc²(x)", "1/cos²(x)", "sin(x)/cos²(x)"],
+    answer: "sec²(x)",
+    difficulty: "medium"
+  },
+  {
+    id: "d11",
+    problem: "y'(x) = x² + 3x",
+    options: ["2x + 3", "2x² + 3", "x + 3", "2x + 3x²"],
+    answer: "2x + 3",
+    difficulty: "easy"
+  },
+  {
+    id: "d12",
+    problem: "y'(x) = x·sin(x)",
+    options: ["sin(x) + x·cos(x)", "x·cos(x)", "sin(x) - x·cos(x)", "cos(x) + x·sin(x)"],
+    answer: "sin(x) + x·cos(x)",
+    difficulty: "medium"
+  }
+];
 
 const DerivFall: React.FC<DerivFallProps> = ({
                                                difficulty = 3,
@@ -42,7 +131,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
   const [difficultyLevel, setDifficultyLevel] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [speed, setSpeed] = useState(3000); // миллисекунды для падения
   const [timeRemaining, setTimeRemaining] = useState(timeLimit);
-  const [problemBank, setProblemBank] = useState<DerivativeProblem[]>([]);
+  const [problemBank, setProblemBank] = useState<DerivativeProblem[]>(DEFAULT_PROBLEMS);
   const [problemsCompleted, setProblemsCompleted] = useState(0);
   const [countdownActive, setCountdownActive] = useState(false);
   const [countdown, setCountdown] = useState(3);
@@ -56,111 +145,34 @@ const DerivFall: React.FC<DerivFallProps> = ({
   const gameIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const problemTimeoutsRef = useRef<{[key: string]: NodeJS.Timeout}>({});
 
-  // Стандартные задачи, если источник не предоставлен
-  const defaultProblems: DerivativeProblem[] = [
-    {
-      id: "d1",
-      problem: "y'(x) = x³",
-      options: ["3x²", "3x⁴", "4x³", "x²"],
-      answer: "3x²",
-      difficulty: "medium"
-    },
-    {
-      id: "d2",
-      problem: "y'(x) = x⁷",
-      options: ["7x⁶", "6x⁵", "7x⁸", "x⁶"],
-      answer: "7x⁶",
-      difficulty: "medium"
-    },
-    {
-      id: "d3",
-      problem: "y'(x) = x⁻²",
-      options: ["-2x⁻³", "2/x³", "-2/x³", "-x⁻³"],
-      answer: "-2x⁻³",
-      difficulty: "hard"
-    },
-    {
-      id: "d4",
-      problem: "y'(x) = √x",
-      options: ["1/(2√x)", "2√x", "1/2√x", "√x/2"],
-      answer: "1/(2√x)",
-      difficulty: "hard"
-    },
-    {
-      id: "d5",
-      problem: "y'(x) = (5x+2)⁻³",
-      options: ["-15(5x+2)⁻⁴", "-3(5x+2)⁻⁴", "-5(5x+2)⁻⁴", "-15(5x+2)⁻²"],
-      answer: "-15(5x+2)⁻⁴",
-      difficulty: "hard"
-    },
-    {
-      id: "d6",
-      problem: "y'(x) = sin(x)",
-      options: ["cos(x)", "-sin(x)", "tan(x)", "sec²(x)"],
-      answer: "cos(x)",
-      difficulty: "easy"
-    },
-    {
-      id: "d7",
-      problem: "y'(x) = e^x",
-      options: ["e^x", "xe^x", "e^(x-1)", "ln(x)e^x"],
-      answer: "e^x",
-      difficulty: "easy"
-    },
-    {
-      id: "d8",
-      problem: "y'(x) = ln(x)",
-      options: ["1/x", "ln(x)/x", "x^(-1)", "1/ln(x)"],
-      answer: "1/x",
-      difficulty: "medium"
-    },
-    {
-      id: "d9",
-      problem: "y'(x) = cos(x)",
-      options: ["-sin(x)", "sin(x)", "-cos(x)", "tan(x)"],
-      answer: "-sin(x)",
-      difficulty: "easy"
-    },
-    {
-      id: "d10",
-      problem: "y'(x) = tan(x)",
-      options: ["sec²(x)", "-csc²(x)", "1/cos²(x)", "sin(x)/cos²(x)"],
-      answer: "sec²(x)",
-      difficulty: "medium"
-    },
-    {
-      id: "d11",
-      problem: "y'(x) = x² + 3x",
-      options: ["2x + 3", "2x² + 3", "x + 3", "2x + 3x²"],
-      answer: "2x + 3",
-      difficulty: "easy"
-    },
-    {
-      id: "d12",
-      problem: "y'(x) = x·sin(x)",
-      options: ["sin(x) + x·cos(x)", "x·cos(x)", "sin(x) - x·cos(x)", "cos(x) + x·sin(x)"],
-      answer: "sin(x) + x·cos(x)",
-      difficulty: "medium"
-    }
-  ];
+  // Установить сообщение обратной связи
+  const setFeedback = useCallback((message: string, type: 'success' | 'error') => {
+    setFeedbackMessage(message);
+    setFeedbackType(type);
+    setShowFeedback(true);
+
+    // Скрываем сообщение через некоторое время
+    setTimeout(() => {
+      setShowFeedback(false);
+    }, 2000);
+  }, []);
 
   // Загрузка проблем из источника или использование стандартных
   useEffect(() => {
     console.log("Настройка источника данных задач");
+
     if (problemsSource && problemsSource.length > 0) {
       console.log(`Получено ${problemsSource.length} задач из источника`);
       setProblemBank(problemsSource);
     } else {
-      console.log(`Используем ${defaultProblems.length} стандартных задач`);
-      setProblemBank([...defaultProblems]);
+      console.log(`Используем ${DEFAULT_PROBLEMS.length} стандартных задач`);
+      setProblemBank([...DEFAULT_PROBLEMS]);
     }
 
-    // ВАЖНО: Создаем явную зависимость от JSON-строки, чтобы обновлять
-    // problemBank при изменении problemsSource
     return () => {
       console.log("Очистка источника данных задач");
     };
-  }, [problemsSource ? JSON.stringify(problemsSource) : 'default']);
+  }, [problemsSource]); // DEFAULT_PROBLEMS как константа не нужна в зависимостях
 
   // Настройка уровня сложности в зависимости от переданного значения
   useEffect(() => {
@@ -177,8 +189,38 @@ const DerivFall: React.FC<DerivFallProps> = ({
     }
   }, [difficulty]);
 
+  // Завершить игру
+  const endGame = useCallback(() => {
+    console.log("Завершение игры");
+    setGameOver(true);
+    setGameStarted(false);
+    setGamePaused(false);
+
+    // Очищаем все таймеры
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (gameIntervalRef.current) {
+      clearInterval(gameIntervalRef.current);
+      gameIntervalRef.current = null;
+    }
+
+    // Очищаем таймеры для задач
+    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
+    problemTimeoutsRef.current = {};
+
+    // Вызываем обратный вызов с результатами
+    if (onComplete) {
+      // Максимально возможный счет зависит от времени и частоты появления задач
+      const maxPossibleScore = Math.max(10, problemsCompleted * 10); // Минимум 10 очков
+      onComplete(score, maxPossibleScore);
+    }
+  }, [score, problemsCompleted, onComplete]);
+
   // Создать новую падающую задачу
-  const createProblem = () => {
+  const createProblem = useCallback(() => {
     if (lives <= 0 || gameOver || !gameStarted || gamePaused) return;
 
     if (problemBank.length === 0) {
@@ -209,7 +251,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
     const randomIndex = Math.floor(Math.random() * filteredProblems.length);
     const problem = filteredProblems[randomIndex];
-    const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
 
     const leftPosition = Math.random() * 70; // Случайная горизонтальная позиция (0-70%)
 
@@ -224,7 +266,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
     }]);
 
     // Запланировать удаление задачи после того, как она выпадет из поля зрения
-    const timeout = setTimeout(() => {
+    problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
       setProblems(prev => {
         const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
         if (problemExists) {
@@ -247,12 +289,10 @@ const DerivFall: React.FC<DerivFallProps> = ({
       // Удаляем таймер из списка
       delete problemTimeoutsRef.current[newProblemId];
     }, speed + 2000); // Время падения + буфер
-
-    problemTimeoutsRef.current[newProblemId] = timeout;
-  };
+  }, [difficultyLevel, problemBank, lives, gameOver, gameStarted, gamePaused, speed, setFeedback, endGame]);
 
   // Обработать выбор ответа
-  const handleAnswerSelect = (problemId: string, selectedOption: string, correctAnswer: string) => {
+  const handleAnswerSelect = useCallback((problemId: string, selectedOption: string, correctAnswer: string) => {
     // Отмечаем задачу как отвеченную
     setProblems(prev =>
         prev.map(p => p.id === problemId ?
@@ -279,42 +319,10 @@ const DerivFall: React.FC<DerivFallProps> = ({
     setTimeout(() => {
       setProblems(prev => prev.filter(p => p.id !== problemId));
     }, 800);
-  };
-
-  // Установить сообщение обратной связи
-  const setFeedback = (message: string, type: 'success' | 'error') => {
-    setFeedbackMessage(message);
-    setFeedbackType(type);
-    setShowFeedback(true);
-
-    // Скрываем сообщение через некоторое время
-    setTimeout(() => {
-      setShowFeedback(false);
-    }, 2000);
-  };
-
-  // Начать игру с обратным отсчетом
-  const startGameWithCountdown = () => {
-    resetGame();
-    setCountdownActive(true);
-    setCountdown(3);
-
-    // Запускаем обратный отсчет
-    const countdownTimer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownTimer);
-          setCountdownActive(false);
-          startGame();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
+  }, [setFeedback]);
 
   // Сбросить игру
-  const resetGame = () => {
+  const resetGame = useCallback(() => {
     // Очищаем все таймеры
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -340,10 +348,10 @@ const DerivFall: React.FC<DerivFallProps> = ({
     setTimeRemaining(timeLimit);
     setProblemsCompleted(0);
     setShowFeedback(false);
-  };
+  }, [timeLimit]);
 
   // Начать игру
-  const startGame = () => {
+  const startGame = useCallback(() => {
     console.log("Старт игры");
     setGameStarted(true);
     setGamePaused(false);
@@ -388,42 +396,32 @@ const DerivFall: React.FC<DerivFallProps> = ({
         createProblem();
       }
     }, interval);
-  };
+  }, [difficultyLevel, gamePaused, createProblem, endGame]);
+
+  // Начать игру с обратным отсчетом
+  const startGameWithCountdown = useCallback(() => {
+    resetGame();
+    setCountdownActive(true);
+    setCountdown(3);
+
+    // Запускаем обратный отсчет
+    const countdownTimer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownTimer);
+          setCountdownActive(false);
+          startGame();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [resetGame, startGame]);
 
   // Поставить игру на паузу
-  const togglePause = () => {
+  const togglePause = useCallback(() => {
     setGamePaused(prev => !prev);
-  };
-
-  // Завершить игру
-  const endGame = () => {
-    console.log("Завершение игры");
-    setGameOver(true);
-    setGameStarted(false);
-    setGamePaused(false);
-
-    // Очищаем все таймеры
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (gameIntervalRef.current) {
-      clearInterval(gameIntervalRef.current);
-      gameIntervalRef.current = null;
-    }
-
-    // Очищаем таймеры для задач
-    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
-    problemTimeoutsRef.current = {};
-
-    // Вызываем обратный вызов с результатами
-    if (onComplete) {
-      // Максимально возможный счет зависит от времени и частоты появления задач
-      const maxPossibleScore = Math.max(10, problemsCompleted * 10); // Минимум 10 очков
-      onComplete(score, maxPossibleScore);
-    }
-  };
+  }, []);
 
   // Очистка интервалов при размонтировании
   useEffect(() => {
@@ -486,20 +484,18 @@ const DerivFall: React.FC<DerivFallProps> = ({
         <div
             ref={gameAreaRef}
             className="relative flex-1 overflow-hidden bg-gray-700 dark:bg-gray-200 transition-colors"
+            style={{height: '500px'}} // Добавляем фиксированную высоту
         >
           {/* Падающие задачи */}
           {problems.map(problem => (
               !problem.answered ? (
                   <div
                       key={problem.id}
-                      className={`absolute bg-blue-700 dark:bg-blue-200 p-3 rounded-lg shadow-lg text-center w-64 transition-colors ${
-                          gamePaused ? 'animate-none' : 'animate-fall'
-                      }`}
+                      className="absolute bg-blue-700 dark:bg-blue-200 p-3 rounded-lg shadow-lg text-center w-64 transition-colors"
                       style={{
                         left: `${problem.left}%`,
                         top: gamePaused ? `${problem.top}%` : 'auto',
-                        animationDuration: `${speed / 1000}s`,
-                        animationPlayState: gamePaused ? 'paused' : 'running'
+                        animation: gamePaused ? 'none' : `fall ${speed / 1000}s linear forwards`
                       }}
                   >
                     <div className="text-lg mb-2 font-medium text-white dark:text-gray-900 transition-colors">
@@ -521,14 +517,15 @@ const DerivFall: React.FC<DerivFallProps> = ({
               ) : (
                   <div
                       key={problem.id}
-                      className={`absolute p-3 rounded-lg shadow-lg text-center w-64 animate-fadeOut ${
-                          problem.correct
-                              ? 'bg-green-700 dark:bg-green-200 text-white dark:text-gray-900'
-                              : 'bg-red-700 dark:bg-red-200 text-white dark:text-gray-900'
-                      } transition-colors`}
+                      className="absolute p-3 rounded-lg shadow-lg text-center w-64 transition-colors"
                       style={{
                         left: `${problem.left}%`,
-                        top: `${problem.top}%`
+                        top: `${problem.top}%`,
+                        animation: 'fadeOut 0.8s forwards',
+                        backgroundColor: problem.correct
+                            ? 'var(--bg-green-700, rgb(21, 128, 61))'
+                            : 'var(--bg-red-700, rgb(185, 28, 28))',
+                        color: 'white'
                       }}
                   >
                     <div className="text-lg mb-2 font-medium text-white dark:text-gray-900 transition-colors">
@@ -610,7 +607,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
           {/* Обратный отсчет перед началом */}
           {countdownActive && (
               <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 z-30">
-                <div className="text-9xl font-bold text-white animate-pulse">
+                <div className="text-9xl font-bold text-white" style={{animation: 'pulse 1.5s infinite'}}>
                   {countdown}
                 </div>
               </div>
@@ -618,11 +615,14 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
           {/* Уведомление с обратной связью */}
           {showFeedback && (
-              <div className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-40 animate-bounce ${
-                  feedbackType === 'success'
-                      ? 'bg-green-700 dark:bg-green-200 text-white dark:text-gray-900'
-                      : 'bg-red-700 dark:bg-red-200 text-white dark:text-gray-900'
-              } transition-colors`}>
+              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-40"
+                   style={{
+                     animation: 'bounce 0.5s',
+                     backgroundColor: feedbackType === 'success'
+                         ? 'var(--bg-green-700, rgb(21, 128, 61))'
+                         : 'var(--bg-red-700, rgb(185, 28, 28))',
+                     color: 'white'
+                   }}>
                 {feedbackMessage}
               </div>
           )}
@@ -635,45 +635,31 @@ const DerivFall: React.FC<DerivFallProps> = ({
           </div>
         </div>
 
-        {/* CSS для анимаций */}
-        <style jsx>{`
-        @keyframes fall {
-          from { top: -100px; }
-          to { top: 100%; }
-        }
-        
-        @keyframes fadeOut {
-          from { opacity: 1; }
-          to { opacity: 0; }
-        }
-        
-        .animate-fall {
-          animation: fall linear forwards;
-        }
-        
-        .animate-fadeOut {
-          animation: fadeOut 0.8s forwards;
-        }
-        
-        .animate-pulse {
-          animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-          0% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.05); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        
-        .animate-bounce {
-          animation: bounce 0.5s;
-        }
-        
-        @keyframes bounce {
-          0%, 100% { transform: translateX(-50%) translateY(0); }
-          50% { transform: translateX(-50%) translateY(-10px); }
-        }
-      `}</style>
+        {/* Стили для анимаций */}
+        <style>
+          {`
+          @keyframes fall {
+            from { top: -100px; }
+            to { top: 100%; }
+          }
+          
+          @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+          }
+          
+          @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+          
+          @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(-10px); }
+          }
+        `}
+        </style>
       </div>
   );
 };
