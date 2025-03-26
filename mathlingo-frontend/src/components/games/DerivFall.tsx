@@ -152,10 +152,65 @@ const DerivFall: React.FC<DerivFallProps> = ({
     setShowFeedback(true);
 
     // Скрываем сообщение через некоторое время
+    // Создаем первую задачу с задержкой
     setTimeout(() => {
-      setShowFeedback(false);
-    }, 2000);
-  }, []);
+      console.log("🎮 Создаем первую задачу напрямую");
+
+      const randomIndex = Math.floor(Math.random() * problemBank.length);
+      const problem = problemBank[randomIndex];
+      const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+
+      // Используем новую функцию распределения
+      const leftPosition = getDistributedPosition();
+
+      // Добавляем задачу напрямую
+      setProblems(prev => [
+        ...prev,
+        {
+          ...problem,
+          id: newProblemId,
+          left: leftPosition,
+          top: 0,
+          answered: false
+        }
+      ]);
+
+      console.log(`✅ Первая задача добавлена: ${problem.problem}`);
+
+      // Настраиваем таймаут для неё
+      problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
+        setProblems(prev => {
+          const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
+          if (problemExists) {
+            setLives(l => {
+              const newLives = l - 1;
+              if (newLives <= 0) {
+                endGame();
+              }
+              return newLives;
+            });
+            setFeedback("Упущенная задача!", "error");
+          }
+          return prev.filter(p => p.id !== newProblemId);
+        });
+        delete problemTimeoutsRef.current[newProblemId];
+      }, speed + 2000);
+
+      // Запускаем интервал для создания последующих задач с ДОПОЛНИТЕЛЬНОЙ задержкой
+      setTimeout(() => {
+        const interval = difficultyLevel === 'hard' ? 2500 :
+            difficultyLevel === 'medium' ? 3500 : 4500;
+
+        console.log(`🎮 Установка интервала генерации задач: ${interval}ms`);
+
+        gameIntervalRef.current = setInterval(() => {
+          if (!gamePaused) {
+            createProblem();
+          }
+        }, interval);
+      }, 2000); // Задержка в 2 секунды перед запуском интервала
+
+    }, 800);
 
   // Загрузка проблем из источника или использование стандартных
   useEffect(() => {
@@ -221,15 +276,37 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
   // Создать новую падающую задачу
   const createProblem = useCallback(() => {
-    if (lives <= 0 || gameOver || !gameStarted || gamePaused) return;
+    // Добавляем отладочный лог
+    console.log("💡 createProblem вызвана", { lives, gameOver, gameStarted, gamePaused, problemBankLength: problemBank.length });
+
+    // Проверяем условия
+    if (lives <= 0) {
+      console.log("❌ Создание задачи отменено: нет жизней");
+      return;
+    }
+
+    if (gameOver) {
+      console.log("❌ Создание задачи отменено: игра окончена");
+      return;
+    }
+
+    if (!gameStarted) {
+      console.log("❌ Создание задачи отменено: игра не начата");
+      return;
+    }
+
+    if (gamePaused) {
+      console.log("❌ Создание задачи отменено: игра на паузе");
+      return;
+    }
 
     if (problemBank.length === 0) {
-      console.error("No problems available!");
+      console.error("❌ No problems available!");
       setFeedback("Ошибка: задания не найдены", "error");
       return;
     }
 
-    console.log(`Создание новой задачи. Сложность: ${difficultyLevel}`);
+    console.log(`🔍 Создание новой задачи. Сложность: ${difficultyLevel}, Доступно задач: ${problemBank.length}`);
 
     // Фильтруем задачи по текущему уровню сложности
     let filteredProblems = problemBank.filter(p => {
@@ -238,12 +315,15 @@ const DerivFall: React.FC<DerivFallProps> = ({
       return true; // Для сложного уровня берем все задачи
     });
 
+    console.log(`🔍 После фильтрации осталось задач: ${filteredProblems.length}`);
+
     if (filteredProblems.length === 0) {
-      console.warn(`После фильтрации по сложности '${difficultyLevel}' задач не осталось!`);
-      console.log("Используем все доступные задачи без фильтрации по сложности");
+      console.warn(`⚠️ После фильтрации по сложности '${difficultyLevel}' задач не осталось!`);
+      console.log("ℹ️ Используем все доступные задачи без фильтрации по сложности");
       filteredProblems = [...problemBank];
 
       if (filteredProblems.length === 0) {
+        console.error("❌ Всё ещё нет доступных задач!");
         setFeedback("Нет доступных заданий!", "error");
         return;
       }
@@ -253,29 +333,58 @@ const DerivFall: React.FC<DerivFallProps> = ({
     const problem = filteredProblems[randomIndex];
     const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
 
-    const leftPosition = Math.random() * 70; // Случайная горизонтальная позиция (0-70%)
+    // Используем функцию getDistributedPosition вместо простого Math.random()
+    const getDistributedPosition = () => {
+      // Находим все текущие горизонтальные позиции задач
+      const currentPositions = problems.map(p => p.left);
+
+      // Пробуем 5 раз найти позицию, не близкую к существующим
+      for (let i = 0; i < 5; i++) {
+        const sector = Math.floor(Math.random() * 4); // 4 сектора
+        const newPos = (sector * 20) + (Math.random() * 15);
+
+        // Проверяем, нет ли рядом других задач (на расстоянии менее 20%)
+        const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 20);
+        if (!isTooClose) {
+          return newPos; // Нашли хорошую позицию
+        }
+      }
+
+      // Если не нашли хорошую позицию, возвращаем случайную
+      return Math.random() * 70;
+    };
+
+    const leftPosition = getDistributedPosition();
 
     // Добавляем новую задачу
-    console.log(`Добавляем задачу ${newProblemId}`);
-    setProblems(prev => [...prev, {
-      ...problem,
-      id: newProblemId,
-      left: leftPosition,
-      top: -20, // Начинаем за пределами экрана
-      answered: false
-    }]);
+    console.log(`✅ Добавляем задачу ${newProblemId}: ${problem.problem}`);
+
+    // Важно: используем функциональное обновление для состояния
+    setProblems(prev => {
+      const newProblems = [...prev, {
+        ...problem,
+        id: newProblemId,
+        left: leftPosition,
+        top: 0, // Начальная позиция (в процентах)
+        answered: false
+      }];
+      console.log(`📊 Всего задач после добавления: ${newProblems.length}`);
+      return newProblems;
+    });
 
     // Запланировать удаление задачи после того, как она выпадет из поля зрения
     problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
+      console.log(`⏱️ Таймаут для задачи ${newProblemId} сработал`);
+
       setProblems(prev => {
         const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
         if (problemExists) {
           // Задача упала без ответа
-          console.log(`Задача ${newProblemId} упала без ответа`);
+          console.log(`❌ Задача ${newProblemId} упала без ответа`);
           setLives(l => {
             const newLives = l - 1;
             if (newLives <= 0) {
-              console.log("Все жизни потеряны, игра завершается");
+              console.log("☠️ Все жизни потеряны, игра завершается");
               endGame();
             }
             return newLives;
@@ -352,9 +461,17 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
   // Начать игру
   const startGame = useCallback(() => {
-    console.log("Старт игры");
+    console.log("💡 startGame вызвана, gameStarted =", gameStarted);
+
+    // Повторно устанавливаем gameStarted, чтобы гарантировать обновление
     setGameStarted(true);
     setGamePaused(false);
+
+    // Очистим все таймеры перед новой игрой
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
+    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
+    problemTimeoutsRef.current = {};
 
     // Настроить скорость в зависимости от сложности
     switch(difficultyLevel) {
@@ -364,12 +481,11 @@ const DerivFall: React.FC<DerivFallProps> = ({
     }
 
     // Запустить таймер игры
-    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       if (!gamePaused) {
         setTimeRemaining(prev => {
           if (prev <= 1) {
-            console.log("Время вышло, игра завершается");
+            console.log("⏱️ Время вышло, игра завершается");
             endGame();
             return 0;
           }
@@ -378,25 +494,62 @@ const DerivFall: React.FC<DerivFallProps> = ({
       }
     }, 1000);
 
-    // Запустить генерацию заданий
-    if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
+    // ВАЖНО: не используйте привязку к стейту gameStarted тут
+    // Создаем первую задачу вручную (не через createProblem)
+    // чтобы обойти проверку на gameStarted
+    console.log("🎮 Создаем первую задачу напрямую");
 
-    // Создаем первую задачу сразу
-    setTimeout(() => createProblem(), 500);
+    const randomIndex = Math.floor(Math.random() * problemBank.length);
+    const problem = problemBank[randomIndex];
+    const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+    const leftPosition = Math.random() * 70;
+
+    // Добавляем задачу напрямую
+    setProblems(prev => [
+      ...prev,
+      {
+        ...problem,
+        id: newProblemId,
+        left: leftPosition,
+        top: 0,
+        answered: false
+      }
+    ]);
+
+    console.log(`✅ Первая задача добавлена: ${problem.problem}`);
+
+    // Настраиваем таймаут для неё
+    problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
+      setProblems(prev => {
+        const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
+        if (problemExists) {
+          setLives(l => {
+            const newLives = l - 1;
+            if (newLives <= 0) {
+              endGame();
+            }
+            return newLives;
+          });
+          setFeedback("Упущенная задача!", "error");
+        }
+        return prev.filter(p => p.id !== newProblemId);
+      });
+      delete problemTimeoutsRef.current[newProblemId];
+    }, speed + 2000);
 
     // Запускаем интервал для создания последующих задач
     const interval = difficultyLevel === 'hard' ? 2500 :
-        difficultyLevel === 'medium' ? 3500 :
-            4500;
+        difficultyLevel === 'medium' ? 3500 : 4500;
 
-    console.log(`Установка интервала генерации задач: ${interval}ms`);
+    console.log(`🎮 Установка интервала генерации задач: ${interval}ms`);
 
     gameIntervalRef.current = setInterval(() => {
       if (!gamePaused) {
         createProblem();
       }
     }, interval);
-  }, [difficultyLevel, gamePaused, createProblem, endGame]);
+
+  }, [difficultyLevel, problemBank, speed, setFeedback, endGame]);
 
   // Начать игру с обратным отсчетом
   const startGameWithCountdown = useCallback(() => {
@@ -407,13 +560,22 @@ const DerivFall: React.FC<DerivFallProps> = ({
     // Запускаем обратный отсчет
     const countdownTimer = setInterval(() => {
       setCountdown(prev => {
-        if (prev <= 1) {
+        const newCount = prev - 1;
+        if (newCount <= 0) {
           clearInterval(countdownTimer);
           setCountdownActive(false);
-          startGame();
+
+          // Сразу устанавливаем gameStarted в true перед вызовом startGame
+          setGameStarted(true);
+
+          // Небольшая задержка перед запуском
+          setTimeout(() => {
+            startGame();
+          }, 100);
+
           return 0;
         }
-        return prev - 1;
+        return newCount;
       });
     }, 1000);
   }, [resetGame, startGame]);
@@ -484,18 +646,21 @@ const DerivFall: React.FC<DerivFallProps> = ({
         <div
             ref={gameAreaRef}
             className="relative flex-1 overflow-hidden bg-gray-700 dark:bg-gray-200 transition-colors"
-            style={{height: '500px'}} // Добавляем фиксированную высоту
+            style={{height: '500px', position: 'relative'}} // Добавляем position: 'relative'
         >
           {/* Падающие задачи */}
           {problems.map(problem => (
               !problem.answered ? (
                   <div
                       key={problem.id}
-                      className="absolute bg-blue-700 dark:bg-blue-200 p-3 rounded-lg shadow-lg text-center w-64 transition-colors"
+                      className="absolute bg-blue-700 dark:bg-blue-200 p-3 rounded-lg shadow-lg text-center transition-colors"
                       style={{
                         left: `${problem.left}%`,
-                        top: gamePaused ? `${problem.top}%` : 'auto',
-                        animation: gamePaused ? 'none' : `fall ${speed / 1000}s linear forwards`
+                        top: '-80px',
+                        width: '250px', // Фиксированная ширина
+                        transform: `translateX(-50%)`, // Центрирование относительно позиции
+                        animation: gamePaused ? 'none' : `fallNew ${speed / 1000}s linear forwards`,
+                        zIndex: parseInt(problem.id.split('-')[1]) % 10, // Разные уровни z-index
                       }}
                   >
                     <div className="text-lg mb-2 font-medium text-white dark:text-gray-900 transition-colors">
@@ -540,7 +705,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
           {/* Наложение паузы */}
           {gamePaused && gameStarted && !gameOver && (
-              <div className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
+              <div
+                  className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
                 <div className="text-4xl font-bold text-white mb-6">ПАУЗА</div>
                 <Button
                     onClick={togglePause}
@@ -553,9 +719,12 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
           {/* Экран окончания игры */}
           {gameOver && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 dark:bg-opacity-70 z-20 transition-colors">
-                <div className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
-                  <h2 className="text-2xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">Игра окончена!</h2>
+              <div
+                  className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 dark:bg-opacity-70 z-20 transition-colors">
+                <div
+                    className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
+                  <h2 className="text-2xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">Игра
+                    окончена!</h2>
                   <p className="mb-6 text-xl text-white dark:text-gray-900 transition-colors">
                     Итоговый счет: <span className="font-bold">{score}</span>
                   </p>
@@ -574,7 +743,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
           {/* Экран начала игры */}
           {!gameStarted && !gameOver && !countdownActive && (
               <div className="absolute inset-0 flex items-center justify-center z-20">
-                <div className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
+                <div
+                    className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
                   <h2 className="text-xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">
                     Игра "Падающие производные"
                   </h2>
@@ -630,7 +800,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
           {/* Добавляем фоновую сетку для лучшего визуального восприятия */}
           <div className="absolute inset-0 grid grid-cols-8 grid-rows-6 gap-0.5 pointer-events-none">
             {Array(48).fill(0).map((_, idx) => (
-                <div key={idx} className="bg-gray-600 dark:bg-gray-300 bg-opacity-20 dark:bg-opacity-20 transition-colors"></div>
+                <div key={idx}
+                     className="bg-gray-600 dark:bg-gray-300 bg-opacity-20 dark:bg-opacity-20 transition-colors"></div>
             ))}
           </div>
         </div>
@@ -639,8 +810,18 @@ const DerivFall: React.FC<DerivFallProps> = ({
         <style>
           {`
           @keyframes fall {
-            from { top: -100px; }
+            from { top: -20px; }
             to { top: 100%; }
+          }
+          
+          @keyframes fallTransform {
+            from { transform: translateY(-20px); }
+            to { transform: translateY(calc(100vh - 100px)); }
+          }
+          
+          @keyframes fallNew {
+            0% { top: -80px; }
+            100% { top: 100%; }
           }
           
           @keyframes fadeOut {
