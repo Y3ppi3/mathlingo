@@ -25,9 +25,10 @@ interface Task {
 }
 
 const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3, onComplete }) => {
-  // Состояния
+  // Основные состояния
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [gamePaused, setGamePaused] = useState(false);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
   const [userFunction, setUserFunction] = useState('');
   const [isValidFunction, setIsValidFunction] = useState(true);
@@ -36,7 +37,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'explorer' | 'challenge'>('explorer');
 
-  // Добавляем типизацию для данных графика
+  // Состояния для графиков
   interface GraphDataPoint {
     x: number;
     y: number;
@@ -48,6 +49,8 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
   const [integralData, setIntegralData] = useState<GraphDataPoint[]>([]);
   const [xMin, setXMin] = useState(-5);
   const [xMax, setXMax] = useState(5);
+
+  // Состояния для ответов и прогресса
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [userAnswer, setUserAnswer] = useState('');
   const [feedback, setFeedback] = useState('');
@@ -57,7 +60,12 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
   const [currentHintIndex, setCurrentHintIndex] = useState(0);
   const [showHints, setShowHints] = useState(false);
   const [animationActive, setAnimationActive] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(60); // Сокращаем до 1 минуты
+  const [timeRemaining, setTimeRemaining] = useState(60); // 60 секунд
+  const [countdownActive, setCountdownActive] = useState(false);
+  const [countdown, setCountdown] = useState(3);
+
+  // Ссылки на таймеры
+  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Загрузка задач при инициализации
   useEffect(() => {
@@ -109,6 +117,8 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
 
           setTasks(integralTasks);
         }
+
+        console.log(`Загружено ${problems.length} задач для режима ${mode}`);
       } catch (error) {
         console.error('Ошибка при загрузке заданий:', error);
 
@@ -313,7 +323,8 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
     );
 
     // Выбираем случайную задачу
-    const randomTask = eligibleTasks[Math.floor(Math.random() * eligibleTasks.length)] || tasks[0];
+    const randomIndex = Math.floor(Math.random() * (eligibleTasks.length || 1));
+    const randomTask = eligibleTasks.length > 0 ? eligibleTasks[randomIndex] : tasks[0];
     setCurrentTask(randomTask);
 
     // Устанавливаем функцию из задания
@@ -336,37 +347,92 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
 
-    if (gameStarted && !gameOver) {
+    if (gameStarted && !gameOver && !gamePaused) {
       timer = setInterval(() => {
         setTimeRemaining(prev => {
           if (prev <= 1) {
-            clearInterval(timer as NodeJS.Timeout);
+            if (timer) clearInterval(timer);
             endGame();
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
+      timerRef.current = timer;
     }
 
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [gameStarted, gameOver]);
+  }, [gameStarted, gameOver, gamePaused]);
+
+  // Начать игру с обратным отсчетом
+  const startGameWithCountdown = () => {
+    resetGame();
+    setCountdownActive(true);
+    setCountdown(3);
+
+    // Запускаем обратный отсчет
+    const countdownTimer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownTimer);
+          setCountdownActive(false);
+          startGame();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Сбросить игру
+  const resetGame = () => {
+    // Очищаем таймер
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    // Сбрасываем состояния
+    setScore(0);
+    setTasksCompleted(0);
+    setTimeRemaining(60);
+    setGameOver(false);
+    setGameStarted(false);
+    setGamePaused(false);
+    setShowFeedback(false);
+  };
 
   // Функция запуска игры
   const startGame = () => {
     setGameStarted(true);
+    setGamePaused(false);
     setScore(0);
     setTasksCompleted(0);
-    setTimeRemaining(60); // 1 минута вместо 5
+    setTimeRemaining(60); // 1 минута
     loadTask();
+  };
+
+  // Поставить игру на паузу или возобновить
+  const togglePause = () => {
+    setGamePaused(prev => !prev);
   };
 
   // Функция завершения игры
   const endGame = () => {
     setGameOver(true);
-    onComplete(score, tasksCompleted);
+    setGamePaused(false);
+
+    // Очищаем таймер
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (onComplete) {
+      onComplete(score, tasksCompleted);
+    }
   };
 
   // Обработка отправки ответа
@@ -469,7 +535,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
   if (loading) {
     return (
         <div className="flex items-center justify-center h-full bg-gray-700 dark:bg-gray-200 rounded-lg p-6 transition-colors">
-          <div className="text-xl text-gray-300 dark:text-gray-700">
+          <div className="text-xl text-gray-300 dark:text-gray-700 transition-colors">
             Загрузка заданий...
           </div>
         </div>
@@ -488,11 +554,11 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
 
           <div className="mb-6 bg-gray-600 dark:bg-gray-300 p-4 rounded transition-colors">
             <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">Что такое MathLab:</h3>
-            <p className="mb-3 text-gray-300 dark:text-gray-700">
+            <p className="mb-3 text-gray-300 dark:text-gray-700 transition-colors">
               Это интерактивная лаборатория для изучения и визуализации математических понятий.
               MathLab объединяет интерактивные графики и задачи в одном компоненте.
             </p>
-            <div className="text-left text-gray-300 dark:text-gray-700">
+            <div className="text-left text-gray-300 dark:text-gray-700 transition-colors">
               <p className="font-medium mb-1">В MathLab вы можете:</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Визуализировать функции и их {mode === 'derivatives' ? 'производные' : 'интегралы'}</li>
@@ -503,7 +569,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
             </div>
           </div>
 
-          <Button onClick={startGame}>Начать исследование</Button>
+          <Button onClick={startGameWithCountdown}>Начать исследование</Button>
         </div>
     );
   }
@@ -533,7 +599,18 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
             </div>
           </div>
 
-          <Button onClick={() => startGame()}>Начать заново</Button>
+          <Button onClick={startGameWithCountdown}>Начать заново</Button>
+        </div>
+    );
+  }
+
+  // Обратный отсчет перед началом
+  if (countdownActive) {
+    return (
+        <div className="flex items-center justify-center h-full bg-gray-700 dark:bg-gray-200 rounded-lg transition-colors">
+          <div className="text-9xl font-bold text-gray-100 dark:text-gray-900 animate-pulse transition-colors">
+            {countdown}
+          </div>
         </div>
     );
   }
@@ -542,23 +619,36 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
   return (
       <div className="flex flex-col h-full bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl overflow-hidden transition-colors">
         {/* Верхняя панель с информацией и таймером */}
-        <div className="flex justify-between items-center p-2 bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400">
+        <div className="flex justify-between items-center p-2 bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
           <div className="flex space-x-4 items-center">
-            <div className="text-gray-100 dark:text-gray-900">
+            <div className="text-gray-100 dark:text-gray-900 transition-colors">
               Счет: <span className="font-bold">{score}</span>
             </div>
-            <div className="text-gray-100 dark:text-gray-900">
+            <div className="text-gray-100 dark:text-gray-900 transition-colors">
               Задач: <span className="font-bold">{tasksCompleted}</span>
             </div>
           </div>
 
-          <div className="text-yellow-400 dark:text-yellow-600 font-bold">
-            Время: {formatTime(timeRemaining)}
+          <div className="flex items-center space-x-3">
+            <button
+                className={`px-3 py-1 text-sm rounded ${
+                    gamePaused
+                        ? 'bg-green-700 dark:bg-green-200 text-white dark:text-gray-900'
+                        : 'bg-amber-700 dark:bg-amber-200 text-white dark:text-gray-900'
+                } transition-colors`}
+                onClick={togglePause}
+            >
+              {gamePaused ? 'Продолжить' : 'Пауза'}
+            </button>
+
+            <div className="text-yellow-400 dark:text-yellow-600 font-bold transition-colors">
+              Время: {formatTime(timeRemaining)}
+            </div>
           </div>
         </div>
 
         {/* Вкладки для переключения между режимами */}
-        <div className="flex bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400">
+        <div className="flex bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
           <button
               className={`px-4 py-2 text-base font-medium transition-colors ${
                   activeTab === 'explorer'
@@ -566,6 +656,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                       : 'text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-400'
               }`}
               onClick={() => setActiveTab('explorer')}
+              disabled={gamePaused}
           >
             Графики
           </button>
@@ -576,28 +667,42 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                       : 'text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-400'
               }`}
               onClick={() => setActiveTab('challenge')}
+              disabled={gamePaused}
           >
             Задачи
           </button>
         </div>
 
+        {/* Наложение паузы */}
+        {gamePaused && (
+            <div className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
+              <div className="text-4xl font-bold text-white mb-6">ПАУЗА</div>
+              <Button
+                  onClick={togglePause}
+              >
+                Продолжить
+              </Button>
+            </div>
+        )}
+
         {/* Содержимое вкладки "Графики" */}
         {activeTab === 'explorer' && (
             <div className="flex-1 p-4 overflow-auto">
-              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg">
-                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900">
+              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg transition-colors">
+                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
                   Исследование функций:
                 </h3>
-                <p className="text-gray-300 dark:text-gray-700 mb-3">
+                <p className="text-gray-300 dark:text-gray-700 mb-3 transition-colors">
                   Введите функцию и настройте параметры для визуализации графика и его {mode === 'derivatives' ? 'производной' : 'интеграла'}.
                 </p>
 
                 <div className="flex items-center space-x-2 mb-3">
-                  <span className="text-gray-100 dark:text-gray-900">f(x) =</span>
+                  <span className="text-gray-100 dark:text-gray-900 transition-colors">f(x) =</span>
                   <input
                       type="text"
                       value={userFunction}
                       onChange={handleFunctionChange}
+                      disabled={gamePaused}
                       className={`flex-grow p-2 rounded bg-gray-700 dark:bg-gray-100 border ${
                           isValidFunction
                               ? 'border-gray-500 dark:border-gray-400'
@@ -608,31 +713,34 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                 </div>
 
                 {!isValidFunction && (
-                    <p className="text-red-500 mb-3">{errorMessage || 'Неверное выражение'}</p>
+                    <p className="text-red-500 mb-3 transition-colors">{errorMessage || 'Неверное выражение'}</p>
                 )}
 
                 <div className="flex flex-wrap gap-2 mb-3">
                   <div className="flex items-center">
-                    <span className="text-gray-100 dark:text-gray-900 mr-2">X min:</span>
+                    <span className="text-gray-100 dark:text-gray-900 mr-2 transition-colors">X min:</span>
                     <input
                         type="number"
                         value={xMin}
                         onChange={(e) => handleLimitsChange(Number(e.target.value), xMax)}
-                        className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900"
+                        disabled={gamePaused}
+                        className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900 transition-colors"
                     />
                   </div>
                   <div className="flex items-center mx-2">
-                    <span className="text-gray-100 dark:text-gray-900 mr-2">X max:</span>
+                    <span className="text-gray-100 dark:text-gray-900 mr-2 transition-colors">X max:</span>
                     <input
                         type="number"
                         value={xMax}
                         onChange={(e) => handleLimitsChange(xMin, Number(e.target.value))}
-                        className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900"
+                        disabled={gamePaused}
+                        className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900 transition-colors"
                     />
                   </div>
                   <Button
                       variant="outline"
                       onClick={() => handleLimitsChange(-5, 5)}
+                      disabled={gamePaused}
                       className="text-sm py-1"
                   >
                     [-5, 5]
@@ -640,6 +748,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                   <Button
                       variant="outline"
                       onClick={() => handleLimitsChange(-Math.PI, Math.PI)}
+                      disabled={gamePaused}
                       className="text-sm py-1"
                   >
                     [-π, π]
@@ -647,11 +756,11 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                 </div>
               </div>
 
-              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg">
-                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900">
+              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg transition-colors">
+                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
                   График функции:
                 </h3>
-                <div className="h-64 bg-gray-800 dark:bg-gray-100 rounded-lg p-2">
+                <div className="h-64 bg-gray-800 dark:bg-gray-100 rounded-lg p-2 transition-colors">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#555" />
@@ -718,16 +827,16 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
               {/* Текущая задача */}
               <div className={`mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg ${
                   animationActive ? 'animate-pulse' : ''
-              }`}>
-                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900">
+              } transition-colors`}>
+                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
                   Задача {tasksCompleted + 1}:
                 </h3>
-                <p className="text-gray-300 dark:text-gray-700 mb-4">
+                <p className="text-gray-300 dark:text-gray-700 mb-4 transition-colors">
                   {currentTask?.question}
                 </p>
 
                 {showHints && currentTask && (
-                    <div className="mt-3 p-2 bg-blue-700 dark:bg-blue-200 text-gray-100 dark:text-gray-900 rounded">
+                    <div className="mt-3 p-2 bg-blue-700 dark:bg-blue-200 text-gray-100 dark:text-gray-900 rounded transition-colors">
                       <p className="font-medium">Подсказка {currentHintIndex + 1}:</p>
                       <p>{currentTask.hints[currentHintIndex]}</p>
                     </div>
@@ -735,8 +844,8 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
               </div>
 
               {/* Поле для ответа */}
-              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg">
-                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900">
+              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg transition-colors">
+                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
                   Ваш ответ:
                 </h3>
 
@@ -750,7 +859,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                                       ? 'bg-blue-700 dark:bg-blue-200 text-gray-100 dark:text-gray-900'
                                       : 'bg-gray-700 dark:bg-gray-100 text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-300'
                               }`}
-                              onClick={() => handleOptionSelect(option)}
+                              onClick={() => !gamePaused && handleOptionSelect(option)}
                           >
                             {option}
                           </div>
@@ -762,8 +871,9 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                           type="text"
                           value={userAnswer}
                           onChange={handleAnswerChange}
+                          disabled={gamePaused}
                           placeholder="Введите ваш ответ..."
-                          className="w-full p-2 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900"
+                          className="w-full p-2 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900 transition-colors"
                       />
                     </div>
                 )}
@@ -772,14 +882,14 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                   <Button
                       variant="outline"
                       onClick={showNextHint}
-                      disabled={showHints && currentHintIndex >= (currentTask?.hints.length || 0) - 1}
+                      disabled={gamePaused || (showHints && currentHintIndex >= (currentTask?.hints.length || 0) - 1)}
                   >
                     {showHints ? 'Следующая подсказка' : 'Показать подсказку'}
                   </Button>
 
                   <Button
                       onClick={handleSubmitAnswer}
-                      disabled={
+                      disabled={gamePaused ||
                           (currentTask?.options && !selectedOption) ||
                           (!currentTask?.options && !userAnswer.trim())
                       }
@@ -796,10 +906,23 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
             <div className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-10 ${
                 feedback.includes('Правильно') ? 'bg-green-700 dark:bg-green-200 text-gray-100 dark:text-gray-900' :
                     'bg-red-700 dark:bg-red-200 text-gray-100 dark:text-gray-900'
-            }`}>
+            } transition-colors`}>
               {feedback}
             </div>
         )}
+
+        {/* CSS для анимаций */}
+        <style jsx>{`
+          @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+          }
+          
+          .animate-pulse {
+            animation: pulse 1.5s infinite;
+          }
+        `}</style>
       </div>
   );
 };

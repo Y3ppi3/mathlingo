@@ -116,7 +116,7 @@ const GamePage: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-700 dark:bg-gray-200">
+            <div className="min-h-screen bg-gray-900 dark:bg-white">
                 <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16">
                     <div className="flex justify-center items-center h-96">
@@ -129,7 +129,7 @@ const GamePage: React.FC = () => {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gray-700 dark:bg-gray-200">
+            <div className="min-h-screen bg-gray-900 dark:bg-white">
                 <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16">
                     <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg p-6 text-center">
@@ -144,13 +144,13 @@ const GamePage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-700 dark:bg-gray-200">
+        <div className="min-h-screen bg-gray-900 dark:bg-white">
             <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
                 {!gameCompleted ? (
                     <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg overflow-hidden">
                         <div className="px-6 py-4 flex items-center justify-between border-b border-gray-700 dark:border-gray-300">
-                            <h1 className="text-2xl font-bold text-gray-100 dark:text-gray-900">
+                            <h1 className="text-2xl font-bold text-white dark:text-gray-900">
                                 {gameInfo?.title}
                             </h1>
                             <Button
@@ -162,7 +162,8 @@ const GamePage: React.FC = () => {
                             </Button>
                         </div>
 
-                        <div className="h-[calc(100vh-200px)] max-h-[800px] p-4">
+                        {/* Исправленный контейнер для игры: фиксированная высота с поддержкой overflow */}
+                        <div className="h-[calc(100vh-220px)] min-h-[600px] max-h-[800px]">
                             {renderGame()}
                         </div>
                     </div>
