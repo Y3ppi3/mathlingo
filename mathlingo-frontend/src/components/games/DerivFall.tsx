@@ -144,6 +144,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const gameIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const problemTimeoutsRef = useRef<{[key: string]: NodeJS.Timeout}>({});
+  const gameActiveRef = useRef(false);
 
   // Установить сообщение обратной связи
   const setFeedback = useCallback((message: string, type: 'success' | 'error') => {
@@ -195,6 +196,9 @@ const DerivFall: React.FC<DerivFallProps> = ({
     setGameOver(true);
     setGameStarted(false);
     setGamePaused(false);
+
+    // ВАЖНО: обновляем ref
+    gameActiveRef.current = false;
 
     // Очищаем все таймеры
     if (timerRef.current) {
@@ -255,7 +259,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
       return;
     }
 
-    if (!gameStarted) {
+    // Вместо проверки gameStarted, используем gameActiveRef
+    if (!gameActiveRef.current) {
       console.log("❌ Создание задачи отменено: игра не начата");
       return;
     }
@@ -362,7 +367,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
       // Удаляем таймер из списка
       delete problemTimeoutsRef.current[newProblemId];
     }, speed + 2000); // Время падения + буфер
-  }, [difficultyLevel, problemBank, lives, gameOver, gameStarted, gamePaused, speed, setFeedback, endGame]);
+  }, [difficultyLevel, problemBank, lives, gameOver, gameStarted, gamePaused,
+    speed, setFeedback, endGame, problems]);
 
   // Обработать выбор ответа
   const handleAnswerSelect = useCallback((problemId: string, selectedOption: string, correctAnswer: string) => {
@@ -421,6 +427,9 @@ const DerivFall: React.FC<DerivFallProps> = ({
     setTimeRemaining(timeLimit);
     setProblemsCompleted(0);
     setShowFeedback(false);
+
+    // ВАЖНО: сбрасываем ref
+    gameActiveRef.current = false;
   }, [timeLimit]);
 
   // Начать игру
@@ -430,6 +439,9 @@ const DerivFall: React.FC<DerivFallProps> = ({
     // Повторно устанавливаем gameStarted, чтобы гарантировать обновление
     setGameStarted(true);
     setGamePaused(false);
+
+    // ВАЖНО: Синхронно устанавливаем ref
+    gameActiveRef.current = true;
 
     // Очистим все таймеры перед новой игрой
     if (timerRef.current) clearInterval(timerRef.current);
@@ -458,15 +470,13 @@ const DerivFall: React.FC<DerivFallProps> = ({
       }
     }, 1000);
 
-    // ВАЖНО: не используйте привязку к стейту gameStarted тут
-    // Создаем первую задачу вручную (не через createProblem)
-    // чтобы обойти проверку на gameStarted
+    // Создаем первую задачу вручную
     console.log("🎮 Создаем первую задачу напрямую");
 
     const randomIndex = Math.floor(Math.random() * problemBank.length);
     const problem = problemBank[randomIndex];
     const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-    const leftPosition = Math.random() * 70;
+    const leftPosition = Math.random() * 70; // или getDistributedPosition(), если доступна
 
     // Добавляем задачу напрямую
     setProblems(prev => [
@@ -508,12 +518,13 @@ const DerivFall: React.FC<DerivFallProps> = ({
     console.log(`🎮 Установка интервала генерации задач: ${interval}ms`);
 
     gameIntervalRef.current = setInterval(() => {
-      if (!gamePaused) {
+      // Используем gameActiveRef.current вместо gameStarted
+      if (!gamePaused && gameActiveRef.current) {
         createProblem();
       }
     }, interval);
 
-  }, [difficultyLevel, problemBank, speed, setFeedback, endGame]);
+  }, [difficultyLevel, problemBank, speed, gamePaused, setFeedback, endGame, createProblem]);
 
   // Начать игру с обратным отсчетом
   const startGameWithCountdown = useCallback(() => {
@@ -524,22 +535,17 @@ const DerivFall: React.FC<DerivFallProps> = ({
     // Запускаем обратный отсчет
     const countdownTimer = setInterval(() => {
       setCountdown(prev => {
-        const newCount = prev - 1;
-        if (newCount <= 0) {
+        if (prev <= 1) {
           clearInterval(countdownTimer);
           setCountdownActive(false);
 
-          // Сразу устанавливаем gameStarted в true перед вызовом startGame
-          setGameStarted(true);
+          // Не устанавливаем здесь gameStarted
+          // т.к. это делается в startGame
 
-          // Небольшая задержка перед запуском
-          setTimeout(() => {
-            startGame();
-          }, 100);
-
+          startGame();
           return 0;
         }
-        return newCount;
+        return prev - 1;
       });
     }, 1000);
   }, [resetGame, startGame]);
