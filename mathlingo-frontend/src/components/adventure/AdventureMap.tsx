@@ -109,12 +109,12 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
 
     return (
         <div className="flex flex-col space-y-4">
-            <h2 className="text-xl font-semibold text-white dark:text-gray-900 transition-colors">
+            <h2 className="text-xl font-semibold text-gray-100 dark:text-gray-900 transition-colors">
                 {mapName}
             </h2>
 
             {/* Основной контейнер карты с увеличенной высотой */}
-            <div className="relative w-full h-[600px] bg-gray-800 dark:bg-gray-100 rounded-lg overflow-hidden shadow-lg">
+            <div className="relative w-full h-[600px] bg-gray-900 dark:bg-gray-100 rounded-lg overflow-hidden shadow-lg">
                 {/* Фоновое изображение карты */}
                 <div
                     className="absolute inset-0 bg-cover bg-center z-0"
@@ -122,7 +122,7 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                 ></div>
 
                 {/* Слой затемнения */}
-                <div className="absolute inset-0 bg-black/20 dark:bg-black/5 z-10"></div>
+                <div className="absolute inset-0 bg-black/5 dark:bg-black/20 z-10"></div>
 
                 {/* Контейнер для локаций - предотвращает перекрытие элементами боковой панели */}
                 <div className="absolute inset-0 z-20">
@@ -141,7 +141,7 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                             }}
                             onClick={() => handleLocationClick(location)}
                         >
-                            <div className="w-12 h-12 flex items-center justify-center bg-gray-900/20 dark:bg-white/20 rounded-full p-1 shadow-lg">
+                            <div className="w-12 h-12 flex items-center justify-center bg-white/20 dark:bg-gray-900/20 rounded-full p-1 shadow-lg">
                                 <img
                                     src={location.icon_url || '/images/default-location.svg'}
                                     alt={location.name}
@@ -150,7 +150,7 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                             </div>
                             {/* Добавляем прозрачный элемент, чтобы увеличить высоту метки и избежать накладывания текста */}
                             <div style={{ height: '25px' }}></div>
-                            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-2 text-xs font-bold text-white dark:text-gray-800 bg-gray-900/95 dark:bg-white/95 px-2 py-1 rounded whitespace-nowrap" style={{
+                            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-2 text-xs font-bold text-white dark:text-gray-800 bg-gray-900 dark:bg-gray-600/95 px-2 py-1 rounded whitespace-nowrap" style={{
                                 maxWidth: "none",  // Убираем ограничение ширины
                                 zIndex: 35,        // Увеличиваем z-index чтобы метка была поверх других элементов
                                 textShadow: "0px 0px 2px rgba(0,0,0,0.5)",  // Добавляем тень для лучшей видимости
@@ -172,7 +172,7 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                             ✕
                         </button>
 
-                        <h3 className="text-xl font-bold mb-2 text-white dark:text-gray-800">{selectedLocation.name}</h3>
+                        <h3 className="text-xl font-bold mb-2 text-gray-100 dark:text-gray-900">{selectedLocation.name}</h3>
                         <p className="text-sm mb-4 text-gray-300 dark:text-gray-600">{selectedLocation.description}</p>
 
                         <div className="mb-6">
@@ -184,7 +184,7 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                             </button>
                         </div>
 
-                        <h4 className="text-lg font-semibold mb-2 text-white dark:text-gray-800">Задания:</h4>
+                        <h4 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-800">Задания:</h4>
                         {selectedLocation.taskGroups.length > 0 ? (
                             <div className="space-y-3">
                                 {selectedLocation.taskGroups.map((group) => (
