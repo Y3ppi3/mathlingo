@@ -152,65 +152,10 @@ const DerivFall: React.FC<DerivFallProps> = ({
     setShowFeedback(true);
 
     // Скрываем сообщение через некоторое время
-    // Создаем первую задачу с задержкой
     setTimeout(() => {
-      console.log("🎮 Создаем первую задачу напрямую");
-
-      const randomIndex = Math.floor(Math.random() * problemBank.length);
-      const problem = problemBank[randomIndex];
-      const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-
-      // Используем новую функцию распределения
-      const leftPosition = getDistributedPosition();
-
-      // Добавляем задачу напрямую
-      setProblems(prev => [
-        ...prev,
-        {
-          ...problem,
-          id: newProblemId,
-          left: leftPosition,
-          top: 0,
-          answered: false
-        }
-      ]);
-
-      console.log(`✅ Первая задача добавлена: ${problem.problem}`);
-
-      // Настраиваем таймаут для неё
-      problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
-        setProblems(prev => {
-          const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
-          if (problemExists) {
-            setLives(l => {
-              const newLives = l - 1;
-              if (newLives <= 0) {
-                endGame();
-              }
-              return newLives;
-            });
-            setFeedback("Упущенная задача!", "error");
-          }
-          return prev.filter(p => p.id !== newProblemId);
-        });
-        delete problemTimeoutsRef.current[newProblemId];
-      }, speed + 2000);
-
-      // Запускаем интервал для создания последующих задач с ДОПОЛНИТЕЛЬНОЙ задержкой
-      setTimeout(() => {
-        const interval = difficultyLevel === 'hard' ? 2500 :
-            difficultyLevel === 'medium' ? 3500 : 4500;
-
-        console.log(`🎮 Установка интервала генерации задач: ${interval}ms`);
-
-        gameIntervalRef.current = setInterval(() => {
-          if (!gamePaused) {
-            createProblem();
-          }
-        }, interval);
-      }, 2000); // Задержка в 2 секунды перед запуском интервала
-
+      setShowFeedback(false);
     }, 800);
+  }, []);
 
   // Загрузка проблем из источника или использование стандартных
   useEffect(() => {
@@ -274,6 +219,26 @@ const DerivFall: React.FC<DerivFallProps> = ({
     }
   }, [score, problemsCompleted, onComplete]);
 
+  const getDistributedPosition = useCallback(() => {
+    // Находим все текущие горизонтальные позиции задач
+    const currentPositions = problems.map(p => p.left);
+
+    // Пробуем 5 раз найти позицию, не близкую к существующим
+    for (let i = 0; i < 5; i++) {
+      const sector = Math.floor(Math.random() * 4); // 4 сектора
+      const newPos = (sector * 20) + (Math.random() * 15);
+
+      // Проверяем, нет ли рядом других задач (на расстоянии менее 20%)
+      const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 20);
+      if (!isTooClose) {
+        return newPos; // Нашли хорошую позицию
+      }
+    }
+
+    // Если не нашли хорошую позицию, возвращаем случайную
+    return Math.random() * 70;
+  }, [problems]);
+
   // Создать новую падающую задачу
   const createProblem = useCallback(() => {
     // Добавляем отладочный лог
@@ -333,7 +298,6 @@ const DerivFall: React.FC<DerivFallProps> = ({
     const problem = filteredProblems[randomIndex];
     const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
 
-    // Используем функцию getDistributedPosition вместо простого Math.random()
     const getDistributedPosition = () => {
       // Находим все текущие горизонтальные позиции задач
       const currentPositions = problems.map(p => p.left);
