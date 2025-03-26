@@ -75,7 +75,7 @@ const UserMenu = ({ username, email, avatarId, onLogout, onClose, isOpen }) => {
             </div>
 
             {/* Разделитель */}
-            <div className="border-t border-gray-200 dark:border-gray-700"></div>
+            <div className="border-t border-gray-700 dark:border-gray-200"></div>
 
             {/* Настройки темы/языка */}
             <div className="px-4 py-3">

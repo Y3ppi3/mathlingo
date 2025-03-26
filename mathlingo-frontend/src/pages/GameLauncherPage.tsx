@@ -198,11 +198,11 @@ const GameLauncherPage: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-900 dark:bg-gray-100">
+            <div className="min-h-screen bg-gray-700 dark:bg-gray-200">
                 <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16">
                     <div className="flex justify-center items-center h-96">
-                        <div className="text-lg text-gray-500">Загрузка...</div>
+                        <div className="text-lg text-gray-300 dark:text-gray-600">Загрузка...</div>
                     </div>
                 </div>
             </div>
@@ -211,11 +211,11 @@ const GameLauncherPage: React.FC = () => {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gray-900 dark:bg-gray-100">
+            <div className="min-h-screen bg-gray-700 dark:bg-gray-200">
                 <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
-                        <h2 className="text-xl text-red-500 mb-4">{error}</h2>
+                    <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg p-6 text-center">
+                        <h2 className="text-xl text-red-500 dark:text-red-600 mb-4">{error}</h2>
                         <Button onClick={handleBack}>
                             Вернуться к карте
                         </Button>
@@ -226,77 +226,79 @@ const GameLauncherPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 dark:bg-gray-100">
+        <div className="min-h-screen bg-gray-700 dark:bg-gray-200">
             <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
-                <div className="bg-gray-800 dark:bg-white rounded-lg shadow-lg p-6">
-                    <div className="mb-6">
-                        <Button
-                            variant="outline"
-                            onClick={handleBack}
-                            className="mb-4"
-                        >
-                            ← Вернуться к карте
-                        </Button>
-
-                        <h1 className="text-2xl font-bold text-white dark:text-gray-900">
-                            {mechanicType
-                                ? `Игры типа "${mechanicType}" по теме "${subjectName}"`
-                                : `Игры по теме "${subjectName}"`}
-                        </h1>
-                    </div>
-
-                    {games.length === 0 ? (
-                        <div className="text-center py-8">
-                            <p className="text-gray-500 mb-4">К сожалению, игры не найдены.</p>
-                            <Button onClick={handleBack}>
-                                Вернуться к карте
+                <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg overflow-hidden">
+                    <div className="p-6">
+                        <div className="mb-6">
+                            <Button
+                                variant="outline"
+                                onClick={handleBack}
+                                className="mb-4"
+                            >
+                                ← Вернуться к карте
                             </Button>
-                        </div>
-                    ) : (
-                        <div>
-                            {/* Сгруппированные игры */}
-                            {gameGroups.map((group) => (
-                                <div key={group.type} className="mb-8">
-                                    <h2 className="text-xl font-semibold mb-4 text-gray-200 dark:text-gray-800">{group.title}</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {group.games.map((game) => (
-                                            <div
-                                                key={game.id}
-                                                className={`
-                                                    p-6 rounded-lg cursor-pointer transition-all transform hover:scale-105
-                                                    ${selectedGame?.id === game.id
-                                                    ? 'bg-indigo-900 dark:bg-indigo-100 border-2 border-indigo-500'
-                                                    : 'bg-gray-700 dark:bg-gray-50 border border-gray-600 dark:border-gray-200 hover:shadow-lg'}
-                                                `}
-                                                onClick={() => handleGameSelect(game)}
-                                            >
-                                                <div className="flex items-center mb-3">
-                                                    <div className="text-3xl mr-3">{game.icon}</div>
-                                                    <h3 className="text-xl font-semibold text-white dark:text-gray-900">{game.title}</h3>
-                                                </div>
-                                                <p className="text-gray-300 dark:text-gray-600 mb-4">{game.description}</p>
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-400 dark:text-gray-500">Сложность: {Array(game.difficulty).fill('★').join('')}</span>
-                                                    <span className="text-gray-400 dark:text-gray-500">~{game.estimatedTime} мин</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
 
-                            <div className="flex justify-center">
-                                <Button
-                                    onClick={handleStartGame}
-                                    disabled={!selectedGame}
-                                    className="px-8 py-3 text-lg"
-                                >
-                                    {selectedGame ? `Начать игру "${selectedGame.title}"` : 'Выберите игру'}
+                            <h1 className="text-2xl font-bold text-gray-100 dark:text-gray-900">
+                                {mechanicType
+                                    ? `Игры типа "${mechanicType}" по теме "${subjectName}"`
+                                    : `Игры по теме "${subjectName}"`}
+                            </h1>
+                        </div>
+
+                        {games.length === 0 ? (
+                            <div className="text-center py-8">
+                                <p className="text-gray-400 dark:text-gray-500 mb-4">К сожалению, игры не найдены.</p>
+                                <Button onClick={handleBack}>
+                                    Вернуться к карте
                                 </Button>
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <div>
+                                {/* Сгруппированные игры */}
+                                {gameGroups.map((group) => (
+                                    <div key={group.type} className="mb-8">
+                                        <h2 className="text-xl font-semibold mb-4 text-gray-200 dark:text-gray-800">{group.title}</h2>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {group.games.map((game) => (
+                                                <div
+                                                    key={game.id}
+                                                    className={`
+                                                        p-6 rounded-lg cursor-pointer transition-all transform hover:scale-105 shadow-md
+                                                        ${selectedGame?.id === game.id
+                                                        ? 'bg-indigo-700 dark:bg-indigo-200 border-2 border-indigo-500 dark:border-indigo-400'
+                                                        : 'bg-gray-700 dark:bg-gray-200 border border-gray-600 dark:border-gray-300 hover:shadow-lg'}
+                                                    `}
+                                                    onClick={() => handleGameSelect(game)}
+                                                >
+                                                    <div className="flex items-center mb-3">
+                                                        <div className="text-3xl mr-3">{game.icon}</div>
+                                                        <h3 className="text-xl font-semibold text-gray-100 dark:text-gray-900">{game.title}</h3>
+                                                    </div>
+                                                    <p className="text-gray-300 dark:text-gray-700 mb-4">{game.description}</p>
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-gray-400 dark:text-gray-500">Сложность: {Array(game.difficulty).fill('★').join('')}</span>
+                                                        <span className="text-gray-400 dark:text-gray-500">~{game.estimatedTime} мин</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                <div className="flex justify-center mt-8">
+                                    <Button
+                                        onClick={handleStartGame}
+                                        disabled={!selectedGame}
+                                        className="px-8 py-3 text-lg"
+                                    >
+                                        {selectedGame ? `Начать игру "${selectedGame.title}"` : 'Выберите игру'}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

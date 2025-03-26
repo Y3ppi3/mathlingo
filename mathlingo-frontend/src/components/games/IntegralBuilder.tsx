@@ -1,589 +1,390 @@
-// src/components/games/IntegralBuilder.tsx
-import React, { useState } from 'react';
-import Button from '../Button';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 
-// Определение типов для перетаскиваемых элементов
-interface DraggableItem {
-  id: number;
-  type: 'integralSign' | 'function' | 'bounds' | 'dx' | 'result' | 'constant';
-  content: string;
-  correctPosition?: number; // индекс правильной позиции в решении
-  latex?: string; // представление в LaTeX для более сложных выражений
-}
-
-// Определение типа задания
-interface IntegralTask {
-  id: number;
+// Интерфейс для задания на интеграл
+interface IntegralProblem {
+  id: string;
   question: string;
-  pieces: DraggableItem[];
-  solution: number[]; // индексы элементов в правильном порядке
-  correctPreview: string; // правильное решение в текстовом виде
-  difficulty: number; // сложность от 1 до 5
+  solutionPieces: string[];
+  distractors: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
 }
 
-// Свойства компонента
+// Интерфейс для фрагмента решения
+interface SolutionPiece {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+}
+
+// Интерфейс для пропсов компонента
 interface IntegralBuilderProps {
   initialDifficulty?: number;
   timeLimit?: number;
-  onComplete: (score: number, maxScore: number) => void;
+  problemsSource?: IntegralProblem[];
+  onComplete?: (score: number, maxScore: number) => void;
 }
 
-// Типы для DnD
-const ItemTypes = {
-  INTEGRAL_PIECE: 'integral_piece'
-};
-
-// Предопределенный набор заданий по интегралам разной сложности
-const integralTasks: IntegralTask[] = [
-  // Уровень 1 - простые интегралы
-  {
-    id: 1,
-    question: 'Соберите интеграл от функции x²',
-    pieces: [
-      { id: 1, type: 'integralSign', content: '∫', correctPosition: 0 },
-      { id: 2, type: 'function', content: 'x²', correctPosition: 1 },
-      { id: 3, type: 'dx', content: 'dx', correctPosition: 2 },
-      { id: 4, type: 'result', content: 'x³/3', correctPosition: 3 },
-      { id: 5, type: 'constant', content: '+ C', correctPosition: 4 },
-    ],
-    solution: [1, 2, 3, 4, 5],
-    correctPreview: '∫ x² dx = x³/3 + C',
-    difficulty: 1
-  },
-  {
-    id: 2,
-    question: 'Соберите интеграл от функции 3x',
-    pieces: [
-      { id: 1, type: 'integralSign', content: '∫', correctPosition: 0 },
-      { id: 2, type: 'function', content: '3x', correctPosition: 1 },
-      { id: 3, type: 'dx', content: 'dx', correctPosition: 2 },
-      { id: 4, type: 'result', content: '3x²/2', correctPosition: 3 },
-      { id: 5, type: 'constant', content: '+ C', correctPosition: 4 },
-    ],
-    solution: [1, 2, 3, 4, 5],
-    correctPreview: '∫ 3x dx = 3x²/2 + C',
-    difficulty: 1
-  },
-
-  // Уровень 2 - определенные интегралы
-  {
-    id: 3,
-    question: 'Соберите определенный интеграл от x от 0 до 1',
-    pieces: [
-      { id: 1, type: 'bounds', content: '₁₀', correctPosition: 0 },
-      { id: 2, type: 'integralSign', content: '∫', correctPosition: 1 },
-      { id: 3, type: 'function', content: 'x', correctPosition: 2 },
-      { id: 4, type: 'dx', content: 'dx', correctPosition: 3 },
-      { id: 5, type: 'result', content: '= [x²/2]₀¹', correctPosition: 4 },
-      { id: 6, type: 'result', content: '= 1/2', correctPosition: 5 },
-    ],
-    solution: [1, 2, 3, 4, 5, 6],
-    correctPreview: '∫₀¹ x dx = [x²/2]₀¹ = 1/2',
-    difficulty: 2
-  },
-  {
-    id: 4,
-    question: 'Соберите определенный интеграл от sin(x) от 0 до π',
-    pieces: [
-      { id: 1, type: 'bounds', content: 'ᵗ₀', correctPosition: 0 },
-      { id: 2, type: 'integralSign', content: '∫', correctPosition: 1 },
-      { id: 3, type: 'function', content: 'sin(x)', correctPosition: 2 },
-      { id: 4, type: 'dx', content: 'dx', correctPosition: 3 },
-      { id: 5, type: 'result', content: '= [-cos(x)]₀ᵗ', correctPosition: 4 },
-      { id: 6, type: 'result', content: '= 2', correctPosition: 5 },
-    ],
-    solution: [1, 2, 3, 4, 5, 6],
-    correctPreview: '∫₀ᵗ sin(x) dx = [-cos(x)]₀ᵗ = 2',
-    difficulty: 2
-  },
-
-  // Уровень 3 - интегралы с подстановкой
-  {
-    id: 5,
-    question: 'Соберите интеграл от e^x',
-    pieces: [
-      { id: 1, type: 'integralSign', content: '∫', correctPosition: 0 },
-      { id: 2, type: 'function', content: 'e^x', correctPosition: 1 },
-      { id: 3, type: 'dx', content: 'dx', correctPosition: 2 },
-      { id: 4, type: 'result', content: '= e^x', correctPosition: 3 },
-      { id: 5, type: 'constant', content: '+ C', correctPosition: 4 },
-    ],
-    solution: [1, 2, 3, 4, 5],
-    correctPreview: '∫ e^x dx = e^x + C',
-    difficulty: 3
-  },
-  {
-    id: 6,
-    question: 'Соберите интеграл от 1/x',
-    pieces: [
-      { id: 1, type: 'integralSign', content: '∫', correctPosition: 0 },
-      { id: 2, type: 'function', content: '1/x', correctPosition: 1 },
-      { id: 3, type: 'dx', content: 'dx', correctPosition: 2 },
-      { id: 4, type: 'result', content: '= ln|x|', correctPosition: 3 },
-      { id: 5, type: 'constant', content: '+ C', correctPosition: 4 },
-    ],
-    solution: [1, 2, 3, 4, 5],
-    correctPreview: '∫ 1/x dx = ln|x| + C',
-    difficulty: 3
-  },
-
-  // Уровень 4 - интегрирование по частям или сложная подстановка
-  {
-    id: 7,
-    question: 'Соберите интеграл от x·sin(x) (интегрирование по частям)',
-    pieces: [
-      { id: 1, type: 'integralSign', content: '∫', correctPosition: 0 },
-      { id: 2, type: 'function', content: 'x·sin(x)', correctPosition: 1 },
-      { id: 3, type: 'dx', content: 'dx', correctPosition: 2 },
-      { id: 4, type: 'result', content: '= -x·cos(x)', correctPosition: 3 },
-      { id: 5, type: 'result', content: '+ ∫cos(x)dx', correctPosition: 4 },
-      { id: 6, type: 'result', content: '= -x·cos(x) + sin(x)', correctPosition: 5 },
-      { id: 7, type: 'constant', content: '+ C', correctPosition: 6 },
-    ],
-    solution: [1, 2, 3, 4, 5, 6, 7],
-    correctPreview: '∫ x·sin(x) dx = -x·cos(x) + ∫cos(x)dx = -x·cos(x) + sin(x) + C',
-    difficulty: 4
-  },
-
-  // Уровень 5 - сложные интегралы
-  {
-    id: 8,
-    question: 'Соберите интеграл от 1/(1+x²)',
-    pieces: [
-      { id: 1, type: 'integralSign', content: '∫', correctPosition: 0 },
-      { id: 2, type: 'function', content: '1/(1+x²)', correctPosition: 1 },
-      { id: 3, type: 'dx', content: 'dx', correctPosition: 2 },
-      { id: 4, type: 'result', content: '= arctan(x)', correctPosition: 3 },
-      { id: 5, type: 'constant', content: '+ C', correctPosition: 4 },
-    ],
-    solution: [1, 2, 3, 4, 5],
-    correctPreview: '∫ 1/(1+x²) dx = arctan(x) + C',
-    difficulty: 5
-  },
-  {
-    id: 9,
-    question: 'Соберите интеграл от 1/√(1-x²)',
-    pieces: [
-      { id: 1, type: 'integralSign', content: '∫', correctPosition: 0 },
-      { id: 2, type: 'function', content: '1/√(1-x²)', correctPosition: 1 },
-      { id: 3, type: 'dx', content: 'dx', correctPosition: 2 },
-      { id: 4, type: 'result', content: '= arcsin(x)', correctPosition: 3 },
-      { id: 5, type: 'constant', content: '+ C', correctPosition: 4 },
-    ],
-    solution: [1, 2, 3, 4, 5],
-    correctPreview: '∫ 1/√(1-x²) dx = arcsin(x) + C',
-    difficulty: 5
-  }
-];
-
-// Компонент перетаскиваемого элемента
-const DraggablePiece: React.FC<{
-  item: DraggableItem;
-  isInCorrectSpot?: boolean;
-  // Не используем индекс в упрощенной версии без DnD
-  // Но оставляем его в типе для будущей совместимости
-  index?: number;
-}> = ({ item, isInCorrectSpot }) => {
-  // Заглушка вместо DnD для демонстрации
-  return (
-      <div
-          className={`
-        px-3 py-2 m-1 rounded-lg font-mono text-lg cursor-grab
-        ${isInCorrectSpot
-              ? 'bg-green-600 text-white dark:bg-green-500'
-              : 'bg-blue-600 text-white dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600'}
-        ${item.type === 'integralSign' ? 'text-2xl' : ''}
-        transition-colors
-      `}
-          style={{ touchAction: 'none' }}
-      >
-        {item.content}
-      </div>
-  );
-};
-
-// Компонент области для перетаскивания
-const DropTarget: React.FC<{
-  accept: string;
-  onDrop: (item: DraggableItem & { index?: number }) => void;
-  children: React.ReactNode;
-  isActive: boolean;
-}> = ({ children, isActive }) => {
-  // Заглушка вместо DnD для демонстрации
-  return (
-      <div
-          className={`
-        min-w-[50px] min-h-[50px] m-1 p-2 rounded-lg border-2 border-dashed
-        flex items-center justify-center
-        ${!isActive ? 'border-gray-300 bg-gray-100 dark:bg-gray-800' : 'border-blue-300 bg-blue-50 dark:bg-blue-900'}
-        transition-colors
-      `}
-      >
-        {children}
-      </div>
-  );
-};
-
-// Основной компонент IntegralBuilder
 const IntegralBuilder: React.FC<IntegralBuilderProps> = ({
-                                                           initialDifficulty = 1,
-                                                           timeLimit = 300, // 5 минут по умолчанию
+                                                           initialDifficulty = 3,
+                                                           timeLimit = 300,
+                                                           problemsSource,
                                                            onComplete
                                                          }) => {
+  const [currentProblem, setCurrentProblem] = useState<IntegralProblem | null>(null);
+  const [userSolution, setUserSolution] = useState<SolutionPiece[]>([]);
+  const [availablePieces, setAvailablePieces] = useState<SolutionPiece[]>([]);
+  const [score, setScore] = useState(0);
+  const [feedback, setFeedback] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
-  const [currentTask, setCurrentTask] = useState<IntegralTask | null>(null);
-  const [availablePieces, setAvailablePieces] = useState<DraggableItem[]>([]);
-  const [solutionPieces, setSolutionPieces] = useState<Array<DraggableItem | null>>([]);
-  const [score, setScore] = useState(0);
-  const [totalTasks, setTotalTasks] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(timeLimit);
-  const [showHint, setShowHint] = useState(false);
-  const [difficulty, setDifficulty] = useState(initialDifficulty);
-  const [feedback, setFeedback] = useState('');
-  const [showFeedback, setShowFeedback] = useState(false);
+  const [difficultyLevel, setDifficultyLevel] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [timeRemaining, setTimeRemaining] = useState(timeLimit);
+  const [problemBank, setProblemBank] = useState<IntegralProblem[]>([]);
+  const [problemsCompleted, setProblemsCompleted] = useState(0);
 
-  // Старт игры
+  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Загрузка проблем из источника
+  useEffect(() => {
+    if (problemsSource && problemsSource.length > 0) {
+      setProblemBank(problemsSource);
+    } else {
+      // Моковые данные, если источник не предоставлен
+      setProblemBank([
+        {
+          id: "i1",
+          question: "∫ x² dx",
+          solutionPieces: ["x³/3", "+C"],
+          distractors: ["x²/2", "3x²", "x³", "2x"],
+          difficulty: "easy"
+        },
+        {
+          id: "i2",
+          question: "∫ 3x² dx",
+          solutionPieces: ["x³", "+C"],
+          distractors: ["3x³/3", "3x²/2", "3x", "6x"],
+          difficulty: "easy"
+        },
+        {
+          id: "i3",
+          question: "∫ sin 2x dx",
+          solutionPieces: ["-", "cos 2x/2", "+C"],
+          distractors: ["sin 2x/2", "2 sin x", "cos x", "sin x²"],
+          difficulty: "medium"
+        },
+        {
+          id: "i4",
+          question: "∫ 1/x² dx",
+          solutionPieces: ["-", "1/x", "+C"],
+          distractors: ["ln|x|", "x⁻¹", "1/2x²", "-x⁻²"],
+          difficulty: "medium"
+        },
+        {
+          id: "i5",
+          question: "∫ e^x dx",
+          solutionPieces: ["e^x", "+C"],
+          distractors: ["xe^x", "e^x/x", "ln(e^x)"],
+          difficulty: "easy"
+        },
+        {
+          id: "i6",
+          question: "∫ 1/x dx",
+          solutionPieces: ["ln|x|", "+C"],
+          distractors: ["1/x²", "x⁻¹", "1/2x²"],
+          difficulty: "medium"
+        },
+        {
+          id: "i7",
+          question: "∫ cos x dx",
+          solutionPieces: ["sin x", "+C"],
+          distractors: ["-cos x", "tan x", "sec x"],
+          difficulty: "easy"
+        },
+        {
+          id: "i8",
+          question: "∫ (3x² - 4x + 5) dx",
+          solutionPieces: ["x³", "-2x²", "+5x", "+C"],
+          distractors: ["3x³", "4x²", "-5x", "x²"],
+          difficulty: "hard"
+        }
+      ]);
+    }
+  }, [problemsSource]);
+
+  // Настройка уровня сложности в зависимости от переданного значения
+  useEffect(() => {
+    if (initialDifficulty <= 2) {
+      setDifficultyLevel('easy');
+    } else if (initialDifficulty >= 5) {
+      setDifficultyLevel('hard');
+    } else {
+      setDifficultyLevel('medium');
+    }
+  }, [initialDifficulty]);
+
+  // Начать новую игру
   const startGame = () => {
-    setGameStarted(true);
     setScore(0);
-    setTotalTasks(0);
-    setTimeLeft(timeLimit);
-    setDifficulty(initialDifficulty);
-    loadNewTask();
+    setGameOver(false);
+    setGameStarted(true);
+    setTimeRemaining(timeLimit);
+    setProblemsCompleted(0);
 
-    // Запуск таймера
-    const timer = setInterval(() => {
-      setTimeLeft(prevTime => {
-        if (prevTime <= 1) {
-          clearInterval(timer);
+    // Запустить таймер игры
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
           endGame();
           return 0;
         }
-        return prevTime - 1;
+        return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    loadNewProblem();
   };
 
-  // Завершение игры
+  // Завершить игру
   const endGame = () => {
     setGameOver(true);
-    onComplete(score, totalTasks);
-  };
+    setGameStarted(false);
+    setFeedback('Время истекло!');
 
-  // Загрузка нового задания
-  const loadNewTask = () => {
-    // Фильтруем задания по сложности (±1 от текущей)
-    const eligibleTasks = integralTasks.filter(
-        task => Math.abs(task.difficulty - difficulty) <= 1
-    );
-
-    if (eligibleTasks.length === 0) {
-      // Fallback на любые задания, если нет подходящих по сложности
-      const randomTask = integralTasks[Math.floor(Math.random() * integralTasks.length)];
-      setupTask(randomTask);
-    } else {
-      const randomTask = eligibleTasks[Math.floor(Math.random() * eligibleTasks.length)];
-      setupTask(randomTask);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
 
-    setTotalTasks(prev => prev + 1);
-    setShowHint(false);
-  };
-
-  // Настройка выбранного задания
-  const setupTask = (task: IntegralTask) => {
-    setCurrentTask(task);
-
-    // Перемешиваем кусочки
-    const shuffledPieces = [...task.pieces].sort(() => Math.random() - 0.5);
-    setAvailablePieces(shuffledPieces);
-
-    // Создаем пустые места для решения
-    setSolutionPieces(Array(task.solution.length).fill(null));
-  };
-
-  // Обработка перетаскивания пазла из доступных в решение
-  const handleDropToSolution = (index: number) => (item: DraggableItem & { index?: number }) => {
-    // Если это перетаскивание из доступных
-    if (item.index === undefined) {
-      const draggedItemIndex = availablePieces.findIndex(piece => piece.id === item.id);
-
-      if (draggedItemIndex !== -1) {
-        // Удаляем из доступных
-        const newAvailablePieces = [...availablePieces];
-        const [draggedItem] = newAvailablePieces.splice(draggedItemIndex, 1);
-
-        // Добавляем в решение
-        const newSolutionPieces = [...solutionPieces];
-
-        // Если место занято, возвращаем предыдущий элемент в доступные
-        if (newSolutionPieces[index] !== null) {
-          newAvailablePieces.push(newSolutionPieces[index]!);
-        }
-
-        newSolutionPieces[index] = draggedItem;
-
-        setAvailablePieces(newAvailablePieces);
-        setSolutionPieces(newSolutionPieces);
-      }
-    }
-    // Если это перетаскивание из решения в решение
-    else {
-      const fromIndex = item.index;
-
-      // Перемещаем элемент
-      const newSolutionPieces = [...solutionPieces];
-      const draggedItem = newSolutionPieces[fromIndex];
-
-      // Меняем местами, если место занято
-      if (newSolutionPieces[index] !== null) {
-        newSolutionPieces[fromIndex] = newSolutionPieces[index];
-      } else {
-        newSolutionPieces[fromIndex] = null;
-      }
-
-      newSolutionPieces[index] = draggedItem;
-
-      setSolutionPieces(newSolutionPieces);
+    if (onComplete) {
+      // Максимально возможное количество решенных задач зависит от сложности
+      const maxPossibleScore = problemsCompleted * 10 + 10; // Текущий счет + потенциальная текущая задача
+      onComplete(score, maxPossibleScore);
     }
   };
 
-  // Обработка перетаскивания пазла из решения обратно в доступные
-  const handleDropToAvailable = (item: DraggableItem & { index?: number }) => {
-    if (item.index !== undefined) {
-      // Возвращаем элемент из решения обратно в доступные
-      const newSolutionPieces = [...solutionPieces];
-      const draggedItem = newSolutionPieces[item.index];
+  // Загрузить новую задачу
+  const loadNewProblem = () => {
+    // Фильтруем задачи по текущему уровню сложности
+    const filteredProblems = problemBank.filter(p => {
+      if (difficultyLevel === 'easy') return p.difficulty === 'easy';
+      if (difficultyLevel === 'medium') return p.difficulty === 'easy' || p.difficulty === 'medium';
+      return true; // Для сложного уровня берем все задачи
+    });
 
-      if (draggedItem) {
-        newSolutionPieces[item.index] = null;
-        setAvailablePieces([...availablePieces, draggedItem]);
-        setSolutionPieces(newSolutionPieces);
-      }
-    }
-  };
-
-  // Проверка решения
-  const checkSolution = () => {
-    if (!currentTask) return;
-
-    // Проверка, что все места заполнены
-    if (solutionPieces.includes(null)) {
-      setFeedback('Заполните все пустые места!');
-      setShowFeedback(true);
-      setTimeout(() => setShowFeedback(false), 2000);
+    if (filteredProblems.length === 0) {
+      setFeedback('Нет доступных заданий для текущего уровня сложности');
       return;
     }
 
-    // Проверка правильности решения
-    const isCorrect = currentTask.solution.every((correctId, index) => {
-      const pieceInSolution = solutionPieces[index];
-      return pieceInSolution?.id === correctId;
-    });
+    const randomIndex = Math.floor(Math.random() * filteredProblems.length);
+    const problem = filteredProblems[randomIndex];
+    setCurrentProblem(problem);
 
-    if (isCorrect) {
-      // Увеличиваем счет и сложность
-      setScore(prev => prev + 1);
+    // Создать и перемешать доступные фрагменты (решение + отвлекающие варианты)
+    const pieces: SolutionPiece[] = [
+      ...problem.solutionPieces.map(piece => ({
+        id: `sol-${Math.random()}`,
+        text: piece,
+        isCorrect: true
+      })),
+      ...problem.distractors.map(piece => ({
+        id: `dis-${Math.random()}`,
+        text: piece,
+        isCorrect: false
+      }))
+    ];
 
-      // Показываем положительный фидбек
-      setFeedback('Правильно! Отличная работа!');
-      setShowFeedback(true);
-      setTimeout(() => {
-        setShowFeedback(false);
+    // Перемешивание Fisher-Yates
+    for (let i = pieces.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+    }
 
-        // Увеличиваем сложность каждые 2 правильных ответа
-        if (score % 2 === 1 && difficulty < 5) {
-          setDifficulty(prev => Math.min(prev + 1, 5));
-        }
+    setAvailablePieces(pieces);
+    setUserSolution([]);
+    setFeedback('');
+  };
 
-        // Загружаем новое задание
-        loadNewTask();
-      }, 1500);
+  // Добавить фрагмент в решение
+  const addToSolution = (piece: SolutionPiece) => {
+    setUserSolution(prev => [...prev, piece]);
+    setAvailablePieces(prev => prev.filter(p => p.id !== piece.id));
+  };
+
+  // Убрать фрагмент из решения
+  const removeFromSolution = (index: number) => {
+    const piece = userSolution[index];
+    setAvailablePieces(prev => [...prev, piece]);
+    setUserSolution(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Проверить решение пользователя
+  const checkSolution = () => {
+    if (!currentProblem || userSolution.length === 0) {
+      setFeedback('Пожалуйста, составьте решение');
+      return;
+    }
+
+    // Проверка, содержит ли решение все правильные фрагменты и не содержит ли неправильных
+    const hasAllCorrectPieces = currentProblem.solutionPieces.every(correctPiece =>
+        userSolution.some(piece => piece.text === correctPiece && piece.isCorrect)
+    );
+
+    const hasNoIncorrectPieces = userSolution.every(piece => piece.isCorrect);
+
+    if (hasAllCorrectPieces && hasNoIncorrectPieces &&
+        userSolution.length === currentProblem.solutionPieces.length) {
+      setFeedback('Правильно! Отлично!');
+      setScore(prev => prev + 10);
+      setProblemsCompleted(prev => prev + 1);
+
+      // Загрузить следующую задачу через небольшую задержку
+      setTimeout(loadNewProblem, 1500);
     } else {
-      // Показываем отрицательный фидбек
       setFeedback('Не совсем верно. Попробуйте еще раз!');
-      setShowFeedback(true);
-      setTimeout(() => setShowFeedback(false), 2000);
     }
   };
 
-  // Обработка показа подсказки
-  const toggleHint = () => {
-    setShowHint(prev => !prev);
+  // Сбросить текущую задачу
+  const resetProblem = () => {
+    // Вернуть все фрагменты в доступные
+    const allPieces = [...userSolution, ...availablePieces];
+    setAvailablePieces(allPieces);
+    setUserSolution([]);
+    setFeedback('');
   };
+
+  // Очистка интервалов при размонтировании
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   // Форматирование времени
   const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
 
-  if (!gameStarted) {
-    return (
-        <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-800 dark:bg-gray-100 rounded-lg shadow-xl transition-colors">
-          <h2 className="text-2xl font-bold mb-4 text-white dark:text-gray-900 transition-colors">Игра "IntegralBuilder"</h2>
-          <p className="mb-6 text-gray-300 dark:text-gray-700 transition-colors">
-            Соберите правильные интегралы из предложенных частей!
-          </p>
-
-          <div className="mb-6 bg-gray-700 dark:bg-gray-200 p-4 rounded transition-colors">
-            <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900 transition-colors">Правила:</h3>
-            <ul className="text-left list-disc pl-5 text-gray-300 dark:text-gray-700 transition-colors">
-              <li>Перетаскивайте кусочки из нижней панели в поля для ответа</li>
-              <li>Расположите их в правильном порядке</li>
-              <li>Нажмите "Проверить" для подтверждения решения</li>
-              <li>У вас есть {formatTime(timeLimit)} на решение максимального количества заданий</li>
-              <li>Начальный уровень сложности: {initialDifficulty} из 5</li>
-            </ul>
-          </div>
-
-          <Button onClick={startGame}>Начать игру</Button>
-        </div>
-    );
-  }
-
-  if (gameOver) {
-    return (
-        <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-800 dark:bg-gray-100 rounded-lg shadow-xl transition-colors">
-          <h2 className="text-2xl font-bold mb-4 text-white dark:text-gray-900 transition-colors">Игра окончена!</h2>
-
-          <div className="mb-6 w-full max-w-md">
-            <div className="bg-gray-700 dark:bg-gray-200 p-4 rounded mb-4 transition-colors">
-              <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900 transition-colors">Ваши результаты:</h3>
-              <div className="grid grid-cols-2 gap-4 text-gray-300 dark:text-gray-700 transition-colors">
-                <div>Правильных ответов:</div>
-                <div className="font-bold">{score}</div>
-
-                <div>Всего заданий:</div>
-                <div className="font-bold">{totalTasks}</div>
-
-                <div>Достигнутый уровень:</div>
-                <div className="font-bold">{difficulty}</div>
-
-                <div>Точность:</div>
-                <div className="font-bold">
-                  {totalTasks > 0
-                      ? Math.round((score / totalTasks) * 100)
-                      : 0}%
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex space-x-4">
-            <Button onClick={() => startGame()}>Играть снова</Button>
-            <Button variant="outline" onClick={() => onComplete(score, totalTasks)}>Вернуться к карте</Button>
-          </div>
-        </div>
-    );
-  }
-
   return (
-      <div className="flex flex-col h-full bg-gray-800 dark:bg-gray-100 rounded-lg shadow-xl p-4 transition-colors">
-        {/* Верхняя панель */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex space-x-4 items-center">
-            <div className="text-white dark:text-gray-900 transition-colors">
-              <span className="font-bold">Уровень:</span> {difficulty}
+      <div className="w-full h-full flex flex-col bg-gray-800 dark:bg-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-3 flex items-center justify-between bg-gray-700 dark:bg-gray-300 border-b border-gray-600 dark:border-gray-400">
+          <div className="flex items-center space-x-6">
+            <div className="text-gray-100 dark:text-gray-900 font-medium">
+              Счет: <span className="font-bold">{score}</span>
             </div>
-            <div className="text-white dark:text-gray-900 transition-colors">
-              <span className="font-bold">Счет:</span> {score}/{totalTasks}
+            <div className="text-gray-100 dark:text-gray-900 font-medium">
+              Задач решено: <span className="font-bold">{problemsCompleted}</span>
+            </div>
+            <div className="text-yellow-500 dark:text-yellow-600 font-medium">
+              Время: {formatTime(timeRemaining)}
             </div>
           </div>
 
           <div className="flex items-center">
-            <div className="text-white dark:text-gray-900 transition-colors">
-              <span className="font-bold">Время:</span> {formatTime(timeLeft)}
+            <div className="text-sm text-gray-300 dark:text-gray-600 mr-2">Сложность:</div>
+            <div className="px-2 py-1 rounded-md text-sm font-medium bg-gray-600 dark:bg-gray-400 text-white dark:text-gray-900">
+              {difficultyLevel === 'easy' ? 'Легкая' : difficultyLevel === 'medium' ? 'Средняя' : 'Сложная'}
             </div>
           </div>
         </div>
 
-        {/* Фидбек */}
-        {showFeedback && (
-            <div className={`mb-4 p-3 rounded-lg text-center transition-colors ${
-                feedback.includes('Правильно')
-                    ? 'bg-green-600 text-white'
-                    : 'bg-red-600 text-white'
-            }`}>
-              {feedback}
-            </div>
-        )}
-
-        {/* Основная область */}
-        {currentTask && (
-            <div className="flex-grow flex flex-col">
-              {/* Задание */}
-              <div className="mb-4 p-4 bg-gray-700 dark:bg-gray-200 rounded-lg transition-colors">
-                <h3 className="text-xl font-semibold mb-2 text-white dark:text-gray-900 transition-colors">
-                  {currentTask.question}
-                </h3>
-
-                {showHint && (
-                    <div className="mt-2 p-2 bg-blue-600 text-white rounded transition-colors">
-                      <p>Правильное решение: {currentTask.correctPreview}</p>
-                    </div>
+        {(!gameStarted || gameOver) ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center bg-gray-700 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto">
+                <h2 className="text-xl mb-4 font-bold text-white dark:text-gray-900">
+                  {gameOver ? 'Игра окончена!' : 'Собираем интегралы'}
+                </h2>
+                {gameOver ? (
+                    <p className="mb-6 text-xl text-white dark:text-gray-900">
+                      Итоговый счет: <span className="font-bold">{score}</span>
+                    </p>
+                ) : (
+                    <p className="mb-4 text-gray-200 dark:text-gray-800">
+                      Перетаскивайте фрагменты, чтобы составить правильное решение интеграла.
+                    </p>
                 )}
+                <button
+                    className="bg-green-700 dark:bg-green-200 text-white dark:text-gray-900 hover:bg-green-600 dark:hover:bg-green-300 px-6 py-3 rounded-lg text-lg transition-colors"
+                    onClick={startGame}
+                >
+                  {gameOver ? 'Играть снова' : 'Начать игру'}
+                </button>
+              </div>
+            </div>
+        ) : (
+            <div className="flex-1 p-6 overflow-auto">
+              <div className="mb-8 text-center">
+                <p className="text-gray-400 dark:text-gray-600 mb-2">Вычислите:</p>
+                <div className="text-3xl font-medium py-4 text-gray-100 dark:text-gray-900">
+                  {currentProblem?.question}
+                </div>
               </div>
 
-              {/* Область для сборки решения */}
-              <div className="mb-6">
-                <h4 className="text-lg font-medium mb-2 text-white dark:text-gray-900 transition-colors">
-                  Соберите решение:
-                </h4>
-                <div className="flex flex-wrap items-center justify-center border border-gray-600 dark:border-gray-300 rounded-lg p-3 min-h-[100px] bg-gray-700 dark:bg-gray-200 transition-colors">
-                  {solutionPieces.map((piece, index) => (
-                      <DropTarget
-                          key={`solution_${index}`}
-                          accept={ItemTypes.INTEGRAL_PIECE}
-                          onDrop={handleDropToSolution(index)}
-                          isActive={true}
+              <div className="mb-8">
+                <h3 className="text-lg mb-3 font-medium text-gray-200 dark:text-gray-800">Ваше решение:</h3>
+                <div className="min-h-24 p-4 bg-gray-700 dark:bg-gray-300 rounded-lg flex flex-wrap gap-2 items-center justify-center border-2 border-dashed border-gray-600 dark:border-gray-400">
+                  {userSolution.length === 0 ? (
+                      <div className="text-gray-400 dark:text-gray-600 italic">
+                        Перетащите фрагменты сюда для построения решения
+                      </div>
+                  ) : (
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {userSolution.map((piece, index) => (
+                            <motion.div
+                                key={piece.id}
+                                className="bg-blue-700 dark:bg-blue-200 text-white dark:text-gray-900 px-4 py-2 rounded-lg cursor-pointer font-medium shadow-md"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => removeFromSolution(index)}
+                            >
+                              {piece.text}
+                            </motion.div>
+                        ))}
+                      </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h3 className="text-lg mb-3 font-medium text-gray-200 dark:text-gray-800">Доступные фрагменты:</h3>
+                <div className="p-4 bg-gray-700 dark:bg-gray-300 rounded-lg flex flex-wrap gap-3 justify-center">
+                  {availablePieces.map(piece => (
+                      <motion.div
+                          key={piece.id}
+                          className="bg-purple-700 dark:bg-purple-200 text-white dark:text-gray-900 px-4 py-2 rounded-lg cursor-pointer font-medium shadow-md"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => addToSolution(piece)}
                       >
-                        {piece && (
-                            <DraggablePiece
-                                item={piece}
-                                isInCorrectSpot={piece.id === currentTask.solution[index]}
-                                index={index}
-                            />
-                        )}
-                      </DropTarget>
+                        {piece.text}
+                      </motion.div>
                   ))}
                 </div>
               </div>
 
-              {/* Доступные элементы */}
-              <div className="mt-auto">
-                <h4 className="text-lg font-medium mb-2 text-white dark:text-gray-900 transition-colors">
-                  Доступные элементы:
-                </h4>
-                <DropTarget
-                    accept={ItemTypes.INTEGRAL_PIECE}
-                    onDrop={handleDropToAvailable}
-                    isActive={true}
+              <div className="flex justify-between mt-6">
+                <button
+                    className="bg-red-700 dark:bg-red-200 text-white dark:text-gray-900 px-4 py-2 rounded-lg hover:bg-red-600 dark:hover:bg-red-300 transition-colors shadow-md"
+                    onClick={resetProblem}
                 >
-                  <div className="flex flex-wrap items-center justify-center">
-                    {availablePieces.map((piece) => (
-                        <DraggablePiece key={piece.id} item={piece} />
-                    ))}
-                  </div>
-                </DropTarget>
-              </div>
+                  Сбросить
+                </button>
 
-              {/* Кнопки управления */}
-              <div className="flex justify-between mt-4">
-                <Button
-                    variant="outline"
-                    onClick={toggleHint}
+                <div className={`text-center text-lg py-2 font-medium ${feedback.includes('Правильно') ? 'text-green-500 dark:text-green-600' : feedback ? 'text-red-500 dark:text-red-600' : ''}`}>
+                  {feedback}
+                </div>
+
+                <button
+                    className="bg-green-700 dark:bg-green-200 text-white dark:text-gray-900 px-4 py-2 rounded-lg hover:bg-green-600 dark:hover:bg-green-300 transition-colors shadow-md"
+                    onClick={checkSolution}
                 >
-                  {showHint ? 'Скрыть подсказку' : 'Показать подсказку'}
-                </Button>
-
-                <Button onClick={checkSolution}>
-                  Проверить решение
-                </Button>
+                  Проверить
+                </button>
               </div>
             </div>
         )}

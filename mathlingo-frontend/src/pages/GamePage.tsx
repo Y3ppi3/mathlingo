@@ -104,8 +104,8 @@ const GamePage: React.FC = () => {
 
             default:
                 return (
-                    <div className="bg-white dark:bg-gray-800 p-8 rounded-lg text-center">
-                        <p className="text-gray-600 dark:text-gray-300 mb-4">Игра не найдена.</p>
+                    <div className="bg-gray-800 dark:bg-gray-100 p-8 rounded-lg text-center">
+                        <p className="text-gray-300 dark:text-gray-700 mb-4">Игра не найдена.</p>
                         <Button onClick={handleReturnToMap}>
                             Вернуться к карте
                         </Button>
@@ -116,11 +116,11 @@ const GamePage: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+            <div className="min-h-screen bg-gray-700 dark:bg-gray-200">
                 <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16">
                     <div className="flex justify-center items-center h-96">
-                        <div className="text-lg text-gray-500">Загрузка игры...</div>
+                        <div className="text-lg text-gray-300 dark:text-gray-600">Загрузка игры...</div>
                     </div>
                 </div>
             </div>
@@ -129,11 +129,11 @@ const GamePage: React.FC = () => {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+            <div className="min-h-screen bg-gray-700 dark:bg-gray-200">
                 <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
-                        <h2 className="text-xl text-red-500 mb-4">{error}</h2>
+                    <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg p-6 text-center">
+                        <h2 className="text-xl text-red-500 dark:text-red-600 mb-4">{error}</h2>
                         <Button onClick={handleReturnToMap}>
                             Вернуться к карте
                         </Button>
@@ -144,13 +144,13 @@ const GamePage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="min-h-screen bg-gray-700 dark:bg-gray-200">
             <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
                 {!gameCompleted ? (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-                        <div className="mb-4 flex items-center justify-between">
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg overflow-hidden">
+                        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-700 dark:border-gray-300">
+                            <h1 className="text-2xl font-bold text-gray-100 dark:text-gray-900">
                                 {gameInfo?.title}
                             </h1>
                             <Button
@@ -162,7 +162,7 @@ const GamePage: React.FC = () => {
                             </Button>
                         </div>
 
-                        <div className="h-[calc(100vh-200px)] max-h-[800px]">
+                        <div className="h-[calc(100vh-200px)] max-h-[800px] p-4">
                             {renderGame()}
                         </div>
                     </div>

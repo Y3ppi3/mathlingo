@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import * as math from 'mathjs';
 import Button from '../Button';
+import { gameDataSource } from '../../utils/gameDataSource';
 
 interface MathLabProps {
   mode?: 'derivatives' | 'integrals';
@@ -13,7 +14,7 @@ interface MathLabProps {
 }
 
 interface Task {
-  id: number;
+  id: number | string;
   type: 'analyze' | 'find' | 'calculate';
   question: string;
   functionExpression: string;
@@ -23,157 +24,6 @@ interface Task {
   hints: string[];
 }
 
-// Набор задач для режима производных
-const derivativeTasks: Task[] = [
-  {
-    id: 1,
-    type: 'analyze',
-    question: 'Изучите график функции f(x) = x² и ее производной. Где производная равна нулю?',
-    functionExpression: 'x^2',
-    correctAnswer: 'x = 0',
-    options: ['x = 0', 'x = 1', 'x = -1', 'Нигде'],
-    difficulty: 1,
-    hints: [
-      'Производная функции f(x) = x² равна f\'(x) = 2x',
-      'Производная равна нулю, когда 2x = 0',
-      'Решите уравнение 2x = 0'
-    ]
-  },
-  {
-    id: 2,
-    type: 'find',
-    question: 'Найдите точки экстремума функции f(x) = x³ - 3x',
-    functionExpression: 'x^3 - 3*x',
-    correctAnswer: 'x = ±1',
-    options: ['x = ±1', 'x = 0', 'x = -3', 'x = 3'],
-    difficulty: 2,
-    hints: [
-      'Производная функции f(x) = x³ - 3x равна f\'(x) = 3x² - 3',
-      'Найдите значения x, при которых f\'(x) = 0',
-      'Решите уравнение 3x² - 3 = 0'
-    ]
-  },
-  {
-    id: 3,
-    type: 'calculate',
-    question: 'Вычислите производную функции f(x) = sin(x) · cos(x) в точке x = π/4',
-    functionExpression: 'sin(x) * cos(x)',
-    correctAnswer: 0,
-    difficulty: 3,
-    hints: [
-      'Используйте правило произведения: (u·v)\' = u\'·v + u·v\'',
-      'sin\'(x) = cos(x), cos\'(x) = -sin(x)',
-      'f\'(x) = cos(x)·cos(x) + sin(x)·(-sin(x)) = cos²(x) - sin²(x) = cos(2x)'
-    ]
-  },
-  {
-    id: 4,
-    type: 'analyze',
-    question: 'Изучите график функции f(x) = x³ - 6x² + 9x + 1 и ее производной. Где функция возрастает?',
-    functionExpression: 'x^3 - 6*x^2 + 9*x + 1',
-    correctAnswer: 'x < 1 или x > 3',
-    options: ['x < 1 или x > 3', 'x < 3', '1 < x < 3', 'x > 0'],
-    difficulty: 4,
-    hints: [
-      'Функция возрастает там, где ее производная положительна',
-      'Найдите производную: f\'(x) = 3x² - 12x + 9',
-      'Решите неравенство 3x² - 12x + 9 > 0',
-      'Используйте дискриминант для решения квадратного неравенства'
-    ]
-  },
-  {
-    id: 5,
-    type: 'find',
-    question: 'Найдите точки перегиба функции f(x) = x⁴ - 4x³',
-    functionExpression: 'x^4 - 4*x^3',
-    correctAnswer: 'x = 0, x = 2',
-    options: ['x = 0, x = 2', 'x = -1, x = 3', 'x = 1, x = 3', 'x = 0, x = 3'],
-    difficulty: 5,
-    hints: [
-      'Точки перегиба находятся там, где вторая производная равна нулю и меняет знак',
-      'Первая производная: f\'(x) = 4x³ - 12x²',
-      'Вторая производная: f\'\'(x) = 12x² - 24x = 12x(x - 2)',
-      'Решите уравнение 12x(x - 2) = 0'
-    ]
-  }
-];
-
-// Набор задач для режима интегралов
-const integralTasks: Task[] = [
-  {
-    id: 101,
-    type: 'analyze',
-    question: 'Изучите график функции f(x) = x² и вычислите площадь под графиком от x = 0 до x = 2',
-    functionExpression: 'x^2',
-    correctAnswer: '8/3',
-    options: ['8/3', '4', '2', '3'],
-    difficulty: 1,
-    hints: [
-      'Площадь под графиком от a до b равна определенному интегралу ∫(a,b) f(x)dx',
-      'Для f(x) = x², интеграл равен F(x) = x³/3',
-      'Используйте формулу: ∫(a,b) f(x)dx = F(b) - F(a)'
-    ]
-  },
-  {
-    id: 102,
-    type: 'calculate',
-    question: 'Вычислите интеграл ∫sin(x)dx от 0 до π',
-    functionExpression: 'sin(x)',
-    correctAnswer: 2,
-    difficulty: 2,
-    hints: [
-      'Первообразная sin(x) равна -cos(x)',
-      'Используйте формулу: ∫(a,b) f(x)dx = F(b) - F(a)',
-      '∫(0,π) sin(x)dx = [-cos(x)](0,π) = -cos(π) - (-cos(0)) = -(-1) - (-1) = 1 + 1 = 2'
-    ]
-  },
-  {
-    id: 103,
-    type: 'analyze',
-    question: 'Изучите график функции f(x) = 4 - x². Найдите площадь области, ограниченной функцией и осью Ox',
-    functionExpression: '4 - x^2',
-    correctAnswer: '16/3',
-    options: ['16/3', '8', '4√3', '4π'],
-    difficulty: 3,
-    hints: [
-      'Найдите точки пересечения графика с осью Ox',
-      'Функция пересекает ось Ox при f(x) = 0, т.е. 4 - x² = 0',
-      'x² = 4, x = ±2',
-      'Интеграл: ∫(-2,2) (4 - x²)dx = [4x - x³/3](-2,2)'
-    ]
-  },
-  {
-    id: 104,
-    type: 'find',
-    question: 'Найдите объем тела вращения, полученного при вращении области под графиком f(x) = sin(x) от 0 до π вокруг оси Ox',
-    functionExpression: 'sin(x)',
-    correctAnswer: 'π²',
-    options: ['π²', '2π', 'π²/2', '2π²'],
-    difficulty: 4,
-    hints: [
-      'Объем тела вращения вокруг оси Ox равен V = π∫(a,b) [f(x)]²dx',
-      'Для f(x) = sin(x) нужно вычислить π∫(0,π) sin²(x)dx',
-      'Используйте тригонометрическую формулу sin²(x) = (1 - cos(2x))/2',
-      'π∫(0,π) sin²(x)dx = π∫(0,π) (1 - cos(2x))/2 dx'
-    ]
-  },
-  {
-    id: 105,
-    type: 'calculate',
-    question: 'Вычислите интеграл ∫e^x·sin(x)dx от 0 до π/2',
-    functionExpression: 'exp(x)*sin(x)',
-    correctAnswer: '(e^(π/2) - 1)/2',
-    options: ['(e^(π/2) - 1)/2', 'e^(π/2)', '(e^(π/2) + 1)/2', '(e^(π/2) - 1)'],
-    difficulty: 5,
-    hints: [
-      'Используйте интегрирование по частям: ∫u·dv = u·v - ∫v·du',
-      'Положите u = e^x, dv = sin(x)dx, тогда du = e^x·dx, v = -cos(x)',
-      '∫e^x·sin(x)dx = -e^x·cos(x) + ∫e^x·cos(x)dx',
-      'Повторите интегрирование по частям для ∫e^x·cos(x)dx'
-    ]
-  }
-];
-
 const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3, onComplete }) => {
   // Состояния
   const [gameStarted, setGameStarted] = useState(false);
@@ -182,6 +32,10 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
   const [userFunction, setUserFunction] = useState('');
   const [isValidFunction, setIsValidFunction] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'explorer' | 'challenge'>('explorer');
+
   // Добавляем типизацию для данных графика
   interface GraphDataPoint {
     x: number;
@@ -203,9 +57,131 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
   const [currentHintIndex, setCurrentHintIndex] = useState(0);
   const [showHints, setShowHints] = useState(false);
   const [animationActive, setAnimationActive] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(60); // Сокращаем до 1 минуты
 
-  // Выбор набора задач в зависимости от режима
-  const tasks = mode === 'derivatives' ? derivativeTasks : integralTasks;
+  // Загрузка задач при инициализации
+  useEffect(() => {
+    const loadTasks = async () => {
+      setLoading(true);
+      try {
+        // Загружаем производные или интегралы в зависимости от режима
+        let problems;
+        if (mode === 'derivatives') {
+          problems = await gameDataSource.fetchDerivativeProblems();
+
+          // Преобразуем задачи по производным в нужный формат
+          const derivativeTasks: Task[] = problems.map(problem => ({
+            id: problem.id,
+            type: 'calculate',
+            question: `Найдите производную: ${problem.problem}`,
+            functionExpression: problem.problem.replace("y'(x) =", "").trim(),
+            correctAnswer: problem.answer,
+            options: problem.options,
+            difficulty: problem.difficulty === 'easy' ? 1 :
+                problem.difficulty === 'medium' ? 3 : 5,
+            hints: [
+              'Используйте правила дифференцирования',
+              'Вспомните формулу производной степенной функции',
+              'Применяйте правило дифференцирования по частям, если необходимо'
+            ]
+          }));
+
+          setTasks(derivativeTasks);
+        } else {
+          problems = await gameDataSource.fetchIntegralProblems();
+
+          // Преобразуем задачи по интегралам в нужный формат
+          const integralTasks: Task[] = problems.map(problem => ({
+            id: problem.id,
+            type: 'find',
+            question: `Вычислите интеграл: ${problem.question}`,
+            functionExpression: problem.question.replace("∫", "").replace("dx", "").trim(),
+            correctAnswer: problem.solutionPieces.join(''),
+            options: [...problem.solutionPieces, ...problem.distractors].slice(0, 4),
+            difficulty: problem.difficulty === 'easy' ? 1 :
+                problem.difficulty === 'medium' ? 3 : 5,
+            hints: [
+              'Найдите первообразную функции',
+              'Вспомните формулы интегрирования',
+              'Не забудьте про константу интегрирования'
+            ]
+          }));
+
+          setTasks(integralTasks);
+        }
+      } catch (error) {
+        console.error('Ошибка при загрузке заданий:', error);
+
+        // Если не удалось загрузить задания из источника, используем базовый набор
+        if (mode === 'derivatives') {
+          setTasks([
+            {
+              id: 1,
+              type: 'analyze',
+              question: 'Изучите график функции f(x) = x² и ее производной. Где производная равна нулю?',
+              functionExpression: 'x^2',
+              correctAnswer: 'x = 0',
+              options: ['x = 0', 'x = 1', 'x = -1', 'Нигде'],
+              difficulty: 1,
+              hints: [
+                'Производная функции f(x) = x² равна f\'(x) = 2x',
+                'Производная равна нулю, когда 2x = 0',
+                'Решите уравнение 2x = 0'
+              ]
+            },
+            {
+              id: 2,
+              type: 'find',
+              question: 'Найдите точки экстремума функции f(x) = x³ - 3x',
+              functionExpression: 'x^3 - 3*x',
+              correctAnswer: 'x = ±1',
+              options: ['x = ±1', 'x = 0', 'x = -3', 'x = 3'],
+              difficulty: 2,
+              hints: [
+                'Производная функции f(x) = x³ - 3x равна f\'(x) = 3x² - 3',
+                'Найдите значения x, при которых f\'(x) = 0',
+                'Решите уравнение 3x² - 3 = 0'
+              ]
+            }
+          ]);
+        } else {
+          setTasks([
+            {
+              id: 101,
+              type: 'analyze',
+              question: 'Изучите график функции f(x) = x² и вычислите площадь под графиком от x = 0 до x = 2',
+              functionExpression: 'x^2',
+              correctAnswer: '8/3',
+              options: ['8/3', '4', '2', '3'],
+              difficulty: 1,
+              hints: [
+                'Площадь под графиком от a до b равна определенному интегралу ∫(a,b) f(x)dx',
+                'Для f(x) = x², интеграл равен F(x) = x³/3',
+                'Используйте формулу: ∫(a,b) f(x)dx = F(b) - F(a)'
+              ]
+            },
+            {
+              id: 102,
+              type: 'calculate',
+              question: 'Вычислите интеграл ∫sin(x)dx от 0 до π',
+              functionExpression: 'sin(x)',
+              correctAnswer: 2,
+              difficulty: 2,
+              hints: [
+                'Первообразная sin(x) равна -cos(x)',
+                'Используйте формулу: ∫(a,b) f(x)dx = F(b) - F(a)',
+                '∫(0,π) sin(x)dx = [-cos(x)](0,π) = -cos(π) - (-cos(0)) = -(-1) - (-1) = 1 + 1 = 2'
+              ]
+            }
+          ]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTasks();
+  }, [mode]);
 
   // Функция для генерации точек графика
   const generateGraphPoints = useCallback((expression: string, min: number, max: number, points: number = 100) => {
@@ -256,7 +232,6 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
   }, []);
 
   // Функция для вычисления интеграла (имитация)
-  // В реальном коде вместо этого можно использовать другие методы из mathjs
   const computeDefiniteIntegral = useCallback((expression: string, a: number, b: number): number => {
     try {
       // Простой способ вычисления определенного интеграла - метод трапеций
@@ -326,10 +301,12 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
       setIsValidFunction(false);
       setErrorMessage('Ошибка при вычислении графиков');
     }
-  }, [userFunction, xMin, xMax, generateGraphPoints, computeDerivative, mode]);
+  }, [userFunction, xMin, xMax, generateGraphPoints, computeDerivative, mode, computeDefiniteIntegral]);
 
   // Загрузка задания при запуске или переходе к следующему
   const loadTask = useCallback(() => {
+    if (tasks.length === 0) return;
+
     // Фильтруем задачи по сложности (±1 от текущей настройки)
     const eligibleTasks = tasks.filter(
         task => Math.abs(task.difficulty - difficulty) <= 1
@@ -355,11 +332,34 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
     setTimeout(() => setAnimationActive(false), 1000);
   }, [tasks, difficulty]);
 
+  // Таймер обратного отсчета
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+
+    if (gameStarted && !gameOver) {
+      timer = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            clearInterval(timer as NodeJS.Timeout);
+            endGame();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [gameStarted, gameOver]);
+
   // Функция запуска игры
   const startGame = () => {
     setGameStarted(true);
     setScore(0);
     setTasksCompleted(0);
+    setTimeRemaining(60); // 1 минута вместо 5
     loadTask();
   };
 
@@ -368,18 +368,6 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
     setGameOver(true);
     onComplete(score, tasksCompleted);
   };
-
-  // Добавим вызов функции endGame по таймауту, если нужно ограничить время игры
-  useEffect(() => {
-    // Например, завершить игру через 10 минут
-    const gameTimer = setTimeout(() => {
-      if (gameStarted && !gameOver) {
-        endGame();
-      }
-    }, 10 * 60 * 1000); // 10 минут
-
-    return () => clearTimeout(gameTimer);
-  }, [gameStarted, gameOver]);
 
   // Обработка отправки ответа
   const handleSubmitAnswer = () => {
@@ -471,24 +459,48 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
     }
   };
 
+  // Форматирование времени
+  const formatTime = (totalSeconds: number) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
+  if (loading) {
+    return (
+        <div className="flex items-center justify-center h-full bg-gray-700 dark:bg-gray-200 rounded-lg p-6 transition-colors">
+          <div className="text-xl text-gray-300 dark:text-gray-700">
+            Загрузка заданий...
+          </div>
+        </div>
+    );
+  }
+
   if (!gameStarted) {
     return (
-        <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-800 dark:bg-gray-100 rounded-lg shadow-xl transition-colors">
-          <h2 className="text-2xl font-bold mb-4 text-white dark:text-gray-900 transition-colors">
+        <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl transition-colors">
+          <h2 className="text-2xl font-bold mb-4 text-gray-100 dark:text-gray-900 transition-colors">
             Виртуальная Лаборатория {mode === 'derivatives' ? 'Производных' : 'Интегралов'}
           </h2>
           <p className="mb-6 text-gray-300 dark:text-gray-700 transition-colors">
             Изучайте функции, их {mode === 'derivatives' ? 'производные' : 'интегралы'} и решайте задачи!
           </p>
 
-          <div className="mb-6 bg-gray-700 dark:bg-gray-200 p-4 rounded transition-colors">
-            <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900 transition-colors">Возможности:</h3>
-            <ul className="text-left list-disc pl-5 text-gray-300 dark:text-gray-700 transition-colors">
-              <li>Визуализация функций и их {mode === 'derivatives' ? 'производных' : 'интегралов'}</li>
-              <li>Изменение диапазона значений по оси X для детального анализа</li>
-              <li>Решение практических задач разного уровня сложности</li>
-              <li>Подсказки для помощи в затруднительных ситуациях</li>
-            </ul>
+          <div className="mb-6 bg-gray-600 dark:bg-gray-300 p-4 rounded transition-colors">
+            <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">Что такое MathLab:</h3>
+            <p className="mb-3 text-gray-300 dark:text-gray-700">
+              Это интерактивная лаборатория для изучения и визуализации математических понятий.
+              MathLab объединяет интерактивные графики и задачи в одном компоненте.
+            </p>
+            <div className="text-left text-gray-300 dark:text-gray-700">
+              <p className="font-medium mb-1">В MathLab вы можете:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Визуализировать функции и их {mode === 'derivatives' ? 'производные' : 'интегралы'}</li>
+                <li>Менять параметры функций и видеть, как меняются графики</li>
+                <li>Решать задачи, проверяя свое понимание</li>
+                <li>Получать мгновенную обратную связь и подсказки</li>
+              </ul>
+            </div>
           </div>
 
           <Button onClick={startGame}>Начать исследование</Button>
@@ -498,12 +510,12 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
 
   if (gameOver) {
     return (
-        <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-800 dark:bg-gray-100 rounded-lg shadow-xl transition-colors">
-          <h2 className="text-2xl font-bold mb-4 text-white dark:text-gray-900 transition-colors">Исследование завершено!</h2>
+        <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl transition-colors">
+          <h2 className="text-2xl font-bold mb-4 text-gray-100 dark:text-gray-900 transition-colors">Исследование завершено!</h2>
 
           <div className="mb-6 w-full max-w-md">
-            <div className="bg-gray-700 dark:bg-gray-200 p-4 rounded mb-4 transition-colors">
-              <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900 transition-colors">Ваши результаты:</h3>
+            <div className="bg-gray-600 dark:bg-gray-300 p-4 rounded mb-4 transition-colors">
+              <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">Ваши результаты:</h3>
               <div className="grid grid-cols-2 gap-4 text-gray-300 dark:text-gray-700 transition-colors">
                 <div>Правильных ответов:</div>
                 <div className="font-bold">{score}</div>
@@ -521,248 +533,269 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
             </div>
           </div>
 
-          <div className="flex space-x-4">
-            <Button onClick={() => startGame()}>Начать заново</Button>
-            <Button variant="outline" onClick={() => onComplete(score, tasksCompleted)}>Вернуться к карте</Button>
-          </div>
+          <Button onClick={() => startGame()}>Начать заново</Button>
         </div>
     );
   }
 
+  // Изменённый интерфейс с вкладками вместо скроллинга
   return (
-      <div className="flex flex-col h-full bg-gray-800 dark:bg-gray-100 rounded-lg shadow-xl p-4 overflow-auto transition-colors">
-        {/* Верхняя панель с задачей */}
-        <div className={`mb-4 p-4 bg-gray-700 dark:bg-gray-200 rounded-lg transition-colors ${
-            animationActive ? 'animate-pulse' : ''
-        }`}>
-          <h3 className="text-xl font-semibold mb-2 text-white dark:text-gray-900 transition-colors">
-            Задача {tasksCompleted + 1}:
-          </h3>
-          <p className="text-gray-300 dark:text-gray-700 transition-colors">
-            {currentTask?.question}
-          </p>
+      <div className="flex flex-col h-full bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl overflow-hidden transition-colors">
+        {/* Верхняя панель с информацией и таймером */}
+        <div className="flex justify-between items-center p-2 bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400">
+          <div className="flex space-x-4 items-center">
+            <div className="text-gray-100 dark:text-gray-900">
+              Счет: <span className="font-bold">{score}</span>
+            </div>
+            <div className="text-gray-100 dark:text-gray-900">
+              Задач: <span className="font-bold">{tasksCompleted}</span>
+            </div>
+          </div>
 
-          {showHints && currentTask && (
-              <div className="mt-3 p-2 bg-blue-600 dark:bg-blue-500 text-white rounded transition-colors">
-                <p className="font-medium">Подсказка {currentHintIndex + 1}:</p>
-                <p>{currentTask.hints[currentHintIndex]}</p>
+          <div className="text-yellow-400 dark:text-yellow-600 font-bold">
+            Время: {formatTime(timeRemaining)}
+          </div>
+        </div>
+
+        {/* Вкладки для переключения между режимами */}
+        <div className="flex bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400">
+          <button
+              className={`px-4 py-2 text-base font-medium transition-colors ${
+                  activeTab === 'explorer'
+                      ? 'bg-gray-700 dark:bg-gray-200 text-gray-100 dark:text-gray-900 border-b-2 border-blue-500 dark:border-blue-600'
+                      : 'text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-400'
+              }`}
+              onClick={() => setActiveTab('explorer')}
+          >
+            Графики
+          </button>
+          <button
+              className={`px-4 py-2 text-base font-medium transition-colors ${
+                  activeTab === 'challenge'
+                      ? 'bg-gray-700 dark:bg-gray-200 text-gray-100 dark:text-gray-900 border-b-2 border-blue-500 dark:border-blue-600'
+                      : 'text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-400'
+              }`}
+              onClick={() => setActiveTab('challenge')}
+          >
+            Задачи
+          </button>
+        </div>
+
+        {/* Содержимое вкладки "Графики" */}
+        {activeTab === 'explorer' && (
+            <div className="flex-1 p-4 overflow-auto">
+              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg">
+                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900">
+                  Исследование функций:
+                </h3>
+                <p className="text-gray-300 dark:text-gray-700 mb-3">
+                  Введите функцию и настройте параметры для визуализации графика и его {mode === 'derivatives' ? 'производной' : 'интеграла'}.
+                </p>
+
+                <div className="flex items-center space-x-2 mb-3">
+                  <span className="text-gray-100 dark:text-gray-900">f(x) =</span>
+                  <input
+                      type="text"
+                      value={userFunction}
+                      onChange={handleFunctionChange}
+                      className={`flex-grow p-2 rounded bg-gray-700 dark:bg-gray-100 border ${
+                          isValidFunction
+                              ? 'border-gray-500 dark:border-gray-400'
+                              : 'border-red-500'
+                      } text-gray-100 dark:text-gray-900 transition-colors`}
+                      placeholder="Введите математическое выражение, например: x^2"
+                  />
+                </div>
+
+                {!isValidFunction && (
+                    <p className="text-red-500 mb-3">{errorMessage || 'Неверное выражение'}</p>
+                )}
+
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <div className="flex items-center">
+                    <span className="text-gray-100 dark:text-gray-900 mr-2">X min:</span>
+                    <input
+                        type="number"
+                        value={xMin}
+                        onChange={(e) => handleLimitsChange(Number(e.target.value), xMax)}
+                        className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900"
+                    />
+                  </div>
+                  <div className="flex items-center mx-2">
+                    <span className="text-gray-100 dark:text-gray-900 mr-2">X max:</span>
+                    <input
+                        type="number"
+                        value={xMax}
+                        onChange={(e) => handleLimitsChange(xMin, Number(e.target.value))}
+                        className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900"
+                    />
+                  </div>
+                  <Button
+                      variant="outline"
+                      onClick={() => handleLimitsChange(-5, 5)}
+                      className="text-sm py-1"
+                  >
+                    [-5, 5]
+                  </Button>
+                  <Button
+                      variant="outline"
+                      onClick={() => handleLimitsChange(-Math.PI, Math.PI)}
+                      className="text-sm py-1"
+                  >
+                    [-π, π]
+                  </Button>
+                </div>
               </div>
-          )}
-        </div>
 
-        {/* Панель управления графиком */}
-        <div className="mb-4 p-4 bg-gray-700 dark:bg-gray-200 rounded-lg transition-colors">
-          <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900 transition-colors">
-            Функция:
-          </h3>
-          <div className="flex items-center space-x-2 mb-3">
-            <span className="text-white dark:text-gray-900 transition-colors">f(x) =</span>
-            <input
-                type="text"
-                value={userFunction}
-                onChange={handleFunctionChange}
-                className={`flex-grow p-2 rounded bg-gray-600 dark:bg-white border ${
-                    isValidFunction
-                        ? 'border-gray-500 dark:border-gray-300'
-                        : 'border-red-500'
-                } text-white dark:text-gray-900 transition-colors`}
-                placeholder="Введите математическое выражение, например: x^2"
-            />
-          </div>
+              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg">
+                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900">
+                  График функции:
+                </h3>
+                <div className="h-64 bg-gray-800 dark:bg-gray-100 rounded-lg p-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#555" />
+                      <XAxis
+                          dataKey="x"
+                          type="number"
+                          domain={[xMin, xMax]}
+                          tickCount={5}
+                          stroke="#aaa"
+                      />
+                      <YAxis stroke="#aaa" />
+                      <Tooltip
+                          formatter={(value: number) => value.toFixed(3)}
+                          labelFormatter={(value: number) => `x = ${value.toFixed(3)}`}
+                          contentStyle={{ backgroundColor: '#333', borderColor: '#555' }}
+                      />
+                      <Legend />
 
-          {!isValidFunction && (
-              <p className="text-red-500 mb-3">{errorMessage || 'Неверное выражение'}</p>
-          )}
+                      <Line
+                          data={graphData}
+                          type="monotone"
+                          dataKey="y"
+                          name="f(x)"
+                          stroke="#8884d8"
+                          dot={false}
+                          isAnimationActive={false}
+                      />
 
-          <div className="flex items-center space-x-4 mb-3">
-            <div className="flex items-center">
-              <span className="text-white dark:text-gray-900 mr-2 transition-colors">X min:</span>
-              <input
-                  type="number"
-                  value={xMin}
-                  onChange={(e) => handleLimitsChange(Number(e.target.value), xMax)}
-                  className="p-1 w-16 rounded bg-gray-600 dark:bg-white border border-gray-500 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
-              />
+                      {mode === 'derivatives' && (
+                          <Line
+                              data={derivativeData}
+                              type="monotone"
+                              dataKey="y"
+                              name="f'(x)"
+                              stroke="#82ca9d"
+                              dot={false}
+                              isAnimationActive={false}
+                          />
+                      )}
+
+                      {mode === 'integrals' && (
+                          <Line
+                              data={integralData}
+                              type="monotone"
+                              dataKey="integral"
+                              name="Площадь"
+                              stroke="#ffc658"
+                              fill="#ffc658"
+                              fillOpacity={0.3}
+                              dot={false}
+                              isAnimationActive={false}
+                          />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center">
-              <span className="text-white dark:text-gray-900 mr-2 transition-colors">X max:</span>
-              <input
-                  type="number"
-                  value={xMax}
-                  onChange={(e) => handleLimitsChange(xMin, Number(e.target.value))}
-                  className="p-1 w-16 rounded bg-gray-600 dark:bg-white border border-gray-500 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
-              />
-            </div>
-          </div>
+        )}
 
-          <div className="flex space-x-2">
-            <Button
-                variant="outline"
-                onClick={() => handleLimitsChange(-10, 10)}
-                className="text-sm py-1"
-            >
-              [-10, 10]
-            </Button>
-            <Button
-                variant="outline"
-                onClick={() => handleLimitsChange(-5, 5)}
-                className="text-sm py-1"
-            >
-              [-5, 5]
-            </Button>
-            <Button
-                variant="outline"
-                onClick={() => handleLimitsChange(-Math.PI, Math.PI)}
-                className="text-sm py-1"
-            >
-              [-π, π]
-            </Button>
-            <Button
-                variant="outline"
-                onClick={() => handleLimitsChange(0, 10)}
-                className="text-sm py-1"
-            >
-              [0, 10]
-            </Button>
-          </div>
-        </div>
+        {/* Содержимое вкладки "Задачи" */}
+        {activeTab === 'challenge' && (
+            <div className="flex-1 p-4 overflow-auto">
+              {/* Текущая задача */}
+              <div className={`mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg ${
+                  animationActive ? 'animate-pulse' : ''
+              }`}>
+                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900">
+                  Задача {tasksCompleted + 1}:
+                </h3>
+                <p className="text-gray-300 dark:text-gray-700 mb-4">
+                  {currentTask?.question}
+                </p>
 
-        {/* Область графиков */}
-        <div className="flex-grow mb-4 p-4 bg-gray-700 dark:bg-gray-200 rounded-lg transition-colors">
-          <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900 transition-colors">
-            Графики:
-          </h3>
-
-          <div className="h-48 sm:h-64 md:h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                  margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#555" />
-                <XAxis
-                    dataKey="x"
-                    type="number"
-                    domain={[xMin, xMax]}
-                    tickCount={5}
-                    stroke="#aaa"
-                />
-                <YAxis stroke="#aaa" />
-                <Tooltip
-                    formatter={(value: number) => value.toFixed(3)}
-                    labelFormatter={(value: number) => `x = ${value.toFixed(3)}`}
-                    contentStyle={{ backgroundColor: '#333', borderColor: '#555' }}
-                />
-                <Legend />
-
-                {/* График функции */}
-                <Line
-                    data={graphData}
-                    type="monotone"
-                    dataKey="y"
-                    name="f(x)"
-                    stroke="#8884d8"
-                    dot={false}
-                    isAnimationActive={false}
-                />
-
-                {/* График производной в режиме производных */}
-                {mode === 'derivatives' && (
-                    <Line
-                        data={derivativeData}
-                        type="monotone"
-                        dataKey="y"
-                        name="f'(x)"
-                        stroke="#82ca9d"
-                        dot={false}
-                        isAnimationActive={false}
-                    />
-                )}
-
-                {/* График интеграла в режиме интегралов */}
-                {mode === 'integrals' && (
-                    <Line
-                        data={integralData}
-                        type="monotone"
-                        dataKey="integral"
-                        name="Площадь"
-                        stroke="#ffc658"
-                        fill="#ffc658"
-                        fillOpacity={0.3}
-                        dot={false}
-                        isAnimationActive={false}
-                    />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Панель ответа */}
-        <div className="mb-4 p-4 bg-gray-700 dark:bg-gray-200 rounded-lg transition-colors">
-          <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900 transition-colors">
-            Ваш ответ:
-          </h3>
-
-          {currentTask?.options ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-                {currentTask.options.map((option, index) => (
-                    <div
-                        key={index}
-                        className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                            selectedOption === option
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-600 text-white dark:bg-gray-300 dark:text-gray-900 hover:bg-gray-500 dark:hover:bg-gray-400'
-                        }`}
-                        onClick={() => handleOptionSelect(option)}
-                    >
-                      {option}
+                {showHints && currentTask && (
+                    <div className="mt-3 p-2 bg-blue-700 dark:bg-blue-200 text-gray-100 dark:text-gray-900 rounded">
+                      <p className="font-medium">Подсказка {currentHintIndex + 1}:</p>
+                      <p>{currentTask.hints[currentHintIndex]}</p>
                     </div>
-                ))}
+                )}
               </div>
-          ) : (
-              <div className="mb-3">
-                <input
-                    type="text"
-                    value={userAnswer}
-                    onChange={handleAnswerChange}
-                    placeholder="Введите ваш ответ..."
-                    className="w-full p-2 rounded bg-gray-600 dark:bg-white border border-gray-500 dark:border-gray-300 text-white dark:text-gray-900 transition-colors"
-                />
+
+              {/* Поле для ответа */}
+              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg">
+                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900">
+                  Ваш ответ:
+                </h3>
+
+                {currentTask?.options ? (
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {currentTask.options.map((option, index) => (
+                          <div
+                              key={index}
+                              className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                                  selectedOption === option
+                                      ? 'bg-blue-700 dark:bg-blue-200 text-gray-100 dark:text-gray-900'
+                                      : 'bg-gray-700 dark:bg-gray-100 text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-300'
+                              }`}
+                              onClick={() => handleOptionSelect(option)}
+                          >
+                            {option}
+                          </div>
+                      ))}
+                    </div>
+                ) : (
+                    <div className="mb-3">
+                      <input
+                          type="text"
+                          value={userAnswer}
+                          onChange={handleAnswerChange}
+                          placeholder="Введите ваш ответ..."
+                          className="w-full p-2 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900"
+                      />
+                    </div>
+                )}
+
+                <div className="flex justify-between">
+                  <Button
+                      variant="outline"
+                      onClick={showNextHint}
+                      disabled={showHints && currentHintIndex >= (currentTask?.hints.length || 0) - 1}
+                  >
+                    {showHints ? 'Следующая подсказка' : 'Показать подсказку'}
+                  </Button>
+
+                  <Button
+                      onClick={handleSubmitAnswer}
+                      disabled={
+                          (currentTask?.options && !selectedOption) ||
+                          (!currentTask?.options && !userAnswer.trim())
+                      }
+                  >
+                    Проверить ответ
+                  </Button>
+                </div>
               </div>
-          )}
-
-          {/* Кнопки действий */}
-          <div className="flex justify-between">
-            <Button
-                variant="outline"
-                onClick={showNextHint}
-                disabled={showHints && currentHintIndex >= (currentTask?.hints.length || 0) - 1}
-            >
-              {showHints ? 'Следующая подсказка' : 'Показать подсказку'}
-            </Button>
-
-            <Button
-                onClick={handleSubmitAnswer}
-                disabled={
-                    (currentTask?.options && !selectedOption) ||
-                    (!currentTask?.options && !userAnswer.trim())
-                }
-            >
-              Проверить ответ
-            </Button>
-          </div>
-        </div>
-
-        {/* Прогресс и счет */}
-        <div className="flex justify-between text-white dark:text-gray-900 transition-colors">
-          <div>Выполнено: {tasksCompleted}</div>
-          <div>Счет: {score}</div>
-        </div>
+            </div>
+        )}
 
         {/* Обратная связь */}
         {showFeedback && (
-            <div className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg text-white z-10 ${
-                feedback.includes('Правильно') ? 'bg-green-600' : 'bg-red-600'
+            <div className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-10 ${
+                feedback.includes('Правильно') ? 'bg-green-700 dark:bg-green-200 text-gray-100 dark:text-gray-900' :
+                    'bg-red-700 dark:bg-red-200 text-gray-100 dark:text-gray-900'
             }`}>
               {feedback}
             </div>
