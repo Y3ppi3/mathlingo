@@ -24,6 +24,12 @@ interface Task {
   hints: string[];
 }
 
+interface GraphDataPoint {
+  x: number;
+  y: number;
+  integral?: number;
+}
+
 const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3, onComplete }) => {
   // Основные состояния
   const [gameStarted, setGameStarted] = useState(false);
@@ -44,7 +50,14 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
 
     // Замена надстрочных символов на стандартные обозначения степеней
     normalized = normalized
-        // Основная обработка степеней
+        // Заменяем символы умножения на *
+        .replace(/·/g, '*')
+        .replace(/×/g, '*')
+        .replace(/\u00D7/g, '*') // Unicode для ×
+        .replace(/\u22C5/g, '*') // Unicode для ⋅
+        .replace(/\u2219/g, '*') // Unicode для ∙
+
+        // Остальные существующие замены...
         .replace(/x²/g, 'x^2')
         .replace(/x³/g, 'x^3')
         .replace(/x⁷/g, 'x^7')
@@ -272,7 +285,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
           const y = parser.evaluate(normalized);
 
           if (typeof y === 'number' && !isNaN(y) && Math.abs(y) < 1000) {
-            data.push({ x, y });
+            data.push({x, y});
           }
         } catch (localError) {
           // Пропускаем точки с ошибками
@@ -524,519 +537,536 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
     }
 
     if (onComplete) {
-      onComplete(score, tasksCompleted);
+      // Максимально возможное количество очков - это количество задач * 10 (если каждая задача стоит 10 очков)
+      // Если tasksCompleted равно 0, используем как минимум 1, чтобы избежать NaN при делении
+      const maxPossibleScore = Math.max(10, tasksCompleted * 10);
+      onComplete(score, maxPossibleScore);
     }
   };
 
-  // Обработка отправки ответа
-  const handleSubmitAnswer = () => {
-    if (!currentTask) return;
+    // Обработка отправки ответа
+    const handleSubmitAnswer = () => {
+      if (!currentTask) return;
 
-    let isCorrect = false;
-    const userAnswerNormalized = userAnswer.trim().toLowerCase();
-    const selectedOptionValue = selectedOption?.trim().toLowerCase();
+      let isCorrect = false;
+      const userAnswerNormalized = userAnswer.trim().toLowerCase();
+      const selectedOptionValue = selectedOption?.trim().toLowerCase();
 
-    // Специальная обработка задач на производные
-    if (currentTask.question && currentTask.question.includes('производную')) {
-      // Для задач с вариантами ответов (случай как на вашем скриншоте)
-      if (currentTask.options && selectedOption) {
-        // Нормализуем выбранный ответ и сравниваем с правильным
-        const normalizedSelection = normalizeExpression(selectedOption);
-        const correctAnswer = String(currentTask.correctAnswer).trim();
+      // Специальная обработка задач на производные
+      if (currentTask.question && currentTask.question.includes('производную')) {
+        // Для задач с вариантами ответов (случай как на вашем скриншоте)
+        if (currentTask.options && selectedOption) {
+          // Нормализуем выбранный ответ и сравниваем с правильным
+          const normalizedSelection = normalizeExpression(selectedOption);
+          const correctAnswer = String(currentTask.correctAnswer).trim();
 
-        console.log(`Сравнение ответов: "${normalizedSelection}" с "${correctAnswer}"`);
+          console.log(`Сравнение ответов: "${normalizedSelection}" с "${correctAnswer}"`);
 
-        // Прямое сравнение с известными правильными ответами
-        if (currentTask.functionExpression === 'x^7' && normalizedSelection === '7*x^6') {
-          isCorrect = true;
-        } else if (currentTask.functionExpression === 'x^2' && normalizedSelection === '2*x') {
-          isCorrect = true;
-        } else {
-          // Для других случаев пытаемся сравнить нормализованные выражения
-          isCorrect = normalizeExpression(selectedOption) === normalizeExpression(String(currentTask.correctAnswer));
+          // Прямое сравнение с известными правильными ответами
+          if (currentTask.functionExpression === 'x^7' && normalizedSelection === '7*x^6') {
+            isCorrect = true;
+          } else if (currentTask.functionExpression === 'x^2' && normalizedSelection === '2*x') {
+            isCorrect = true;
+          } else {
+            // Для других случаев пытаемся сравнить нормализованные выражения
+            isCorrect = normalizeExpression(selectedOption) === normalizeExpression(String(currentTask.correctAnswer));
+          }
+        } else if (userAnswerNormalized) {
+          // Обработка текстовых ответов
+          const correctAnswerNorm = normalizeExpression(String(currentTask.correctAnswer));
+          isCorrect = normalizeExpression(userAnswerNormalized) === correctAnswerNorm;
         }
-      } else if (userAnswerNormalized) {
-        // Обработка текстовых ответов
-        const correctAnswerNorm = normalizeExpression(String(currentTask.correctAnswer));
-        isCorrect = normalizeExpression(userAnswerNormalized) === correctAnswerNorm;
-      }
-    } else {
-      // Стандартная логика для других типов задач
-      if (currentTask.type === 'analyze' || currentTask.type === 'find') {
-        if (currentTask.options) {
-          isCorrect = selectedOptionValue === String(currentTask.correctAnswer).trim().toLowerCase();
-        } else {
-          isCorrect = userAnswerNormalized === String(currentTask.correctAnswer).trim().toLowerCase();
-        }
-      } else if (currentTask.type === 'calculate') {
-        try {
-          const userValue = safeEvaluate(userAnswerNormalized);
-          const correctValue = typeof currentTask.correctAnswer === 'number'
-              ? currentTask.correctAnswer
-              : safeEvaluate(String(currentTask.correctAnswer));
+      } else {
+        // Стандартная логика для других типов задач
+        if (currentTask.type === 'analyze' || currentTask.type === 'find') {
+          if (currentTask.options) {
+            isCorrect = selectedOptionValue === String(currentTask.correctAnswer).trim().toLowerCase();
+          } else {
+            isCorrect = userAnswerNormalized === String(currentTask.correctAnswer).trim().toLowerCase();
+          }
+        } else if (currentTask.type === 'calculate') {
+          try {
+            const userValue = safeEvaluate(userAnswerNormalized);
+            const correctValue = typeof currentTask.correctAnswer === 'number'
+                ? currentTask.correctAnswer
+                : safeEvaluate(String(currentTask.correctAnswer));
 
-          const tolerance = 0.001;
-          isCorrect = !isNaN(userValue) && !isNaN(correctValue) &&
-              Math.abs(userValue - correctValue) < tolerance;
-        } catch (error) {
-          console.error('Ошибка при проверке числового ответа:', error);
-          isCorrect = false;
+            const tolerance = 0.001;
+            isCorrect = !isNaN(userValue) && !isNaN(correctValue) &&
+                Math.abs(userValue - correctValue) < tolerance;
+          } catch (error) {
+            console.error('Ошибка при проверке числового ответа:', error);
+            isCorrect = false;
+          }
         }
       }
-    }
 
-    // Обновляем счет и показываем обратную связь
-    if (isCorrect) {
-      setScore(prev => prev + 1);
-      setFeedback('Правильно! Отличная работа!');
-    } else {
-      setFeedback(`Неверно. Правильный ответ: ${currentTask.correctAnswer}`);
-    }
-
-    setShowFeedback(true);
-    setTasksCompleted(prev => prev + 1);
-
-    setTimeout(() => {
-      setShowFeedback(false);
-      loadTask();
-    }, 2000);
-  };
-
-  // Обработка изменения функции пользователем
-  const handleFunctionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value;
-    setUserFunction(input);
-
-    try {
-      // Проверяем выражение без вычисления
-      const normalized = normalizeExpression(input);
-      if (normalized) {
-        setIsValidFunction(true);
-        setErrorMessage('');
+      // Обновляем счет и показываем обратную связь
+      if (isCorrect) {
+        // Увеличиваем счет на 10 очков за правильный ответ, а не на 1
+        setScore(prev => prev + 10);
+        setFeedback('Правильно! Отличная работа!');
+      } else {
+        setFeedback(`Неверно. Правильный ответ: ${currentTask.correctAnswer}`);
       }
-    } catch (error) {
-      setIsValidFunction(false);
-      setErrorMessage('Некорректное выражение');
-    }
-  };
 
-  // Обработка изменения пределов
-  const handleLimitsChange = (min: number, max: number) => {
-    if (min < max) {
-      setXMin(min);
-      setXMax(max);
-    }
-  };
+      setShowFeedback(true);
+      setTasksCompleted(prev => prev + 1);
 
-  // Обработка выбора варианта ответа
-  const handleOptionSelect = (option: string) => {
-    setSelectedOption(option);
-  };
+      setTimeout(() => {
+        setShowFeedback(false);
+        loadTask();
+      }, 2000);
+    };
 
-  // Обработка изменения текстового ответа
-  const handleAnswerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUserAnswer(e.target.value);
-  };
+    // Обработка изменения функции пользователем
+    const handleFunctionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const input = e.target.value;
+      setUserFunction(input);
 
-  // Показ следующей подсказки
-  const showNextHint = () => {
-    if (!currentTask) return;
+      try {
+        // Проверяем выражение без вычисления
+        const normalized = normalizeExpression(input);
+        if (normalized) {
+          setIsValidFunction(true);
+          setErrorMessage('');
+        }
+      } catch (error) {
+        setIsValidFunction(false);
+        setErrorMessage('Некорректное выражение');
+      }
+    };
 
-    if (!showHints) {
-      setShowHints(true);
-    } else if (currentHintIndex < currentTask.hints.length - 1) {
-      setCurrentHintIndex(prev => prev + 1);
-    }
-  };
+    // Обработка изменения пределов
+    const handleLimitsChange = (min: number, max: number) => {
+      if (min < max) {
+        setXMin(min);
+        setXMax(max);
+      }
+    };
 
-  // Форматирование времени
-  const formatTime = (totalSeconds: number) => {
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-  };
+    // Обработка выбора варианта ответа
+    const handleOptionSelect = (option: string) => {
+      setSelectedOption(option);
+    };
 
-  if (loading) {
-    return (
-        <div className="flex items-center justify-center h-full bg-gray-700 dark:bg-gray-200 rounded-lg p-6 transition-colors">
-          <div className="text-xl text-gray-300 dark:text-gray-700 transition-colors">
-            Загрузка заданий...
-          </div>
-        </div>
-    );
-  }
+    // Обработка изменения текстового ответа
+    const handleAnswerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setUserAnswer(e.target.value);
+    };
 
-  if (!gameStarted) {
-    return (
-        <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl transition-colors">
-          <h2 className="text-2xl font-bold mb-4 text-gray-100 dark:text-gray-900 transition-colors">
-            Виртуальная Лаборатория {mode === 'derivatives' ? 'Производных' : 'Интегралов'}
-          </h2>
-          <p className="mb-6 text-gray-300 dark:text-gray-700 transition-colors">
-            Изучайте функции, их {mode === 'derivatives' ? 'производные' : 'интегралы'} и решайте задачи!
-          </p>
+    // Показ следующей подсказки
+    const showNextHint = () => {
+      if (!currentTask) return;
 
-          <div className="mb-6 bg-gray-600 dark:bg-gray-300 p-4 rounded transition-colors">
-            <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">Что такое MathLab:</h3>
-            <p className="mb-3 text-gray-300 dark:text-gray-700 transition-colors">
-              Это интерактивная лаборатория для изучения и визуализации математических понятий.
-              MathLab объединяет интерактивные графики и задачи в одном компоненте.
-            </p>
-            <div className="text-left text-gray-300 dark:text-gray-700 transition-colors">
-              <p className="font-medium mb-1">В MathLab вы можете:</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Визуализировать функции и их {mode === 'derivatives' ? 'производные' : 'интегралы'}</li>
-                <li>Менять параметры функций и видеть, как меняются графики</li>
-                <li>Решать задачи, проверяя свое понимание</li>
-                <li>Получать мгновенную обратную связь и подсказки</li>
-              </ul>
+      if (!showHints) {
+        setShowHints(true);
+      } else if (currentHintIndex < currentTask.hints.length - 1) {
+        setCurrentHintIndex(prev => prev + 1);
+      }
+    };
+
+    // Форматирование времени
+    const formatTime = (totalSeconds: number) => {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    };
+
+    if (loading) {
+      return (
+          <div
+              className="flex items-center justify-center h-full bg-gray-700 dark:bg-gray-200 rounded-lg p-6 transition-colors">
+            <div className="text-xl text-gray-300 dark:text-gray-700 transition-colors">
+              Загрузка заданий...
             </div>
           </div>
+      );
+    }
 
-          <Button onClick={startGameWithCountdown}>Начать исследование</Button>
-        </div>
-    );
-  }
+    if (!gameStarted) {
+      return (
+          <div
+              className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl transition-colors">
+            <h2 className="text-2xl font-bold mb-4 text-gray-100 dark:text-gray-900 transition-colors">
+              Виртуальная Лаборатория {mode === 'derivatives' ? 'Производных' : 'Интегралов'}
+            </h2>
+            <p className="mb-6 text-gray-300 dark:text-gray-700 transition-colors">
+              Изучайте функции, их {mode === 'derivatives' ? 'производные' : 'интегралы'} и решайте задачи!
+            </p>
 
-  if (gameOver) {
-    return (
-        <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl transition-colors">
-          <h2 className="text-2xl font-bold mb-4 text-gray-100 dark:text-gray-900 transition-colors">Исследование завершено!</h2>
+            <div className="mb-6 bg-gray-600 dark:bg-gray-300 p-4 rounded transition-colors">
+              <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">Что такое
+                MathLab:</h3>
+              <p className="mb-3 text-gray-300 dark:text-gray-700 transition-colors">
+                Это интерактивная лаборатория для изучения и визуализации математических понятий.
+                MathLab объединяет интерактивные графики и задачи в одном компоненте.
+              </p>
+              <div className="text-left text-gray-300 dark:text-gray-700 transition-colors">
+                <p className="font-medium mb-1">В MathLab вы можете:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Визуализировать функции и их {mode === 'derivatives' ? 'производные' : 'интегралы'}</li>
+                  <li>Менять параметры функций и видеть, как меняются графики</li>
+                  <li>Решать задачи, проверяя свое понимание</li>
+                  <li>Получать мгновенную обратную связь и подсказки</li>
+                </ul>
+              </div>
+            </div>
 
-          <div className="mb-6 w-full max-w-md">
-            <div className="bg-gray-600 dark:bg-gray-300 p-4 rounded mb-4 transition-colors">
-              <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">Ваши результаты:</h3>
-              <div className="grid grid-cols-2 gap-4 text-gray-300 dark:text-gray-700 transition-colors">
-                <div>Правильных ответов:</div>
-                <div className="font-bold">{score}</div>
+            <Button onClick={startGameWithCountdown}>Начать исследование</Button>
+          </div>
+      );
+    }
 
-                <div>Всего задач:</div>
-                <div className="font-bold">{tasksCompleted}</div>
+    if (gameOver) {
+      return (
+          <div
+              className="flex flex-col items-center justify-center h-full p-6 text-center bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl transition-colors">
+            <h2 className="text-2xl font-bold mb-4 text-gray-100 dark:text-gray-900 transition-colors">Исследование
+              завершено!</h2>
 
-                <div>Точность:</div>
-                <div className="font-bold">
-                  {tasksCompleted > 0
-                      ? Math.round((score / tasksCompleted) * 100)
-                      : 0}%
+            <div className="mb-6 w-full max-w-md">
+              <div className="bg-gray-600 dark:bg-gray-300 p-4 rounded mb-4 transition-colors">
+                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">Ваши
+                  результаты:</h3>
+                <div className="grid grid-cols-2 gap-4 text-gray-300 dark:text-gray-700 transition-colors">
+                  <div>Правильных ответов:</div>
+                  <div className="font-bold">{score}</div>
+
+                  <div>Всего задач:</div>
+                  <div className="font-bold">{tasksCompleted}</div>
+
+                  <div>Точность:</div>
+                  <div className="font-bold">
+                    {tasksCompleted > 0
+                        ? Math.round((score / tasksCompleted) * 100)
+                        : 0}%
+                  </div>
                 </div>
               </div>
             </div>
+
+            <Button onClick={startGameWithCountdown}>Начать заново</Button>
           </div>
+      );
+    }
 
-          <Button onClick={startGameWithCountdown}>Начать заново</Button>
-        </div>
-    );
-  }
+    // Обратный отсчет перед началом
+    if (countdownActive) {
+      return (
+          <div
+              className="flex items-center justify-center h-full bg-gray-700 dark:bg-gray-200 rounded-lg transition-colors">
+            <div className="text-9xl font-bold text-gray-100 dark:text-gray-900 animate-pulse transition-colors">
+              {countdown}
+            </div>
+          </div>
+      );
+    }
 
-  // Обратный отсчет перед началом
-  if (countdownActive) {
+    // Изменённый интерфейс с вкладками вместо скроллинга
     return (
-        <div className="flex items-center justify-center h-full bg-gray-700 dark:bg-gray-200 rounded-lg transition-colors">
-          <div className="text-9xl font-bold text-gray-100 dark:text-gray-900 animate-pulse transition-colors">
-            {countdown}
-          </div>
-        </div>
-    );
-  }
-
-  // Изменённый интерфейс с вкладками вместо скроллинга
-  return (
-      <div className="flex flex-col h-full bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl overflow-hidden transition-colors">
-        {/* Верхняя панель с информацией и таймером */}
-        <div className="flex justify-between items-center p-2 bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
-          <div className="flex space-x-4 items-center">
-            <div className="text-gray-100 dark:text-gray-900 transition-colors">
-              Счет: <span className="font-bold">{score}</span>
+        <div
+            className="flex flex-col h-full bg-gray-700 dark:bg-gray-200 rounded-lg shadow-xl overflow-hidden transition-colors">
+          {/* Верхняя панель с информацией и таймером */}
+          <div
+              className="flex justify-between items-center p-2 bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
+            <div className="flex space-x-4 items-center">
+              <div className="text-gray-100 dark:text-gray-900 transition-colors">
+                Счет: <span className="font-bold">{score}</span>
+              </div>
+              <div className="text-gray-100 dark:text-gray-900 transition-colors">
+                Задач: <span className="font-bold">{tasksCompleted}</span>
+              </div>
             </div>
-            <div className="text-gray-100 dark:text-gray-900 transition-colors">
-              Задач: <span className="font-bold">{tasksCompleted}</span>
-            </div>
-          </div>
 
-          <div className="flex items-center space-x-3">
-            <button
-                className={`px-3 py-1 text-sm rounded ${
-                    gamePaused
-                        ? 'bg-green-700 dark:bg-green-200 text-white dark:text-gray-900'
-                        : 'bg-amber-700 dark:bg-amber-200 text-white dark:text-gray-900'
-                } transition-colors`}
-                onClick={togglePause}
-            >
-              {gamePaused ? 'Продолжить' : 'Пауза'}
-            </button>
-
-            <div className="text-yellow-400 dark:text-yellow-600 font-bold transition-colors">
-              Время: {formatTime(timeRemaining)}
-            </div>
-          </div>
-        </div>
-
-        {/* Вкладки для переключения между режимами */}
-        <div className="flex bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
-          <button
-              className={`px-4 py-2 text-base font-medium transition-colors ${
-                  activeTab === 'explorer'
-                      ? 'bg-gray-700 dark:bg-gray-200 text-gray-100 dark:text-gray-900 border-b-2 border-blue-500 dark:border-blue-600'
-                      : 'text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-400'
-              }`}
-              onClick={() => setActiveTab('explorer')}
-              disabled={gamePaused}
-          >
-            Графики
-          </button>
-          <button
-              className={`px-4 py-2 text-base font-medium transition-colors ${
-                  activeTab === 'challenge'
-                      ? 'bg-gray-700 dark:bg-gray-200 text-gray-100 dark:text-gray-900 border-b-2 border-blue-500 dark:border-blue-600'
-                      : 'text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-400'
-              }`}
-              onClick={() => setActiveTab('challenge')}
-              disabled={gamePaused}
-          >
-            Задачи
-          </button>
-        </div>
-
-        {/* Наложение паузы */}
-        {gamePaused && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
-              <div className="text-4xl font-bold text-white mb-6">ПАУЗА</div>
-              <Button
+            <div className="flex items-center space-x-3">
+              <button
+                  className={`px-3 py-1 text-sm rounded ${
+                      gamePaused
+                          ? 'bg-green-700 dark:bg-green-200 text-white dark:text-gray-900'
+                          : 'bg-amber-700 dark:bg-amber-200 text-white dark:text-gray-900'
+                  } transition-colors`}
                   onClick={togglePause}
               >
-                Продолжить
-              </Button>
-            </div>
-        )}
+                {gamePaused ? 'Продолжить' : 'Пауза'}
+              </button>
 
-        {/* Содержимое вкладки "Графики" */}
-        {activeTab === 'explorer' && (
-            <div className="flex-1 p-4 overflow-auto">
-              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg transition-colors">
-                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
-                  Исследование функций:
-                </h3>
-                <p className="text-gray-300 dark:text-gray-700 mb-3 transition-colors">
-                  Введите функцию и настройте параметры для визуализации графика и его {mode === 'derivatives' ? 'производной' : 'интеграла'}.
-                </p>
-
-                <div className="flex items-center space-x-2 mb-3">
-                  <span className="text-gray-100 dark:text-gray-900 transition-colors">f(x) =</span>
-                  <input
-                      type="text"
-                      value={userFunction}
-                      onChange={handleFunctionChange}
-                      disabled={gamePaused}
-                      className={`flex-grow p-2 rounded bg-gray-700 dark:bg-gray-100 border ${
-                          isValidFunction
-                              ? 'border-gray-500 dark:border-gray-400'
-                              : 'border-red-500'
-                      } text-gray-100 dark:text-gray-900 transition-colors`}
-                      placeholder="Введите математическое выражение, например: x^2"
-                  />
-                </div>
-
-                {!isValidFunction && (
-                    <p className="text-red-500 mb-3 transition-colors">{errorMessage || 'Неверное выражение'}</p>
-                )}
-
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <div className="flex items-center">
-                    <span className="text-gray-100 dark:text-gray-900 mr-2 transition-colors">X min:</span>
-                    <input
-                        type="number"
-                        value={xMin}
-                        onChange={(e) => handleLimitsChange(Number(e.target.value), xMax)}
-                        disabled={gamePaused}
-                        className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900 transition-colors"
-                    />
-                  </div>
-                  <div className="flex items-center mx-2">
-                    <span className="text-gray-100 dark:text-gray-900 mr-2 transition-colors">X max:</span>
-                    <input
-                        type="number"
-                        value={xMax}
-                        onChange={(e) => handleLimitsChange(xMin, Number(e.target.value))}
-                        disabled={gamePaused}
-                        className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900 transition-colors"
-                    />
-                  </div>
-                  <Button
-                      variant="outline"
-                      onClick={() => handleLimitsChange(-5, 5)}
-                      disabled={gamePaused}
-                      className="text-sm py-1"
-                  >
-                    [-5, 5]
-                  </Button>
-                  <Button
-                      variant="outline"
-                      onClick={() => handleLimitsChange(-Math.PI, Math.PI)}
-                      disabled={gamePaused}
-                      className="text-sm py-1"
-                  >
-                    [-π, π]
-                  </Button>
-                </div>
-              </div>
-
-              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg transition-colors">
-                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
-                  График функции:
-                </h3>
-                <div className="h-64 bg-gray-800 dark:bg-gray-100 rounded-lg p-2 transition-colors">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#555" />
-                      <XAxis
-                          dataKey="x"
-                          type="number"
-                          domain={[xMin, xMax]}
-                          tickCount={5}
-                          stroke="#aaa"
-                      />
-                      <YAxis stroke="#aaa" />
-                      <Tooltip
-                          formatter={(value: number) => value.toFixed(3)}
-                          labelFormatter={(value: number) => `x = ${value.toFixed(3)}`}
-                          contentStyle={{ backgroundColor: '#333', borderColor: '#555' }}
-                      />
-                      <Legend />
-
-                      <Line
-                          data={graphData}
-                          type="monotone"
-                          dataKey="y"
-                          name="f(x)"
-                          stroke="#8884d8"
-                          dot={false}
-                          isAnimationActive={false}
-                      />
-
-                      {mode === 'derivatives' && (
-                          <Line
-                              data={derivativeData}
-                              type="monotone"
-                              dataKey="y"
-                              name="f'(x)"
-                              stroke="#82ca9d"
-                              dot={false}
-                              isAnimationActive={false}
-                          />
-                      )}
-
-                      {mode === 'integrals' && (
-                          <Line
-                              data={integralData}
-                              type="monotone"
-                              dataKey="integral"
-                              name="Площадь"
-                              stroke="#ffc658"
-                              fill="#ffc658"
-                              fillOpacity={0.3}
-                              dot={false}
-                              isAnimationActive={false}
-                          />
-                      )}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+              <div className="text-yellow-400 dark:text-yellow-600 font-bold transition-colors">
+                Время: {formatTime(timeRemaining)}
               </div>
             </div>
-        )}
+          </div>
 
-        {/* Содержимое вкладки "Задачи" */}
-        {activeTab === 'challenge' && (
-            <div className="flex-1 p-4 overflow-auto">
-              {/* Текущая задача */}
-              <div className={`mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg ${
-                  animationActive ? 'animate-pulse' : ''
-              } transition-colors`}>
-                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
-                  Задача {tasksCompleted + 1}:
-                </h3>
-                <p className="text-gray-300 dark:text-gray-700 mb-4 transition-colors">
-                  {currentTask?.question}
-                </p>
+          {/* Вкладки для переключения между режимами */}
+          <div
+              className="flex bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
+            <button
+                className={`px-4 py-2 text-base font-medium transition-colors ${
+                    activeTab === 'explorer'
+                        ? 'bg-gray-700 dark:bg-gray-200 text-gray-100 dark:text-gray-900 border-b-2 border-blue-500 dark:border-blue-600'
+                        : 'text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-400'
+                }`}
+                onClick={() => setActiveTab('explorer')}
+                disabled={gamePaused}
+            >
+              Графики
+            </button>
+            <button
+                className={`px-4 py-2 text-base font-medium transition-colors ${
+                    activeTab === 'challenge'
+                        ? 'bg-gray-700 dark:bg-gray-200 text-gray-100 dark:text-gray-900 border-b-2 border-blue-500 dark:border-blue-600'
+                        : 'text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-400'
+                }`}
+                onClick={() => setActiveTab('challenge')}
+                disabled={gamePaused}
+            >
+              Задачи
+            </button>
+          </div>
 
-                {showHints && currentTask && (
-                    <div className="mt-3 p-2 bg-blue-700 dark:bg-blue-200 text-gray-100 dark:text-gray-900 rounded transition-colors">
-                      <p className="font-medium">Подсказка {currentHintIndex + 1}:</p>
-                      <p>{currentTask.hints[currentHintIndex]}</p>
-                    </div>
-                )}
+          {/* Наложение паузы */}
+          {gamePaused && (
+              <div
+                  className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
+                <div className="text-4xl font-bold text-white mb-6">ПАУЗА</div>
+                <Button
+                    onClick={togglePause}
+                >
+                  Продолжить
+                </Button>
               </div>
+          )}
 
-              {/* Поле для ответа */}
-              <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg transition-colors">
-                <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
-                  Ваш ответ:
-                </h3>
+          {/* Содержимое вкладки "Графики" */}
+          {activeTab === 'explorer' && (
+              <div className="flex-1 p-4 overflow-auto">
+                <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg transition-colors">
+                  <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
+                    Исследование функций:
+                  </h3>
+                  <p className="text-gray-300 dark:text-gray-700 mb-3 transition-colors">
+                    Введите функцию и настройте параметры для визуализации графика и
+                    его {mode === 'derivatives' ? 'производной' : 'интеграла'}.
+                  </p>
 
-                {currentTask?.options ? (
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      {currentTask.options.map((option, index) => (
-                          <div
-                              key={index}
-                              className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                                  selectedOption === option
-                                      ? 'bg-blue-700 dark:bg-blue-200 text-gray-100 dark:text-gray-900'
-                                      : 'bg-gray-700 dark:bg-gray-100 text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-300'
-                              }`}
-                              onClick={() => !gamePaused && handleOptionSelect(option)}
-                          >
-                            {option}
-                          </div>
-                      ))}
-                    </div>
-                ) : (
-                    <div className="mb-3">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <span className="text-gray-100 dark:text-gray-900 transition-colors">f(x) =</span>
+                    <input
+                        type="text"
+                        value={userFunction}
+                        onChange={handleFunctionChange}
+                        disabled={gamePaused}
+                        className={`flex-grow p-2 rounded bg-gray-700 dark:bg-gray-100 border ${
+                            isValidFunction
+                                ? 'border-gray-500 dark:border-gray-400'
+                                : 'border-red-500'
+                        } text-gray-100 dark:text-gray-900 transition-colors`}
+                        placeholder="Введите математическое выражение, например: x^2"
+                    />
+                  </div>
+
+                  {!isValidFunction && (
+                      <p className="text-red-500 mb-3 transition-colors">{errorMessage || 'Неверное выражение'}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <div className="flex items-center">
+                      <span className="text-gray-100 dark:text-gray-900 mr-2 transition-colors">X min:</span>
                       <input
-                          type="text"
-                          value={userAnswer}
-                          onChange={handleAnswerChange}
+                          type="number"
+                          value={xMin}
+                          onChange={(e) => handleLimitsChange(Number(e.target.value), xMax)}
                           disabled={gamePaused}
-                          placeholder="Введите ваш ответ..."
-                          className="w-full p-2 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900 transition-colors"
+                          className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900 transition-colors"
                       />
                     </div>
-                )}
+                    <div className="flex items-center mx-2">
+                      <span className="text-gray-100 dark:text-gray-900 mr-2 transition-colors">X max:</span>
+                      <input
+                          type="number"
+                          value={xMax}
+                          onChange={(e) => handleLimitsChange(xMin, Number(e.target.value))}
+                          disabled={gamePaused}
+                          className="p-1 w-16 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900 transition-colors"
+                      />
+                    </div>
+                    <Button
+                        variant="outline"
+                        onClick={() => handleLimitsChange(-5, 5)}
+                        disabled={gamePaused}
+                        className="text-sm py-1"
+                    >
+                      [-5, 5]
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => handleLimitsChange(-Math.PI, Math.PI)}
+                        disabled={gamePaused}
+                        className="text-sm py-1"
+                    >
+                      [-π, π]
+                    </Button>
+                  </div>
+                </div>
 
-                <div className="flex justify-between">
-                  <Button
-                      variant="outline"
-                      onClick={showNextHint}
-                      disabled={gamePaused || (showHints && currentHintIndex >= (currentTask?.hints.length || 0) - 1)}
-                  >
-                    {showHints ? 'Следующая подсказка' : 'Показать подсказку'}
-                  </Button>
+                <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg transition-colors">
+                  <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
+                    График функции:
+                  </h3>
+                  <div className="h-64 bg-gray-800 dark:bg-gray-100 rounded-lg p-2 transition-colors">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart margin={{top: 5, right: 5, left: 0, bottom: 5}}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#555"/>
+                        <XAxis
+                            dataKey="x"
+                            type="number"
+                            domain={[xMin, xMax]}
+                            tickCount={5}
+                            stroke="#aaa"
+                        />
+                        <YAxis stroke="#aaa"/>
+                        <Tooltip
+                            formatter={(value: number) => value.toFixed(3)}
+                            labelFormatter={(value: number) => `x = ${value.toFixed(3)}`}
+                            contentStyle={{backgroundColor: '#333', borderColor: '#555'}}
+                        />
+                        <Legend/>
 
-                  <Button
-                      onClick={handleSubmitAnswer}
-                      disabled={gamePaused ||
-                          (currentTask?.options && !selectedOption) ||
-                          (!currentTask?.options && !userAnswer.trim())
-                      }
-                  >
-                    Проверить ответ
-                  </Button>
+                        <Line
+                            data={graphData}
+                            type="monotone"
+                            dataKey="y"
+                            name="f(x)"
+                            stroke="#8884d8"
+                            dot={false}
+                            isAnimationActive={false}
+                        />
+
+                        {mode === 'derivatives' && (
+                            <Line
+                                data={derivativeData}
+                                type="monotone"
+                                dataKey="y"
+                                name="f'(x)"
+                                stroke="#82ca9d"
+                                dot={false}
+                                isAnimationActive={false}
+                            />
+                        )}
+
+                        {mode === 'integrals' && (
+                            <Line
+                                data={integralData}
+                                type="monotone"
+                                dataKey="integral"
+                                name="Площадь"
+                                stroke="#ffc658"
+                                fill="#ffc658"
+                                fillOpacity={0.3}
+                                dot={false}
+                                isAnimationActive={false}
+                            />
+                        )}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
-            </div>
-        )}
+          )}
 
-        {/* Обратная связь */}
-        {showFeedback && (
-            <div className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-10 ${
-                feedback.includes('Правильно') ? 'bg-green-700 dark:bg-green-200 text-gray-100 dark:text-gray-900' :
-                    'bg-red-700 dark:bg-red-200 text-gray-100 dark:text-gray-900'
-            } transition-colors`}>
-              {feedback}
-            </div>
-        )}
+          {/* Содержимое вкладки "Задачи" */}
+          {activeTab === 'challenge' && (
+              <div className="flex-1 p-4 overflow-auto">
+                {/* Текущая задача */}
+                <div className={`mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg ${
+                    animationActive ? 'animate-pulse' : ''
+                } transition-colors`}>
+                  <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
+                    Задача {tasksCompleted + 1}:
+                  </h3>
+                  <p className="text-gray-300 dark:text-gray-700 mb-4 transition-colors">
+                    {currentTask?.question}
+                  </p>
 
-        {/* CSS для анимаций */}
-        <style>{`
+                  {showHints && currentTask && (
+                      <div
+                          className="mt-3 p-2 bg-blue-700 dark:bg-blue-200 text-gray-100 dark:text-gray-900 rounded transition-colors">
+                        <p className="font-medium">Подсказка {currentHintIndex + 1}:</p>
+                        <p>{currentTask.hints[currentHintIndex]}</p>
+                      </div>
+                  )}
+                </div>
+
+                {/* Поле для ответа */}
+                <div className="mb-4 p-4 bg-gray-600 dark:bg-gray-300 rounded-lg transition-colors">
+                  <h3 className="text-lg font-semibold mb-2 text-gray-100 dark:text-gray-900 transition-colors">
+                    Ваш ответ:
+                  </h3>
+
+                  {currentTask?.options ? (
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        {currentTask.options.map((option, index) => (
+                            <div
+                                key={index}
+                                className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                                    selectedOption === option
+                                        ? 'bg-blue-700 dark:bg-blue-200 text-gray-100 dark:text-gray-900'
+                                        : 'bg-gray-700 dark:bg-gray-100 text-gray-300 dark:text-gray-700 hover:bg-gray-500 dark:hover:bg-gray-300'
+                                }`}
+                                onClick={() => !gamePaused && handleOptionSelect(option)}
+                            >
+                              {option}
+                            </div>
+                        ))}
+                      </div>
+                  ) : (
+                      <div className="mb-3">
+                        <input
+                            type="text"
+                            value={userAnswer}
+                            onChange={handleAnswerChange}
+                            disabled={gamePaused}
+                            placeholder="Введите ваш ответ..."
+                            className="w-full p-2 rounded bg-gray-700 dark:bg-gray-100 border border-gray-500 dark:border-gray-400 text-gray-100 dark:text-gray-900 transition-colors"
+                        />
+                      </div>
+                  )}
+
+                  <div className="flex justify-between">
+                    <Button
+                        variant="outline"
+                        onClick={showNextHint}
+                        disabled={gamePaused || (showHints && currentHintIndex >= (currentTask?.hints.length || 0) - 1)}
+                    >
+                      {showHints ? 'Следующая подсказка' : 'Показать подсказку'}
+                    </Button>
+
+                    <Button
+                        onClick={handleSubmitAnswer}
+                        disabled={gamePaused ||
+                            (currentTask?.options && !selectedOption) ||
+                            (!currentTask?.options && !userAnswer.trim())
+                        }
+                    >
+                      Проверить ответ
+                    </Button>
+                  </div>
+                </div>
+              </div>
+          )}
+
+          {/* Обратная связь */}
+          {showFeedback && (
+              <div className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-10 ${
+                  feedback.includes('Правильно') ? 'bg-green-700 dark:bg-green-200 text-gray-100 dark:text-gray-900' :
+                      'bg-red-700 dark:bg-red-200 text-gray-100 dark:text-gray-900'
+              } transition-colors`}>
+                {feedback}
+              </div>
+          )}
+
+          {/* CSS для анимаций */}
+          <style>{`
           @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -1047,8 +1077,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
             animation: pulse 1.5s infinite;
           }
         `}</style>
-      </div>
-  );
-};
-
+        </div>
+    );
+  };
 export default MathLab;
