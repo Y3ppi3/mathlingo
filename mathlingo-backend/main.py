@@ -1,11 +1,11 @@
 
 import os
+import time
+import secrets
+
 from fastapi import FastAPI, Depends, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import secrets
-import time
-
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,7 +15,7 @@ from app.models import User, Task
 from app.auth import get_current_user
 
 app = FastAPI(title="MathLingo API")
-
+'''
 csrf_tokens = {}
 
 CSRF_TOKEN_EXPIRY = 3600
@@ -75,7 +75,7 @@ async def csrf_protection(request: Request, call_next):
                 status_code=403
             )
     return await call_next(request)
-
+'''
 
 #CORS configuration
 origins = [
@@ -85,8 +85,11 @@ origins = [
     "http://127.0.0.1:5174",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://192.168.0.157:5173/",
-    "http://192.168.0.157:8000/"
+    "http://192.168.0.157:5173",
+    "http://192.168.0.157:8000",
+    "http://localhost:8000",
+    "http://localhost:8001",
+    "http://localhost:8080"
     # Добавьте здесь ваши production домены, когда перейдете в production
 ]
 

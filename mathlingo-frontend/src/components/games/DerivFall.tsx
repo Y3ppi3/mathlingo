@@ -180,13 +180,13 @@ const DerivFall: React.FC<DerivFallProps> = ({
     console.log(`Настройка уровня сложности: ${difficulty}`);
     if (difficulty <= 2) {
       setDifficultyLevel('easy');
-      setSpeed(6000);
+      setSpeed(8000); // Increased from 6000ms to 8000ms (8 seconds)
     } else if (difficulty >= 5) {
       setDifficultyLevel('hard');
-      setSpeed(2500);
+      setSpeed(4500); // Increased from 2500ms to 4500ms (4.5 seconds)
     } else {
       setDifficultyLevel('medium');
-      setSpeed(4000);
+      setSpeed(6000); // Increased from 4000ms to 6000ms (6 seconds)
     }
   }, [difficulty]);
 
@@ -223,24 +223,36 @@ const DerivFall: React.FC<DerivFallProps> = ({
     }
   }, [score, problemsCompleted, onComplete]);
 
+  // Функция для получения распределенной позиции задачи
   const getDistributedPosition = useCallback(() => {
-    // Находим все текущие горизонтальные позиции задач
+    // Define safe boundaries - keep tasks away from the edges
+    const safeMarginPercent = 15; // 15% margin from left and right edges
+    const minPosition = safeMarginPercent;
+    const maxPosition = 100 - safeMarginPercent;
+    const availableWidth = maxPosition - minPosition;
+    const problemWidthPercent = 25;
+
+    // Finds all current horizontal positions of tasks
     const currentPositions = problems.map(p => p.left);
 
-    // Пробуем 5 раз найти позицию, не близкую к существующим
+    // Try to find a position that's not too close to existing tasks
     for (let i = 0; i < 5; i++) {
-      const sector = Math.floor(Math.random() * 4); // 4 сектора
-      const newPos = (sector * 20) + (Math.random() * 15);
+      // Create 5 sectors instead of 4 for better distribution
+      const sector = Math.floor(Math.random() * 5);
+      const sectorWidth = availableWidth / 5;
 
-      // Проверяем, нет ли рядом других задач (на расстоянии менее 20%)
-      const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 20);
+      // Calculate a position within the current sector
+      const newPos = minPosition + (sector * sectorWidth) + (Math.random() * sectorWidth);
+
+      // Check if this position is too close to existing tasks
+      const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 15);
       if (!isTooClose) {
-        return newPos; // Нашли хорошую позицию
+        return newPos; // Found a good position
       }
     }
 
-    // Если не нашли хорошую позицию, возвращаем случайную
-    return Math.random() * 70;
+    // If no good position was found, pick a random position within safe boundaries
+    return minPosition + (Math.random() * availableWidth);
   }, [problems]);
 
   // Создать новую падающую задачу
@@ -303,26 +315,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
     const problem = filteredProblems[randomIndex];
     const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
 
-    const getDistributedPosition = () => {
-      // Находим все текущие горизонтальные позиции задач
-      const currentPositions = problems.map(p => p.left);
-
-      // Пробуем 5 раз найти позицию, не близкую к существующим
-      for (let i = 0; i < 5; i++) {
-        const sector = Math.floor(Math.random() * 4); // 4 сектора
-        const newPos = (sector * 20) + (Math.random() * 15);
-
-        // Проверяем, нет ли рядом других задач (на расстоянии менее 20%)
-        const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 20);
-        if (!isTooClose) {
-          return newPos; // Нашли хорошую позицию
-        }
-      }
-
-      // Если не нашли хорошую позицию, возвращаем случайную
-      return Math.random() * 70;
-    };
-
+    // Используем улучшенную функцию getDistributedPosition
     const leftPosition = getDistributedPosition();
 
     // Добавляем новую задачу
@@ -368,7 +361,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
       delete problemTimeoutsRef.current[newProblemId];
     }, speed + 2000); // Время падения + буфер
   }, [difficultyLevel, problemBank, lives, gameOver, gameStarted, gamePaused,
-    speed, setFeedback, endGame, problems]);
+    speed, setFeedback, endGame, problems, getDistributedPosition]);
 
   // Обработать выбор ответа
   const handleAnswerSelect = useCallback((problemId: string, selectedOption: string, correctAnswer: string) => {
@@ -449,13 +442,6 @@ const DerivFall: React.FC<DerivFallProps> = ({
     Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
     problemTimeoutsRef.current = {};
 
-    // Настроить скорость в зависимости от сложности
-    switch(difficultyLevel) {
-      case 'easy': setSpeed(6000); break;
-      case 'medium': setSpeed(4000); break;
-      case 'hard': setSpeed(2500); break;
-    }
-
     // Запустить таймер игры
     timerRef.current = setInterval(() => {
       if (!gamePaused) {
@@ -476,7 +462,9 @@ const DerivFall: React.FC<DerivFallProps> = ({
     const randomIndex = Math.floor(Math.random() * problemBank.length);
     const problem = problemBank[randomIndex];
     const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-    const leftPosition = Math.random() * 70; // или getDistributedPosition(), если доступна
+
+    // Используем улучшенную функцию getDistributedPosition для первой задачи
+    const leftPosition = getDistributedPosition();
 
     // Добавляем задачу напрямую
     setProblems(prev => [
@@ -524,7 +512,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
       }
     }, interval);
 
-  }, [difficultyLevel, problemBank, speed, gamePaused, setFeedback, endGame, createProblem]);
+  }, [difficultyLevel, problemBank, speed, gamePaused, setFeedback, endGame, createProblem, getDistributedPosition]);
 
   // Начать игру с обратным отсчетом
   const startGameWithCountdown = useCallback(() => {
@@ -616,7 +604,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
         <div
             ref={gameAreaRef}
             className="relative flex-1 overflow-hidden bg-gray-700 dark:bg-gray-200 transition-colors"
-            style={{height: '500px', position: 'relative'}} // Добавляем position: 'relative'
+            style={{height: '500px', position: 'relative'}}
         >
           {/* Падающие задачи */}
           {problems.map(problem => (
