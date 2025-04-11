@@ -180,13 +180,13 @@ const DerivFall: React.FC<DerivFallProps> = ({
     console.log(`Настройка уровня сложности: ${difficulty}`);
     if (difficulty <= 2) {
       setDifficultyLevel('easy');
-      setSpeed(8000); // Increased from 6000ms to 8000ms (8 seconds)
+      setSpeed(8000); // 8 seconds for falling
     } else if (difficulty >= 5) {
       setDifficultyLevel('hard');
-      setSpeed(4500); // Increased from 2500ms to 4500ms (4.5 seconds)
+      setSpeed(4500); // 4.5 seconds for falling
     } else {
       setDifficultyLevel('medium');
-      setSpeed(6000); // Increased from 4000ms to 6000ms (6 seconds)
+      setSpeed(6000); // 6 seconds for falling
     }
   }, [difficulty]);
 
@@ -225,34 +225,80 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
   // Функция для получения распределенной позиции задачи
   const getDistributedPosition = useCallback(() => {
-    // Define safe boundaries - keep tasks away from the edges
-    const safeMarginPercent = 15; // 15% margin from left and right edges
-    const minPosition = safeMarginPercent;
-    const maxPosition = 100 - safeMarginPercent;
-    const availableWidth = maxPosition - minPosition;
-    const problemWidthPercent = 25;
+    // Определяем четкие зоны на экране
+    const zones = [
+      { min: 15, max: 25 },  // Крайняя левая
+      { min: 35, max: 45 },  // Левый центр
+      { min: 55, max: 65 },  // Правый центр
+      { min: 75, max: 85 }   // Крайняя правая
+    ];
 
-    // Finds all current horizontal positions of tasks
-    const currentPositions = problems.map(p => p.left);
+    // Получаем текущие позиции только видимых (неотвеченных) задач
+    const occupiedPositions = problems
+        .filter(p => !p.answered)
+        .map(p => p.left);
 
-    // Try to find a position that's not too close to existing tasks
-    for (let i = 0; i < 5; i++) {
-      // Create 5 sectors instead of 4 for better distribution
-      const sector = Math.floor(Math.random() * 5);
-      const sectorWidth = availableWidth / 5;
-
-      // Calculate a position within the current sector
-      const newPos = minPosition + (sector * sectorWidth) + (Math.random() * sectorWidth);
-
-      // Check if this position is too close to existing tasks
-      const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 15);
-      if (!isTooClose) {
-        return newPos; // Found a good position
-      }
+    // Если нет задач, размещаем по центру
+    if (occupiedPositions.length === 0) {
+      return 50;
     }
 
-    // If no good position was found, pick a random position within safe boundaries
-    return minPosition + (Math.random() * availableWidth);
+    // Находим полностью пустые зоны
+    const availableZones = zones.filter(zone => {
+      return !occupiedPositions.some(pos =>
+          pos >= zone.min && pos <= zone.max
+      );
+    });
+
+    // Если есть пустые зоны, выбираем одну случайно
+    if (availableZones.length > 0) {
+      const randomZone = availableZones[Math.floor(Math.random() * availableZones.length)];
+      return randomZone.min + Math.random() * (randomZone.max - randomZone.min);
+    }
+
+    // Все зоны имеют хотя бы одну задачу, ищем наименее заполненную
+    const zoneOccupancy = zones.map(zone => {
+      const count = occupiedPositions.filter(pos =>
+          pos >= zone.min && pos <= zone.max
+      ).length;
+      return { zone, count };
+    });
+
+    // Сортируем по заполненности (от меньшей к большей)
+    zoneOccupancy.sort((a, b) => a.count - b.count);
+
+    // Используем наименее заполненную зону
+    const bestZone = zoneOccupancy[0].zone;
+
+    // В этой зоне ищем самое свободное место
+    const zoneProblems = occupiedPositions.filter(pos =>
+        pos >= bestZone.min && pos <= bestZone.max
+    );
+
+    if (zoneProblems.length > 0) {
+      // Находим наибольший промежуток в этой зоне
+      zoneProblems.sort((a, b) => a - b);
+
+      // Добавляем границы зоны для расчета промежутков
+      const allPositions = [bestZone.min, ...zoneProblems, bestZone.max];
+
+      let maxGap = 0;
+      let gapStart = bestZone.min;
+
+      for (let i = 0; i < allPositions.length - 1; i++) {
+        const gap = allPositions[i+1] - allPositions[i];
+        if (gap > maxGap) {
+          maxGap = gap;
+          gapStart = allPositions[i];
+        }
+      }
+
+      // Размещаем в середине наибольшего промежутка
+      return gapStart + (maxGap / 2);
+    }
+
+    // Запасной вариант: случайная позиция в лучшей зоне
+    return bestZone.min + Math.random() * (bestZone.max - bestZone.min);
   }, [problems]);
 
   // Создать новую падающую задачу
@@ -427,27 +473,25 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
   // Начать игру
   const startGame = useCallback(() => {
-    console.log("💡 startGame вызвана, gameStarted =", gameStarted);
+    console.log("💡 startGame called, gameStarted =", gameStarted);
 
-    // Повторно устанавливаем gameStarted, чтобы гарантировать обновление
+    // Set game states
     setGameStarted(true);
     setGamePaused(false);
-
-    // ВАЖНО: Синхронно устанавливаем ref
     gameActiveRef.current = true;
 
-    // Очистим все таймеры перед новой игрой
+    // Clear all timers before starting a new game
     if (timerRef.current) clearInterval(timerRef.current);
     if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
     Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
     problemTimeoutsRef.current = {};
 
-    // Запустить таймер игры
+    // Start game timer
     timerRef.current = setInterval(() => {
       if (!gamePaused) {
         setTimeRemaining(prev => {
           if (prev <= 1) {
-            console.log("⏱️ Время вышло, игра завершается");
+            console.log("⏱️ Time's up, ending game");
             endGame();
             return 0;
           }
@@ -456,63 +500,79 @@ const DerivFall: React.FC<DerivFallProps> = ({
       }
     }, 1000);
 
-    // Создаем первую задачу вручную
-    console.log("🎮 Создаем первую задачу напрямую");
+    // Create the first problem manually with deliberate positioning
+    console.log("🎮 Creating first problem manually");
 
-    const randomIndex = Math.floor(Math.random() * problemBank.length);
-    const problem = problemBank[randomIndex];
-    const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+    // Wait briefly before adding the first problem
+    setTimeout(() => {
+      const randomIndex = Math.floor(Math.random() * problemBank.length);
+      const problem = problemBank[randomIndex];
+      const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
 
-    // Используем улучшенную функцию getDistributedPosition для первой задачи
-    const leftPosition = getDistributedPosition();
+      // First problem position - center of screen
+      const firstProblemPosition = 50; // Center of screen for better visibility
 
-    // Добавляем задачу напрямую
-    setProblems(prev => [
-      ...prev,
-      {
-        ...problem,
-        id: newProblemId,
-        left: leftPosition,
-        top: 0,
-        answered: false
-      }
-    ]);
-
-    console.log(`✅ Первая задача добавлена: ${problem.problem}`);
-
-    // Настраиваем таймаут для неё
-    problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
-      setProblems(prev => {
-        const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
-        if (problemExists) {
-          setLives(l => {
-            const newLives = l - 1;
-            if (newLives <= 0) {
-              endGame();
-            }
-            return newLives;
-          });
-          setFeedback("Упущенная задача!", "error");
+      // Add first problem
+      setProblems(prev => [
+        ...prev,
+        {
+          ...problem,
+          id: newProblemId,
+          left: firstProblemPosition,
+          top: 0,
+          answered: false
         }
-        return prev.filter(p => p.id !== newProblemId);
-      });
-      delete problemTimeoutsRef.current[newProblemId];
-    }, speed + 2000);
+      ]);
 
-    // Запускаем интервал для создания последующих задач
-    const interval = difficultyLevel === 'hard' ? 2500 :
-        difficultyLevel === 'medium' ? 3500 : 4500;
+      console.log(`✅ First problem added: ${problem.problem} at position ${firstProblemPosition}%`);
 
-    console.log(`🎮 Установка интервала генерации задач: ${interval}ms`);
+      // Set timeout for first problem
+      problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
+        setProblems(prev => {
+          const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
+          if (problemExists) {
+            setLives(l => {
+              const newLives = l - 1;
+              if (newLives <= 0) {
+                endGame();
+              }
+              return newLives;
+            });
+            setFeedback("Missed problem!", "error");
+          }
+          return prev.filter(p => p.id !== newProblemId);
+        });
+        delete problemTimeoutsRef.current[newProblemId];
+      }, speed + 2000);
 
-    gameIntervalRef.current = setInterval(() => {
-      // Используем gameActiveRef.current вместо gameStarted
-      if (!gamePaused && gameActiveRef.current) {
-        createProblem();
-      }
-    }, interval);
+      // Calculate appropriate interval between problems based on difficulty
+      // Make it much longer than the fall time to prevent overlap
+      const calculateInterval = () => {
+        // Базовый интервал - это процент от времени падения
+        // Больший интервал = меньше проблем на экране = меньше перекрытий
+        switch(difficultyLevel) {
+          case 'easy': return Math.floor(speed * 0.9); // 90% от времени падения
+          case 'medium': return Math.floor(speed * 0.75); // 75% от времени падения
+          case 'hard': return Math.floor(speed * 0.6); // 60% от времени падения
+          default: return Math.floor(speed * 0.75);
+        }
+      };
 
-  }, [difficultyLevel, problemBank, speed, gamePaused, setFeedback, endGame, createProblem, getDistributedPosition]);
+      const interval = calculateInterval();
+      console.log(`🎮 Установка интервала генерации задач: ${interval}ms на основе скорости ${speed}ms`);
+
+      const initialDelay = Math.floor(speed * 0.5); // 50% от времени падения
+
+      setTimeout(() => {
+        gameIntervalRef.current = setInterval(() => {
+          if (!gamePaused && gameActiveRef.current) {
+            createProblem();
+          }
+        }, interval);
+      }, initialDelay);
+    }, 500); // Small initial delay before first problem appears
+
+  }, [difficultyLevel, problemBank, speed, gamePaused, setFeedback, endGame, createProblem]);
 
   // Начать игру с обратным отсчетом
   const startGameWithCountdown = useCallback(() => {
@@ -526,9 +586,6 @@ const DerivFall: React.FC<DerivFallProps> = ({
         if (prev <= 1) {
           clearInterval(countdownTimer);
           setCountdownActive(false);
-
-          // Не устанавливаем здесь gameStarted
-          // т.к. это делается в startGame
 
           startGame();
           return 0;
