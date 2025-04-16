@@ -162,6 +162,23 @@ const DerivFall: React.FC<DerivFallProps> = ({
   const gameActiveRef = useRef(false);
   // Add a ref to track the current score reliably
   const currentScoreRef = useRef(0);
+  // Add the gameStateRef at the component level
+  const gameStateRef = useRef({ isPaused: false });
+
+  // Update the gameStateRef when the pause state changes
+  useEffect(() => {
+    gameStateRef.current.isPaused = gamePaused;
+  }, [gamePaused]);
+
+  // Initialize CSS variable for animation control
+  useEffect(() => {
+    document.documentElement.style.setProperty('--animations-paused', 'running');
+
+    return () => {
+      // Clean up when component unmounts
+      document.documentElement.style.removeProperty('--animations-paused');
+    };
+  }, []);
 
   // Set feedback message
   const setFeedback = useCallback((message: string, type: 'success' | 'error') => {
@@ -289,7 +306,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
   // Create a new falling problem
   const createProblem = useCallback(() => {
-    // Check if we should create a new problem
+    // Check if we should create a new problem - ADD A STRONG CHECK FOR PAUSE
     if (lives <= 0 || gameOver || !gameActiveRef.current || gamePaused) {
       return;
     }
@@ -331,12 +348,21 @@ const DerivFall: React.FC<DerivFallProps> = ({
       }
     ]);
 
+    // Account for pause state in timeout calculation
+    const fallDuration = speed + 1000;
+
     // Schedule removal when it falls out of view
     problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
+      // Check the current pause state from the ref
+      if (gameStateRef.current.isPaused) {
+        // If game is paused, don't remove the problem or penalize the player
+        return;
+      }
+
       setProblems(prev => {
         const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
         if (problemExists) {
-          // Problem fell without being answered
+          // Only deduct life and points if game is not paused
           setLives(l => {
             const newLives = l - 1;
             if (newLives <= 0) {
@@ -360,7 +386,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
       // Remove timer reference
       delete problemTimeoutsRef.current[newProblemId];
-    }, speed + 1000); // Fall time plus buffer
+    }, fallDuration);
   }, [
     difficultyLevel, problemBank, problems, lives, gameOver,
     gamePaused, getSafePosition, endGame, setFeedback, speed,
@@ -454,7 +480,94 @@ const DerivFall: React.FC<DerivFallProps> = ({
     setOccupiedPositions([]);
 
     gameActiveRef.current = false;
+    gameStateRef.current.isPaused = false;
   }, []);
+
+  // Toggle pause - Updated to directly handle problem creation
+  const togglePause = useCallback(() => {
+    setGamePaused(prev => {
+      const newPausedState = !prev;
+
+      // Update the ref immediately
+      gameStateRef.current.isPaused = newPausedState;
+
+      if (newPausedState) {
+        // --- PAUSING GAME ---
+        console.log("Pausing game");
+
+        // Pause CSS animations
+        document.documentElement.style.setProperty('--animations-paused', 'paused');
+
+        // Clear intervals
+        if (gameIntervalRef.current) {
+          clearInterval(gameIntervalRef.current);
+          gameIntervalRef.current = null;
+        }
+
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      } else {
+        // --- UNPAUSING GAME ---
+        console.log("Unpausing game");
+
+        // Resume CSS animations
+        document.documentElement.style.setProperty('--animations-paused', 'running');
+
+        // Restart timer
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+          setTimeRemaining(prev => {
+            if (prev <= 1) {
+              endGame();
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        // Determine problem interval based on difficulty
+        let problemInterval;
+        if (difficultyLevel === 'easy') {
+          problemInterval = 4000;
+        } else if (difficultyLevel === 'medium') {
+          problemInterval = 3000;
+        } else {
+          problemInterval = 2000;
+        }
+
+        console.log(`Setting up problem generation with interval: ${problemInterval}ms`);
+
+        // Clear any existing problem interval
+        if (gameIntervalRef.current) {
+          clearInterval(gameIntervalRef.current);
+        }
+
+        // Create a problem immediately if needed
+        setTimeout(() => {
+          const activeProblemsCount = problems.filter(p => !p.answered).length;
+          if (activeProblemsCount < maxProblemsOnScreen) {
+            console.log("Creating problem immediately after unpause");
+            createProblem();
+          }
+        }, 200);
+
+        // Create a new problem generation interval
+        gameIntervalRef.current = setInterval(() => {
+          if (!gameStateRef.current.isPaused && gameActiveRef.current) {
+            const activeProblemsCount = problems.filter(p => !p.answered).length;
+            if (activeProblemsCount < maxProblemsOnScreen) {
+              console.log("Creating new problem from interval");
+              createProblem();
+            }
+          }
+        }, problemInterval);
+      }
+
+      return newPausedState;
+    });
+  }, [difficultyLevel, problems, maxProblemsOnScreen, createProblem, endGame]);
 
   // Start game
   const startGame = useCallback(() => {
@@ -463,6 +576,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
     // Set initial game state
     setGameStarted(true);
     setGamePaused(false);
+    gameStateRef.current.isPaused = false;
     setTimeRemaining(60); // Ensure exactly 60 seconds
     gameActiveRef.current = true;
 
@@ -474,7 +588,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
     // Start game timer - 1 minute countdown
     timerRef.current = setInterval(() => {
-      if (!gamePaused) {
+      if (!gameStateRef.current.isPaused) {
         setTimeRemaining(prev => {
           if (prev <= 1) {
             endGame();
@@ -503,7 +617,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
       // Create subsequent problems at intervals
       gameIntervalRef.current = setInterval(() => {
-        if (!gamePaused && gameActiveRef.current) {
+        if (!gameStateRef.current.isPaused && gameActiveRef.current) {
           const activeProblems = problems.filter(p => !p.answered);
           if (activeProblems.length < maxProblemsOnScreen) {
             createProblem();
@@ -512,9 +626,20 @@ const DerivFall: React.FC<DerivFallProps> = ({
       }, problemInterval);
     }, 1000);
   }, [
-    createProblem, difficultyLevel, endGame, gamePaused,
+    createProblem, difficultyLevel, endGame,
     problems, maxProblemsOnScreen
   ]);
+
+  // Handle pause/unpause effects
+  useEffect(() => {
+    if (gameStarted && !gameOver) {
+      // Set the CSS variable based on pause state
+      document.documentElement.style.setProperty(
+          '--animations-paused',
+          gamePaused ? 'paused' : 'running'
+      );
+    }
+  }, [gamePaused, gameStarted, gameOver]);
 
   // Start game with countdown
   const startGameWithCountdown = useCallback(() => {
@@ -535,24 +660,6 @@ const DerivFall: React.FC<DerivFallProps> = ({
       });
     }, 1000);
   }, [resetGame, startGame]);
-
-  // Toggle pause
-  const togglePause = useCallback(() => {
-    setGamePaused(prev => {
-      const newPausedState = !prev;
-
-      // When pausing:
-      if (newPausedState) {
-        // Store current positions of all problems
-        document.documentElement.style.setProperty('--animations-paused', 'paused');
-      } else {
-        // When unpausing:
-        document.documentElement.style.setProperty('--animations-paused', 'running');
-      }
-
-      return newPausedState;
-    });
-  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -580,16 +687,19 @@ const DerivFall: React.FC<DerivFallProps> = ({
   }, [difficulty]);
 
   return (
-      <div className="w-full h-full flex flex-col bg-gray-700 dark:bg-gray-200 rounded-lg overflow-hidden transition-colors">
+      <div
+          className="w-full h-full flex flex-col bg-gray-700 dark:bg-gray-200 rounded-lg overflow-hidden transition-colors">
         {/* Header panel */}
-        <div className="px-4 py-3 flex justify-between items-center bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
+        <div
+            className="px-4 py-3 flex justify-between items-center bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
           <div className="flex items-center space-x-6">
             <div className="text-gray-100 dark:text-gray-900 font-medium transition-colors">
               Счет: <span className="font-bold">{score}</span>
             </div>
             <div className="flex items-center">
               <span className="text-gray-100 dark:text-gray-900 mr-2 transition-colors">Жизни:</span>
-              <span className="text-red-500 dark:text-red-600 transition-colors">{Array(lives).fill('❤️').join('')}</span>
+              <span
+                  className="text-red-500 dark:text-red-600 transition-colors">{Array(lives).fill('❤️').join('')}</span>
             </div>
 
             <div className="text-yellow-500 dark:text-yellow-600 font-medium transition-colors">
@@ -611,7 +721,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
                 </button>
             )}
 
-            <div className="px-2 py-1 rounded-md text-sm font-medium bg-gray-500 dark:bg-gray-400 text-white dark:text-gray-900 transition-colors">
+            <div
+                className="px-2 py-1 rounded-md text-sm font-medium bg-gray-500 dark:bg-gray-400 text-white dark:text-gray-900 transition-colors">
               {getDifficultyDisplayText()} ({difficulty}/5)
             </div>
           </div>
@@ -688,7 +799,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
           {/* Pause overlay */}
           {gamePaused && gameStarted && !gameOver && (
-              <div className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
+              <div
+                  className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
                 <div className="text-4xl font-bold text-white mb-6">ПАУЗА</div>
                 <Button
                     onClick={togglePause}
@@ -701,8 +813,10 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
           {/* Game over screen */}
           {gameOver && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 dark:bg-opacity-70 z-20 transition-colors">
-                <div className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
+              <div
+                  className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 dark:bg-opacity-70 z-20 transition-colors">
+                <div
+                    className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
                   <h2 className="text-2xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">
                     Игра окончена!
                   </h2>
@@ -735,7 +849,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
           {/* Start screen */}
           {!gameStarted && !gameOver && !countdownActive && (
               <div className="absolute inset-0 flex items-center justify-center z-20">
-                <div className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
+                <div
+                    className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
                   <h2 className="text-xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">
                     Игра "Падающие производные"
                   </h2>
@@ -744,8 +859,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
                   </p>
                   <p className="mb-6 text-gray-200 dark:text-gray-800 transition-colors">
                     Сложность: <span className="font-medium">
-                    {getDifficultyDisplayText()} ({difficulty}/5)
-                  </span>
+                  {getDifficultyDisplayText()} ({difficulty}/5)
+                </span>
                   </p>
                   <div className="mb-4 p-4 bg-gray-500 dark:bg-gray-400 rounded-lg transition-colors">
                     <h3 className="font-bold text-white dark:text-gray-900 mb-2 transition-colors">Как играть:</h3>
@@ -827,6 +942,11 @@ const DerivFall: React.FC<DerivFallProps> = ({
           
           .animate-pulse {
             animation: pulse 1.5s infinite;
+          }
+          
+          /* Fixed: The closing brace and selector were missing */
+          * {
+            animation-play-state: var(--animations-paused, running) !important;
           }
         `}
         </style>

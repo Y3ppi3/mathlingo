@@ -11,6 +11,3 @@ echo =========================================================
 cd mathlingo-backend
 echo Запуск Mathlingo backend на порту 8000...
 docker compose up
-
-rem Команда выше не вернется, пока пользователь не нажмет Ctrl+C
-echo Mathlingo backend остановлен.
