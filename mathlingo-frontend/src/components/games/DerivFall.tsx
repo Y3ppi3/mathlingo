@@ -107,6 +107,9 @@ const DEFAULT_PROBLEMS: DerivativeProblem[] = [
   }
 ];
 
+// Define fixed positions for problems to prevent overlap
+const FIXED_POSITIONS = [20, 50, 80]; // Left, center, right positions
+
 const DerivFall: React.FC<DerivFallProps> = ({
                                                difficulty = 3,
                                                timeLimit = 60, // Fixed at 1 minute exactly (60 seconds)
@@ -126,6 +129,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
     top: number;
     answered: boolean;
     correct?: boolean;
+    column?: number; // Track which column the problem is in (0, 1, 2)
   }>>([]);
 
   // Game state
@@ -148,8 +152,11 @@ const DerivFall: React.FC<DerivFallProps> = ({
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackType, setFeedbackType] = useState<'success' | 'error'>('success');
 
-  // Track location of existing problems to prevent overlap
-  const [occupiedPositions, setOccupiedPositions] = useState<number[]>([]);
+  // Add a state to track when we need to force create a problem after unpause
+  const [needProblemAfterUnpause, setNeedProblemAfterUnpause] = useState(false);
+
+  // Track which columns are currently in use
+  const [usedColumns, setUsedColumns] = useState<boolean[]>([false, false, false]);
 
   // Limit simultaneous problems on screen
   const maxProblemsOnScreen = 3;
@@ -164,10 +171,32 @@ const DerivFall: React.FC<DerivFallProps> = ({
   const currentScoreRef = useRef(0);
   // Add the gameStateRef at the component level
   const gameStateRef = useRef({ isPaused: false });
+  // Track last problem creation time
+  const lastProblemTimeRef = useRef(0);
 
   // Update the gameStateRef when the pause state changes
   useEffect(() => {
     gameStateRef.current.isPaused = gamePaused;
+
+    // Force create a problem when unpausing if needed
+    if (!gamePaused && needProblemAfterUnpause && gameStarted && !gameOver) {
+      console.log("Detecting unpause - will force create problem");
+
+      setNeedProblemAfterUnpause(false);
+
+      // Small delay to ensure state is up to date
+      const timer = setTimeout(() => {
+        const activeProblemsCount = problems.filter(p => !p.answered).length;
+        console.log(`Active problems after unpause: ${activeProblemsCount}/${maxProblemsOnScreen}`);
+
+        if (activeProblemsCount < maxProblemsOnScreen) {
+          console.log("Creating problem directly after unpause");
+          createProblem();
+        }
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }
   }, [gamePaused]);
 
   // Initialize CSS variable for animation control
@@ -244,78 +273,79 @@ const DerivFall: React.FC<DerivFallProps> = ({
     // Use the current score from the ref, which is always up-to-date
     const finalScore = currentScoreRef.current;
 
+    // Debug log to trace score calculation
+    console.log("Game ended with score:", finalScore);
+    console.log("Problems completed:", problemsCompleted, "x 10 points =", problemsCompleted * 10);
+    console.log("Current score ref value:", currentScoreRef.current);
+
     if (onComplete) {
       const maxScore = problemsCompleted > 0 ? problemsCompleted * 10 : 10;
+      console.log("Passing to onComplete - score:", finalScore, "maxScore:", maxScore);
 
       // Pass the actual score from our ref
       onComplete(finalScore, maxScore);
     }
   }, [problemsCompleted, onComplete]);
 
-  // Find safe position for a new problem to avoid overlap
-  const getSafePosition = useCallback(() => {
-    // Define safe zones as percentages of screen width (avoid edges)
-    const safeZones = [
-      { min: 15, max: 30 },  // Left zone
-      { min: 40, max: 55 },  // Center zone
-      { min: 70, max: 85 }   // Right zone
-    ];
+  // Find a free column for a new problem to avoid overlap
+  const getFreeColumn = useCallback(() => {
+    // Update usedColumns based on current problems
+    const activeProblems = problems.filter(p => !p.answered);
+    const currentColumns = [false, false, false];
 
-    // If no active problems, choose random zone
-    if (problems.filter(p => !p.answered).length === 0) {
-      const randomZone = safeZones[Math.floor(Math.random() * safeZones.length)];
-      return randomZone.min + Math.random() * (randomZone.max - randomZone.min);
-    }
-
-    // Get positions of active problems
-    const activePositions = problems
-        .filter(p => !p.answered)
-        .map(p => p.left);
-
-    // Update occupied positions
-    setOccupiedPositions(activePositions);
-
-    // Find zones that don't have a problem
-    const availableZones = safeZones.filter(zone =>
-        !activePositions.some(pos => pos >= zone.min && pos <= zone.max)
-    );
-
-    // If we have an empty zone, use it
-    if (availableZones.length > 0) {
-      const zone = availableZones[Math.floor(Math.random() * availableZones.length)];
-      return zone.min + Math.random() * (zone.max - zone.min);
-    }
-
-    // Otherwise, find position with maximum distance from other problems
-    let bestPosition = 50; // Default center
-    let maxMinDistance = 0;
-
-    // Check positions at intervals
-    for (let pos = 15; pos <= 85; pos += 5) {
-      // Find minimum distance to any existing problem
-      const minDistance = Math.min(...activePositions.map(p => Math.abs(p - pos)));
-
-      if (minDistance > maxMinDistance) {
-        maxMinDistance = minDistance;
-        bestPosition = pos;
+    activeProblems.forEach(problem => {
+      if (problem.column !== undefined) {
+        currentColumns[problem.column] = true;
       }
+    });
+
+    // Find the first free column
+    const freeColumnIndex = currentColumns.findIndex(used => !used);
+
+    if (freeColumnIndex !== -1) {
+      return freeColumnIndex;
     }
 
-    return bestPosition;
+    // If all columns are used, find the column with the fewest problems
+    const columnCounts = [0, 0, 0];
+    activeProblems.forEach(problem => {
+      if (problem.column !== undefined) {
+        columnCounts[problem.column]++;
+      }
+    });
+
+    // Return the column with the fewest problems
+    const minCount = Math.min(...columnCounts);
+    return columnCounts.findIndex(count => count === minCount);
   }, [problems]);
 
   // Create a new falling problem
   const createProblem = useCallback(() => {
-    // Check if we should create a new problem - ADD A STRONG CHECK FOR PAUSE
-    if (lives <= 0 || gameOver || !gameActiveRef.current || gamePaused) {
+    console.log("Create problem called - checking conditions");
+
+    // Check if we should create a new problem
+    if (lives <= 0 || gameOver || !gameActiveRef.current || gameStateRef.current.isPaused) {
+      console.log("Not creating problem - game inactive or paused");
       return;
     }
 
     // Don't create more than max problems
     const activeProblems = problems.filter(p => !p.answered);
     if (activeProblems.length >= maxProblemsOnScreen) {
+      console.log("Not creating problem - already at max problems");
       return;
     }
+
+    // Enforce minimum time between problem creation to prevent bunching
+    const now = Date.now();
+    if (now - lastProblemTimeRef.current < 1000) { // At least 1 second between problems
+      console.log("Not creating problem - too soon after last problem");
+      return;
+    }
+
+    lastProblemTimeRef.current = now;
+
+    console.log("Creating new problem...");
 
     // Filter problems by difficulty
     let filteredProblems = problemBank.filter(p => {
@@ -333,8 +363,11 @@ const DerivFall: React.FC<DerivFallProps> = ({
     const problem = filteredProblems[randomIndex];
     const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
-    // Find a safe position
-    const leftPosition = getSafePosition();
+    // Find a free column to place the problem
+    const columnIndex = getFreeColumn();
+    const leftPosition = FIXED_POSITIONS[columnIndex];
+
+    console.log(`Adding new problem with ID: ${newProblemId} in column ${columnIndex} at position ${leftPosition}`);
 
     // Add the new problem
     setProblems(prev => [
@@ -344,9 +377,15 @@ const DerivFall: React.FC<DerivFallProps> = ({
         id: newProblemId,
         left: leftPosition,
         top: 0,
-        answered: false
+        answered: false,
+        column: columnIndex
       }
     ]);
+
+    // Update used columns
+    const newUsedColumns = [...usedColumns];
+    newUsedColumns[columnIndex] = true;
+    setUsedColumns(newUsedColumns);
 
     // Account for pause state in timeout calculation
     const fallDuration = speed + 1000;
@@ -380,6 +419,13 @@ const DerivFall: React.FC<DerivFallProps> = ({
           setScore(currentScoreRef.current);
 
           setFeedback("Пропущена задача! -5 очков", "error");
+
+          // Free up the column
+          if (problemExists.column !== undefined) {
+            const newUsedColumns = [...usedColumns];
+            newUsedColumns[problemExists.column] = false;
+            setUsedColumns(newUsedColumns);
+          }
         }
         return prev.filter(p => p.id !== newProblemId);
       });
@@ -389,17 +435,63 @@ const DerivFall: React.FC<DerivFallProps> = ({
     }, fallDuration);
   }, [
     difficultyLevel, problemBank, problems, lives, gameOver,
-    gamePaused, getSafePosition, endGame, setFeedback, speed,
+    getFreeColumn, endGame, setFeedback, speed, usedColumns,
     maxProblemsOnScreen
   ]);
+
+  // Setup problem generation interval
+  const setupProblemGenerationInterval = useCallback(() => {
+    // Clear any existing interval first
+    if (gameIntervalRef.current) {
+      clearInterval(gameIntervalRef.current);
+      gameIntervalRef.current = null;
+    }
+
+    // Determine problem interval based on difficulty
+    let problemInterval;
+    if (difficultyLevel === 'easy') {
+      // Increase to 5000ms (5 seconds)
+      problemInterval = 5000;
+    } else if (difficultyLevel === 'medium') {
+      // Increase to 4000ms (4 seconds)
+      problemInterval = 4000;
+    } else {
+      // Increase to 3000ms (3 seconds)
+      problemInterval = 3000;
+    }
+
+    console.log(`Setting up problem generation interval: ${problemInterval}ms`);
+
+    // Create new interval for problem generation
+    gameIntervalRef.current = setInterval(() => {
+      if (!gameStateRef.current.isPaused && gameActiveRef.current) {
+        createProblem();
+      }
+    }, problemInterval);
+
+    return () => {
+      if (gameIntervalRef.current) {
+        clearInterval(gameIntervalRef.current);
+        gameIntervalRef.current = null;
+      }
+    };
+  }, [difficultyLevel, createProblem]);
 
   // Handle answer selection
   const handleAnswerSelect = useCallback((problemId: string, selectedOption: string, correctAnswer: string) => {
     // Mark problem as answered
-    setProblems(prev =>
-        prev.map(p => p.id === problemId ?
-            {...p, answered: true, correct: selectedOption === correctAnswer} : p)
-    );
+    setProblems(prev => {
+      const problem = prev.find(p => p.id === problemId);
+      if (problem && problem.column !== undefined) {
+        // Free up the column
+        const newUsedColumns = [...usedColumns];
+        newUsedColumns[problem.column] = false;
+        setUsedColumns(newUsedColumns);
+      }
+
+      return prev.map(p => p.id === problemId ?
+          {...p, answered: true, correct: selectedOption === correctAnswer} : p);
+    });
 
     // Clear timeout for this problem
     if (problemTimeoutsRef.current[problemId]) {
@@ -418,6 +510,9 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
       setProblemsCompleted(p => p + 1);
       setFeedback("Правильно! +10 очков", "success");
+
+      // Log for debugging score issue
+      console.log("Correct answer! New score:", currentScoreRef.current, "Problems completed:", problemsCompleted + 1);
     } else {
       // Incorrect answer - subtract 5 points
       const pointsToSubtract = 5;
@@ -429,22 +524,16 @@ const DerivFall: React.FC<DerivFallProps> = ({
 
       setProblemsIncorrect(p => p + 1);
       setFeedback(`Неверно! -5 очков. Ответ: ${correctAnswer}`, "error");
+
+      // Log for debugging score issue
+      console.log("Incorrect answer! New score:", currentScoreRef.current, "Problems incorrect:", problemsIncorrect + 1);
     }
 
     // Remove problem with animation
     setTimeout(() => {
       setProblems(prev => prev.filter(p => p.id !== problemId));
-
-      // Update occupied positions
-      setOccupiedPositions(prev =>
-          prev.filter(pos =>
-              !problems
-                  .filter(p => p.id === problemId)
-                  .some(p => p.left === pos)
-          )
-      );
     }, 800);
-  }, [problems, setFeedback]);
+  }, [usedColumns, setFeedback, problemsCompleted, problemsIncorrect]);
 
   // Reset game
   const resetGame = useCallback(() => {
@@ -477,13 +566,90 @@ const DerivFall: React.FC<DerivFallProps> = ({
     setProblemsCompleted(0);
     setProblemsIncorrect(0);
     setShowFeedback(false);
-    setOccupiedPositions([]);
+    setUsedColumns([false, false, false]);
+    setNeedProblemAfterUnpause(false);
 
     gameActiveRef.current = false;
     gameStateRef.current.isPaused = false;
+    lastProblemTimeRef.current = 0;
   }, []);
 
-  // Toggle pause - Updated to directly handle problem creation
+  // Start game
+  const startGame = useCallback(() => {
+    if (gameActiveRef.current) return; // Prevent double-start
+
+    // Set initial game state
+    setGameStarted(true);
+    setGamePaused(false);
+    gameStateRef.current.isPaused = false;
+    setTimeRemaining(60); // Ensure exactly 60 seconds
+    gameActiveRef.current = true;
+
+    console.log("Starting game...");
+
+    // Clear any existing timers
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
+    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
+    problemTimeoutsRef.current = {};
+
+    // Start game timer - 1 minute countdown
+    timerRef.current = setInterval(() => {
+      if (!gameStateRef.current.isPaused) {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            endGame();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }
+    }, 1000);
+
+    // Reset used columns
+    setUsedColumns([false, false, false]);
+
+    // Generate first problem after a short delay
+    setTimeout(() => {
+      createProblem();
+
+      // Set up interval for creating subsequent problems
+      setupProblemGenerationInterval();
+    }, 1000);
+  }, [createProblem, endGame, setupProblemGenerationInterval]);
+
+  // Handle pause/unpause effects
+  useEffect(() => {
+    if (gameStarted && !gameOver) {
+      // Set the CSS variable based on pause state
+      document.documentElement.style.setProperty(
+          '--animations-paused',
+          gamePaused ? 'paused' : 'running'
+      );
+    }
+  }, [gamePaused, gameStarted, gameOver]);
+
+  // Start game with countdown
+  const startGameWithCountdown = useCallback(() => {
+    resetGame();
+    setCountdownActive(true);
+    setCountdown(3);
+
+    // Start countdown
+    const countdownTimer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownTimer);
+          setCountdownActive(false);
+          startGame();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [resetGame, startGame]);
+
+  // Toggle pause with better handling for problem generation
   const togglePause = useCallback(() => {
     setGamePaused(prev => {
       const newPausedState = !prev;
@@ -527,139 +693,19 @@ const DerivFall: React.FC<DerivFallProps> = ({
           });
         }, 1000);
 
-        // Determine problem interval based on difficulty
-        let problemInterval;
-        if (difficultyLevel === 'easy') {
-          problemInterval = 4000;
-        } else if (difficultyLevel === 'medium') {
-          problemInterval = 3000;
-        } else {
-          problemInterval = 2000;
-        }
+        // Flag that we need to create a problem after unpause
+        setNeedProblemAfterUnpause(true);
 
-        console.log(`Setting up problem generation with interval: ${problemInterval}ms`);
+        // Reset last problem time to allow immediate creation
+        lastProblemTimeRef.current = 0;
 
-        // Clear any existing problem interval
-        if (gameIntervalRef.current) {
-          clearInterval(gameIntervalRef.current);
-        }
-
-        // Create a problem immediately if needed
-        setTimeout(() => {
-          const activeProblemsCount = problems.filter(p => !p.answered).length;
-          if (activeProblemsCount < maxProblemsOnScreen) {
-            console.log("Creating problem immediately after unpause");
-            createProblem();
-          }
-        }, 200);
-
-        // Create a new problem generation interval
-        gameIntervalRef.current = setInterval(() => {
-          if (!gameStateRef.current.isPaused && gameActiveRef.current) {
-            const activeProblemsCount = problems.filter(p => !p.answered).length;
-            if (activeProblemsCount < maxProblemsOnScreen) {
-              console.log("Creating new problem from interval");
-              createProblem();
-            }
-          }
-        }, problemInterval);
+        // Restart the problem generation interval
+        setupProblemGenerationInterval();
       }
 
       return newPausedState;
     });
-  }, [difficultyLevel, problems, maxProblemsOnScreen, createProblem, endGame]);
-
-  // Start game
-  const startGame = useCallback(() => {
-    if (gameActiveRef.current) return; // Prevent double-start
-
-    // Set initial game state
-    setGameStarted(true);
-    setGamePaused(false);
-    gameStateRef.current.isPaused = false;
-    setTimeRemaining(60); // Ensure exactly 60 seconds
-    gameActiveRef.current = true;
-
-    // Clear any existing timers
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
-    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
-    problemTimeoutsRef.current = {};
-
-    // Start game timer - 1 minute countdown
-    timerRef.current = setInterval(() => {
-      if (!gameStateRef.current.isPaused) {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            endGame();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }
-    }, 1000);
-
-    // Generate first problem after a short delay
-    setTimeout(() => {
-      createProblem();
-
-      // Calculate problem creation interval based on difficulty
-      let problemInterval;
-      if (difficultyLevel === 'easy') {
-        problemInterval = 4000; // 4 seconds between problems on easy
-      } else if (difficultyLevel === 'medium') {
-        problemInterval = 3000; // 3 seconds between problems on medium
-      } else {
-        problemInterval = 2000; // 2 seconds between problems on hard
-      }
-
-      console.log(`Game started with ${difficultyLevel} difficulty - problem interval: ${problemInterval}ms`);
-
-      // Create subsequent problems at intervals
-      gameIntervalRef.current = setInterval(() => {
-        if (!gameStateRef.current.isPaused && gameActiveRef.current) {
-          const activeProblems = problems.filter(p => !p.answered);
-          if (activeProblems.length < maxProblemsOnScreen) {
-            createProblem();
-          }
-        }
-      }, problemInterval);
-    }, 1000);
-  }, [
-    createProblem, difficultyLevel, endGame,
-    problems, maxProblemsOnScreen
-  ]);
-
-  // Handle pause/unpause effects
-  useEffect(() => {
-    if (gameStarted && !gameOver) {
-      // Set the CSS variable based on pause state
-      document.documentElement.style.setProperty(
-          '--animations-paused',
-          gamePaused ? 'paused' : 'running'
-      );
-    }
-  }, [gamePaused, gameStarted, gameOver]);
-
-  // Start game with countdown
-  const startGameWithCountdown = useCallback(() => {
-    resetGame();
-    setCountdownActive(true);
-    setCountdown(3);
-
-    // Start countdown
-    const countdownTimer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownTimer);
-          setCountdownActive(false);
-          startGame();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [resetGame, startGame]);
+  }, [endGame, setupProblemGenerationInterval]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -739,6 +785,7 @@ const DerivFall: React.FC<DerivFallProps> = ({
               !problem.answered ? (
                   <div
                       key={problem.id}
+                      data-problem-id={problem.id}
                       className="absolute bg-blue-700 dark:bg-blue-200 p-3 rounded-lg shadow-lg text-center transition-colors"
                       style={{
                         left: `${problem.left}%`,
