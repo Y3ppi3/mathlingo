@@ -6,7 +6,7 @@
   <p><strong>Изучайте математику бесплатно, весело и эффективно!</strong></p>
   
   ![License](https://img.shields.io/badge/license-MIT-blue)
-  ![Version](https://img.shields.io/badge/version-0.0.1.6.2-green)
+  ![Version](https://img.shields.io/badge/version-0.0.1.6.3-green)
   
 </div>
 
