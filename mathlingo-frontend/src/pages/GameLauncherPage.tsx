@@ -1,6 +1,6 @@
 // src/pages/GameLauncherPage.tsx
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { api } from '../utils/api';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
@@ -25,7 +25,19 @@ interface GameMechanicGroup {
 
 const GameLauncherPage: React.FC = () => {
     const { subjectId, mechanicType } = useParams<{ subjectId: string, mechanicType: string }>();
+    const [searchParams] = useSearchParams();
+    const difficulty = searchParams.get('difficulty') ? parseInt(searchParams.get('difficulty')!, 10) : undefined;
+    const rewardPoints = searchParams.get('reward') ? parseInt(searchParams.get('reward')!, 10) : undefined;
     const navigate = useNavigate();
+
+    const launchGame = (gameId: string) => {
+        // Pass the custom parameters if they exist
+        if (difficulty !== undefined && rewardPoints !== undefined) {
+            navigate(`/subject/${subjectId}/game/${gameId}?difficulty=${difficulty}&reward=${rewardPoints}`);
+        } else {
+            navigate(`/subject/${subjectId}/game/${gameId}`);
+        }
+    };
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -71,7 +83,7 @@ const GameLauncherPage: React.FC = () => {
                         icon: '📉',
                         mechanicType: 'падение',
                         subject: 'derivatives',
-                        difficulty: 3,
+                        difficulty: difficulty !== undefined ? difficulty : 3, // Use custom difficulty if available
                         estimatedTime: 5
                     },
                     {
@@ -81,7 +93,7 @@ const GameLauncherPage: React.FC = () => {
                         icon: '🧩',
                         mechanicType: 'сборка',
                         subject: 'integrals',
-                        difficulty: 4,
+                        difficulty: difficulty !== undefined ? difficulty : 4, // Use custom difficulty if available
                         estimatedTime: 10
                     },
                     {
@@ -91,7 +103,7 @@ const GameLauncherPage: React.FC = () => {
                         icon: '🔬',
                         mechanicType: 'лаборатория',
                         subject: 'derivatives',
-                        difficulty: 3,
+                        difficulty: difficulty !== undefined ? difficulty : 3, // Use custom difficulty if available
                         estimatedTime: 15
                     },
                     {
@@ -101,7 +113,7 @@ const GameLauncherPage: React.FC = () => {
                         icon: '🧪',
                         mechanicType: 'лаборатория',
                         subject: 'integrals',
-                        difficulty: 4,
+                        difficulty: difficulty !== undefined ? difficulty : 4, // Use custom difficulty if available
                         estimatedTime: 15
                     }
                 ];
@@ -179,7 +191,7 @@ const GameLauncherPage: React.FC = () => {
         };
 
         fetchSubjectAndGames();
-    }, [subjectId, mechanicType]);
+    }, [subjectId, mechanicType, difficulty]);
 
     const handleGameSelect = (game: GameInfo) => {
         setSelectedGame(game);
@@ -188,8 +200,8 @@ const GameLauncherPage: React.FC = () => {
     const handleStartGame = () => {
         if (!selectedGame) return;
 
-        // Переходим на соответствующую страницу игры
-        navigate(`/subject/${subjectId}/game/${selectedGame.id}`);
+        // Use the launchGame function to ensure custom parameters are passed
+        launchGame(selectedGame.id);
     };
 
     const handleBack = () => {
@@ -247,6 +259,23 @@ const GameLauncherPage: React.FC = () => {
                             </h1>
                         </div>
 
+                        {/* Display custom settings if available */}
+                        {difficulty !== undefined && rewardPoints !== undefined && (
+                            <div className="mb-6 p-4 bg-blue-900/30 dark:bg-blue-100/50 border border-blue-800 dark:border-blue-300 rounded-lg">
+                                <h2 className="text-lg font-semibold text-blue-300 dark:text-blue-800 mb-2">Выбранные настройки:</h2>
+                                <div className="flex space-x-4">
+                                    <div className="flex items-center">
+                                        <span className="text-yellow-400 dark:text-yellow-600 mr-1">★</span>
+                                        <span className="text-white dark:text-gray-800">Сложность: {difficulty}/5</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <span className="text-green-400 dark:text-green-600 mr-1">🏆</span>
+                                        <span className="text-white dark:text-gray-800">Награда: {rewardPoints} очков</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {games.length === 0 ? (
                             <div className="text-center py-8">
                                 <p className="text-gray-400 dark:text-gray-500 mb-4">К сожалению, игры не найдены.</p>
@@ -280,6 +309,18 @@ const GameLauncherPage: React.FC = () => {
                                                     <div className="flex justify-between text-sm">
                                                         <span className="text-gray-400 dark:text-gray-500">Сложность: {Array(game.difficulty).fill('★').join('')}</span>
                                                         <span className="text-gray-400 dark:text-gray-500">~{game.estimatedTime} мин</span>
+                                                    </div>
+                                                    {/* Add quick launch button */}
+                                                    <div className="mt-4">
+                                                        <button
+                                                            className="w-full py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                launchGame(game.id);
+                                                            }}
+                                                        >
+                                                            Быстрый запуск
+                                                        </button>
                                                     </div>
                                                 </div>
                                             ))}

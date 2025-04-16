@@ -1,6 +1,6 @@
 // src/pages/GamePage.tsx
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
 import DerivFall from '../components/games/DerivFall';
@@ -11,7 +11,11 @@ import { mockGameData } from '../utils/gameMockData';
 
 const GamePage: React.FC = () => {
     const { subjectId, gameId } = useParams<{ subjectId: string, gameId: string }>();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+
+    const customDifficulty = searchParams.get('difficulty') ? parseInt(searchParams.get('difficulty')!, 10) : undefined;
+    const customReward = searchParams.get('reward') ? parseInt(searchParams.get('reward')!, 10) : undefined;
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -34,7 +38,20 @@ const GamePage: React.FC = () => {
             try {
                 // Используем заглушки из mockGameData
                 if (gameId && gameId in mockGameData) {
-                    setGameInfo(mockGameData[gameId as keyof typeof mockGameData]);
+                    // Get base game info
+                    const baseGameInfo = mockGameData[gameId as keyof typeof mockGameData];
+
+                    // Override with custom settings if available
+                    setGameInfo({
+                        ...baseGameInfo,
+                        difficulty: customDifficulty !== undefined ? customDifficulty : baseGameInfo.difficulty,
+                        rewardPoints: customReward !== undefined ? customReward : baseGameInfo.rewardPoints
+                    });
+
+                    console.log("Game settings:", {
+                        difficulty: customDifficulty !== undefined ? customDifficulty : baseGameInfo.difficulty,
+                        rewardPoints: customReward !== undefined ? customReward : baseGameInfo.rewardPoints
+                    });
                 } else {
                     setError('Игра не найдена');
                 }
@@ -47,7 +64,7 @@ const GamePage: React.FC = () => {
         };
 
         loadGameInfo();
-    }, [gameId]);
+    }, [gameId, customDifficulty, customReward]);
 
     const handleGameComplete = (finalScore: number, finalMaxScore: number) => {
         setScore(finalScore);
@@ -169,9 +186,9 @@ const GamePage: React.FC = () => {
                     </div>
                 ) : (
                     <RewardPopup
-                        points={score}
-                        totalPoints={maxScore}
-                        taskGroupName={gameInfo?.title || 'Игра'}
+                        score={score} // Ensure this is a number
+                        maxScore={maxScore || 10} // Provide a fallback to avoid division by zero
+                        rewardPoints={gameInfo?.rewardPoints || 0} // Make sure this is always defined
                         onClose={handleReturnToMap}
                     />
                 )}

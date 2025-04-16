@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Button from '../Button';
 
-// Интерфейс для задачи на производную
+// Interface for derivative problem
 interface DerivativeProblem {
   id: string;
   problem: string;
@@ -11,7 +11,7 @@ interface DerivativeProblem {
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
-// Интерфейс для пропсов компонента
+// Interface for component props
 interface DerivFallProps {
   difficulty?: number;
   timeLimit?: number;
@@ -19,7 +19,7 @@ interface DerivFallProps {
   onComplete?: (score: number, maxScore: number) => void;
 }
 
-// Стандартные задачи для использования если источник не предоставлен
+// Default problems to use if source is not provided
 const DEFAULT_PROBLEMS: DerivativeProblem[] = [
   {
     id: "d1",
@@ -109,98 +109,108 @@ const DEFAULT_PROBLEMS: DerivativeProblem[] = [
 
 const DerivFall: React.FC<DerivFallProps> = ({
                                                difficulty = 3,
-                                               timeLimit = 60, // 60 секунд по умолчанию
+                                               timeLimit = 60, // Fixed at 1 minute exactly (60 seconds)
                                                problemsSource,
                                                onComplete
                                              }) => {
-  // Состояние падающих проблем
-  const [problems, setProblems] = useState<Array<DerivativeProblem & {
+  console.log("DerivFall initialized with difficulty:", difficulty); // Log the received difficulty
+
+  // Falling problems state
+  const [problems, setProblems] = useState<Array<{
     id: string;
+    problem: string;
+    options: string[];
+    answer: string;
+    difficulty: 'easy' | 'medium' | 'hard';
     left: number;
     top: number;
     answered: boolean;
     correct?: boolean;
   }>>([]);
 
-  // Игровые состояния
+  // Game state
   const [score, setScore] = useState(0);
+  const [pointsEarned, setPointsEarned] = useState(0);
+  const [pointsLost, setPointsLost] = useState(0);
   const [lives, setLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [gamePaused, setGamePaused] = useState(false);
   const [difficultyLevel, setDifficultyLevel] = useState<'easy' | 'medium' | 'hard'>('medium');
-  const [speed, setSpeed] = useState(3000); // миллисекунды для падения
-  const [timeRemaining, setTimeRemaining] = useState(timeLimit);
+  const [speed, setSpeed] = useState(6000); // milliseconds for falling
+  const [timeRemaining, setTimeRemaining] = useState(60); // Fixed to 60 seconds (1 minute)
   const [problemBank, setProblemBank] = useState<DerivativeProblem[]>(DEFAULT_PROBLEMS);
   const [problemsCompleted, setProblemsCompleted] = useState(0);
+  const [problemsIncorrect, setProblemsIncorrect] = useState(0);
   const [countdownActive, setCountdownActive] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackType, setFeedbackType] = useState<'success' | 'error'>('success');
 
-  // Ссылки для доступа к DOM и таймерам
+  // Track location of existing problems to prevent overlap
+  const [occupiedPositions, setOccupiedPositions] = useState<number[]>([]);
+
+  // Limit simultaneous problems on screen
+  const maxProblemsOnScreen = 3;
+
+  // Refs
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const gameIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const problemTimeoutsRef = useRef<{[key: string]: NodeJS.Timeout}>({});
   const gameActiveRef = useRef(false);
+  // Add a ref to track the current score reliably
+  const currentScoreRef = useRef(0);
 
-  // Установить сообщение обратной связи
+  // Set feedback message
   const setFeedback = useCallback((message: string, type: 'success' | 'error') => {
     setFeedbackMessage(message);
     setFeedbackType(type);
     setShowFeedback(true);
 
-    // Скрываем сообщение через некоторое время
+    // Hide feedback after a short delay
     setTimeout(() => {
       setShowFeedback(false);
     }, 800);
   }, []);
 
-  // Загрузка проблем из источника или использование стандартных
+  // Load problems from source or use defaults
   useEffect(() => {
-    console.log("Настройка источника данных задач");
-
     if (problemsSource && problemsSource.length > 0) {
-      console.log(`Получено ${problemsSource.length} задач из источника`);
       setProblemBank(problemsSource);
     } else {
-      console.log(`Используем ${DEFAULT_PROBLEMS.length} стандартных задач`);
       setProblemBank([...DEFAULT_PROBLEMS]);
     }
+  }, [problemsSource]);
 
-    return () => {
-      console.log("Очистка источника данных задач");
-    };
-  }, [problemsSource]); // DEFAULT_PROBLEMS как константа не нужна в зависимостях
-
-  // Настройка уровня сложности в зависимости от переданного значения
+  // Set difficulty level based on props
   useEffect(() => {
-    console.log(`Настройка уровня сложности: ${difficulty}`);
+    console.log("Setting difficulty level based on:", difficulty);
+
     if (difficulty <= 2) {
       setDifficultyLevel('easy');
-      setSpeed(6000);
+      setSpeed(7000); // 7 seconds for falling in easy mode
+      console.log("Setting EASY difficulty - speed: 7000ms");
     } else if (difficulty >= 5) {
       setDifficultyLevel('hard');
-      setSpeed(2500);
+      setSpeed(4000); // 4 seconds for falling in hard mode
+      console.log("Setting HARD difficulty - speed: 4000ms");
     } else {
       setDifficultyLevel('medium');
-      setSpeed(4000);
+      setSpeed(5500); // 5.5 seconds for falling in medium mode
+      console.log("Setting MEDIUM difficulty - speed: 5500ms");
     }
   }, [difficulty]);
 
-  // Завершить игру
+  // End game function
   const endGame = useCallback(() => {
-    console.log("Завершение игры");
     setGameOver(true);
     setGameStarted(false);
     setGamePaused(false);
-
-    // ВАЖНО: обновляем ref
     gameActiveRef.current = false;
 
-    // Очищаем все таймеры
+    // Clear all timers
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -211,274 +221,105 @@ const DerivFall: React.FC<DerivFallProps> = ({
       gameIntervalRef.current = null;
     }
 
-    // Очищаем таймеры для задач
     Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
     problemTimeoutsRef.current = {};
 
-    // Вызываем обратный вызов с результатами
+    // Use the current score from the ref, which is always up-to-date
+    const finalScore = currentScoreRef.current;
+
     if (onComplete) {
-      // Максимально возможный счет зависит от времени и частоты появления задач
-      const maxPossibleScore = Math.max(10, problemsCompleted * 10); // Минимум 10 очков
-      onComplete(score, maxPossibleScore);
+      const maxScore = problemsCompleted > 0 ? problemsCompleted * 10 : 10;
+
+      // Pass the actual score from our ref
+      onComplete(finalScore, maxScore);
     }
-  }, [score, problemsCompleted, onComplete]);
+  }, [problemsCompleted, onComplete]);
 
-  const getDistributedPosition = useCallback(() => {
-    // Находим все текущие горизонтальные позиции задач
-    const currentPositions = problems.map(p => p.left);
+  // Find safe position for a new problem to avoid overlap
+  const getSafePosition = useCallback(() => {
+    // Define safe zones as percentages of screen width (avoid edges)
+    const safeZones = [
+      { min: 15, max: 30 },  // Left zone
+      { min: 40, max: 55 },  // Center zone
+      { min: 70, max: 85 }   // Right zone
+    ];
 
-    // Пробуем 5 раз найти позицию, не близкую к существующим
-    for (let i = 0; i < 5; i++) {
-      const sector = Math.floor(Math.random() * 4); // 4 сектора
-      const newPos = (sector * 20) + (Math.random() * 15);
+    // If no active problems, choose random zone
+    if (problems.filter(p => !p.answered).length === 0) {
+      const randomZone = safeZones[Math.floor(Math.random() * safeZones.length)];
+      return randomZone.min + Math.random() * (randomZone.max - randomZone.min);
+    }
 
-      // Проверяем, нет ли рядом других задач (на расстоянии менее 20%)
-      const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 20);
-      if (!isTooClose) {
-        return newPos; // Нашли хорошую позицию
+    // Get positions of active problems
+    const activePositions = problems
+        .filter(p => !p.answered)
+        .map(p => p.left);
+
+    // Update occupied positions
+    setOccupiedPositions(activePositions);
+
+    // Find zones that don't have a problem
+    const availableZones = safeZones.filter(zone =>
+        !activePositions.some(pos => pos >= zone.min && pos <= zone.max)
+    );
+
+    // If we have an empty zone, use it
+    if (availableZones.length > 0) {
+      const zone = availableZones[Math.floor(Math.random() * availableZones.length)];
+      return zone.min + Math.random() * (zone.max - zone.min);
+    }
+
+    // Otherwise, find position with maximum distance from other problems
+    let bestPosition = 50; // Default center
+    let maxMinDistance = 0;
+
+    // Check positions at intervals
+    for (let pos = 15; pos <= 85; pos += 5) {
+      // Find minimum distance to any existing problem
+      const minDistance = Math.min(...activePositions.map(p => Math.abs(p - pos)));
+
+      if (minDistance > maxMinDistance) {
+        maxMinDistance = minDistance;
+        bestPosition = pos;
       }
     }
 
-    // Если не нашли хорошую позицию, возвращаем случайную
-    return Math.random() * 70;
+    return bestPosition;
   }, [problems]);
 
-  // Создать новую падающую задачу
+  // Create a new falling problem
   const createProblem = useCallback(() => {
-    // Добавляем отладочный лог
-    console.log("💡 createProblem вызвана", { lives, gameOver, gameStarted, gamePaused, problemBankLength: problemBank.length });
-
-    // Проверяем условия
-    if (lives <= 0) {
-      console.log("❌ Создание задачи отменено: нет жизней");
+    // Check if we should create a new problem
+    if (lives <= 0 || gameOver || !gameActiveRef.current || gamePaused) {
       return;
     }
 
-    if (gameOver) {
-      console.log("❌ Создание задачи отменено: игра окончена");
+    // Don't create more than max problems
+    const activeProblems = problems.filter(p => !p.answered);
+    if (activeProblems.length >= maxProblemsOnScreen) {
       return;
     }
 
-    // Вместо проверки gameStarted, используем gameActiveRef
-    if (!gameActiveRef.current) {
-      console.log("❌ Создание задачи отменено: игра не начата");
-      return;
-    }
-
-    if (gamePaused) {
-      console.log("❌ Создание задачи отменено: игра на паузе");
-      return;
-    }
-
-    if (problemBank.length === 0) {
-      console.error("❌ No problems available!");
-      setFeedback("Ошибка: задания не найдены", "error");
-      return;
-    }
-
-    console.log(`🔍 Создание новой задачи. Сложность: ${difficultyLevel}, Доступно задач: ${problemBank.length}`);
-
-    // Фильтруем задачи по текущему уровню сложности
+    // Filter problems by difficulty
     let filteredProblems = problemBank.filter(p => {
       if (difficultyLevel === 'easy') return p.difficulty === 'easy';
       if (difficultyLevel === 'medium') return p.difficulty === 'easy' || p.difficulty === 'medium';
-      return true; // Для сложного уровня берем все задачи
+      return true; // For hard difficulty, use all problems
     });
-
-    console.log(`🔍 После фильтрации осталось задач: ${filteredProblems.length}`);
 
     if (filteredProblems.length === 0) {
-      console.warn(`⚠️ После фильтрации по сложности '${difficultyLevel}' задач не осталось!`);
-      console.log("ℹ️ Используем все доступные задачи без фильтрации по сложности");
-      filteredProblems = [...problemBank];
-
-      if (filteredProblems.length === 0) {
-        console.error("❌ Всё ещё нет доступных задач!");
-        setFeedback("Нет доступных заданий!", "error");
-        return;
-      }
+      filteredProblems = [...problemBank]; // Fallback to all problems
     }
 
+    // Pick a random problem
     const randomIndex = Math.floor(Math.random() * filteredProblems.length);
     const problem = filteredProblems[randomIndex];
-    const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+    const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
-    const getDistributedPosition = () => {
-      // Находим все текущие горизонтальные позиции задач
-      const currentPositions = problems.map(p => p.left);
+    // Find a safe position
+    const leftPosition = getSafePosition();
 
-      // Пробуем 5 раз найти позицию, не близкую к существующим
-      for (let i = 0; i < 5; i++) {
-        const sector = Math.floor(Math.random() * 4); // 4 сектора
-        const newPos = (sector * 20) + (Math.random() * 15);
-
-        // Проверяем, нет ли рядом других задач (на расстоянии менее 20%)
-        const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 20);
-        if (!isTooClose) {
-          return newPos; // Нашли хорошую позицию
-        }
-      }
-
-      // Если не нашли хорошую позицию, возвращаем случайную
-      return Math.random() * 70;
-    };
-
-    const leftPosition = getDistributedPosition();
-
-    // Добавляем новую задачу
-    console.log(`✅ Добавляем задачу ${newProblemId}: ${problem.problem}`);
-
-    // Важно: используем функциональное обновление для состояния
-    setProblems(prev => {
-      const newProblems = [...prev, {
-        ...problem,
-        id: newProblemId,
-        left: leftPosition,
-        top: 0, // Начальная позиция (в процентах)
-        answered: false
-      }];
-      console.log(`📊 Всего задач после добавления: ${newProblems.length}`);
-      return newProblems;
-    });
-
-    // Запланировать удаление задачи после того, как она выпадет из поля зрения
-    problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
-      console.log(`⏱️ Таймаут для задачи ${newProblemId} сработал`);
-
-      setProblems(prev => {
-        const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
-        if (problemExists) {
-          // Задача упала без ответа
-          console.log(`❌ Задача ${newProblemId} упала без ответа`);
-          setLives(l => {
-            const newLives = l - 1;
-            if (newLives <= 0) {
-              console.log("☠️ Все жизни потеряны, игра завершается");
-              endGame();
-            }
-            return newLives;
-          });
-
-          setFeedback("Упущенная задача!", "error");
-        }
-        return prev.filter(p => p.id !== newProblemId);
-      });
-
-      // Удаляем таймер из списка
-      delete problemTimeoutsRef.current[newProblemId];
-    }, speed + 2000); // Время падения + буфер
-  }, [difficultyLevel, problemBank, lives, gameOver, gameStarted, gamePaused,
-    speed, setFeedback, endGame, problems]);
-
-  // Обработать выбор ответа
-  const handleAnswerSelect = useCallback((problemId: string, selectedOption: string, correctAnswer: string) => {
-    // Отмечаем задачу как отвеченную
-    setProblems(prev =>
-        prev.map(p => p.id === problemId ?
-            {...p, answered: true, correct: selectedOption === correctAnswer} : p)
-    );
-
-    // Убираем таймер удаления для этой задачи
-    if (problemTimeoutsRef.current[problemId]) {
-      clearTimeout(problemTimeoutsRef.current[problemId]);
-      delete problemTimeoutsRef.current[problemId];
-    }
-
-    if (selectedOption === correctAnswer) {
-      console.log(`Правильный ответ для задачи ${problemId}`);
-      setScore(s => s + 10);
-      setProblemsCompleted(p => p + 1);
-      setFeedback("Правильно! +10 очков", "success");
-    } else {
-      console.log(`Неправильный ответ для задачи ${problemId}`);
-      setFeedback(`Неверно! Правильный ответ: ${correctAnswer}`, "error");
-    }
-
-    // Удалить задачу после ответа с анимацией
-    setTimeout(() => {
-      setProblems(prev => prev.filter(p => p.id !== problemId));
-    }, 800);
-  }, [setFeedback]);
-
-  // Сбросить игру
-  const resetGame = useCallback(() => {
-    // Очищаем все таймеры
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (gameIntervalRef.current) {
-      clearInterval(gameIntervalRef.current);
-      gameIntervalRef.current = null;
-    }
-
-    // Очищаем таймеры для задач
-    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
-    problemTimeoutsRef.current = {};
-
-    // Сбрасываем состояния
-    setProblems([]);
-    setScore(0);
-    setLives(3);
-    setGameOver(false);
-    setGameStarted(false);
-    setGamePaused(false);
-    setTimeRemaining(timeLimit);
-    setProblemsCompleted(0);
-    setShowFeedback(false);
-
-    // ВАЖНО: сбрасываем ref
-    gameActiveRef.current = false;
-  }, [timeLimit]);
-
-  // Начать игру
-  const startGame = useCallback(() => {
-    console.log("💡 startGame вызвана, gameStarted =", gameStarted);
-
-    // Повторно устанавливаем gameStarted, чтобы гарантировать обновление
-    setGameStarted(true);
-    setGamePaused(false);
-
-    // ВАЖНО: Синхронно устанавливаем ref
-    gameActiveRef.current = true;
-
-    // Очистим все таймеры перед новой игрой
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
-    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
-    problemTimeoutsRef.current = {};
-
-    // Настроить скорость в зависимости от сложности
-    switch(difficultyLevel) {
-      case 'easy': setSpeed(6000); break;
-      case 'medium': setSpeed(4000); break;
-      case 'hard': setSpeed(2500); break;
-    }
-
-    // Запустить таймер игры
-    timerRef.current = setInterval(() => {
-      if (!gamePaused) {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            console.log("⏱️ Время вышло, игра завершается");
-            endGame();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }
-    }, 1000);
-
-    // Создаем первую задачу вручную
-    console.log("🎮 Создаем первую задачу напрямую");
-
-    const randomIndex = Math.floor(Math.random() * problemBank.length);
-    const problem = problemBank[randomIndex];
-    const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-    const leftPosition = Math.random() * 70; // или getDistributedPosition(), если доступна
-
-    // Добавляем задачу напрямую
+    // Add the new problem
     setProblems(prev => [
       ...prev,
       {
@@ -490,13 +331,12 @@ const DerivFall: React.FC<DerivFallProps> = ({
       }
     ]);
 
-    console.log(`✅ Первая задача добавлена: ${problem.problem}`);
-
-    // Настраиваем таймаут для неё
+    // Schedule removal when it falls out of view
     problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
       setProblems(prev => {
         const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
         if (problemExists) {
+          // Problem fell without being answered
           setLives(l => {
             const newLives = l - 1;
             if (newLives <= 0) {
@@ -504,44 +344,190 @@ const DerivFall: React.FC<DerivFallProps> = ({
             }
             return newLives;
           });
-          setFeedback("Упущенная задача!", "error");
+
+          // Deduct 5 points for missed problems
+          const pointsToSubtract = 5;
+          setPointsLost(prev => prev + pointsToSubtract);
+
+          // Update both state and ref
+          currentScoreRef.current = Math.max(0, currentScoreRef.current - pointsToSubtract);
+          setScore(currentScoreRef.current);
+
+          setFeedback("Пропущена задача! -5 очков", "error");
         }
         return prev.filter(p => p.id !== newProblemId);
       });
+
+      // Remove timer reference
       delete problemTimeoutsRef.current[newProblemId];
-    }, speed + 2000);
+    }, speed + 1000); // Fall time plus buffer
+  }, [
+    difficultyLevel, problemBank, problems, lives, gameOver,
+    gamePaused, getSafePosition, endGame, setFeedback, speed,
+    maxProblemsOnScreen
+  ]);
 
-    // Запускаем интервал для создания последующих задач
-    const interval = difficultyLevel === 'hard' ? 2500 :
-        difficultyLevel === 'medium' ? 3500 : 4500;
+  // Handle answer selection
+  const handleAnswerSelect = useCallback((problemId: string, selectedOption: string, correctAnswer: string) => {
+    // Mark problem as answered
+    setProblems(prev =>
+        prev.map(p => p.id === problemId ?
+            {...p, answered: true, correct: selectedOption === correctAnswer} : p)
+    );
 
-    console.log(`🎮 Установка интервала генерации задач: ${interval}ms`);
+    // Clear timeout for this problem
+    if (problemTimeoutsRef.current[problemId]) {
+      clearTimeout(problemTimeoutsRef.current[problemId]);
+      delete problemTimeoutsRef.current[problemId];
+    }
 
-    gameIntervalRef.current = setInterval(() => {
-      // Используем gameActiveRef.current вместо gameStarted
-      if (!gamePaused && gameActiveRef.current) {
-        createProblem();
+    if (selectedOption === correctAnswer) {
+      // Correct answer - add 10 points
+      const pointsToAdd = 10;
+      setPointsEarned(prev => prev + pointsToAdd);
+
+      // Update both state and ref for score
+      currentScoreRef.current += pointsToAdd;
+      setScore(currentScoreRef.current);
+
+      setProblemsCompleted(p => p + 1);
+      setFeedback("Правильно! +10 очков", "success");
+    } else {
+      // Incorrect answer - subtract 5 points
+      const pointsToSubtract = 5;
+      setPointsLost(prev => prev + pointsToSubtract);
+
+      // Update both state and ref, preventing negative score
+      currentScoreRef.current = Math.max(0, currentScoreRef.current - pointsToSubtract);
+      setScore(currentScoreRef.current);
+
+      setProblemsIncorrect(p => p + 1);
+      setFeedback(`Неверно! -5 очков. Ответ: ${correctAnswer}`, "error");
+    }
+
+    // Remove problem with animation
+    setTimeout(() => {
+      setProblems(prev => prev.filter(p => p.id !== problemId));
+
+      // Update occupied positions
+      setOccupiedPositions(prev =>
+          prev.filter(pos =>
+              !problems
+                  .filter(p => p.id === problemId)
+                  .some(p => p.left === pos)
+          )
+      );
+    }, 800);
+  }, [problems, setFeedback]);
+
+  // Reset game
+  const resetGame = useCallback(() => {
+    // Clear all timers
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (gameIntervalRef.current) {
+      clearInterval(gameIntervalRef.current);
+      gameIntervalRef.current = null;
+    }
+
+    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
+    problemTimeoutsRef.current = {};
+
+    // Reset all state
+    setProblems([]);
+    setScore(0);
+    // Reset the score ref too
+    currentScoreRef.current = 0;
+    setPointsEarned(0);
+    setPointsLost(0);
+    setLives(3);
+    setGameOver(false);
+    setGameStarted(false);
+    setGamePaused(false);
+    setTimeRemaining(60); // Reset to exactly 60 seconds
+    setProblemsCompleted(0);
+    setProblemsIncorrect(0);
+    setShowFeedback(false);
+    setOccupiedPositions([]);
+
+    gameActiveRef.current = false;
+  }, []);
+
+  // Start game
+  const startGame = useCallback(() => {
+    if (gameActiveRef.current) return; // Prevent double-start
+
+    // Set initial game state
+    setGameStarted(true);
+    setGamePaused(false);
+    setTimeRemaining(60); // Ensure exactly 60 seconds
+    gameActiveRef.current = true;
+
+    // Clear any existing timers
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
+    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
+    problemTimeoutsRef.current = {};
+
+    // Start game timer - 1 minute countdown
+    timerRef.current = setInterval(() => {
+      if (!gamePaused) {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            endGame();
+            return 0;
+          }
+          return prev - 1;
+        });
       }
-    }, interval);
+    }, 1000);
 
-  }, [difficultyLevel, problemBank, speed, gamePaused, setFeedback, endGame, createProblem]);
+    // Generate first problem after a short delay
+    setTimeout(() => {
+      createProblem();
 
-  // Начать игру с обратным отсчетом
+      // Calculate problem creation interval based on difficulty
+      let problemInterval;
+      if (difficultyLevel === 'easy') {
+        problemInterval = 4000; // 4 seconds between problems on easy
+      } else if (difficultyLevel === 'medium') {
+        problemInterval = 3000; // 3 seconds between problems on medium
+      } else {
+        problemInterval = 2000; // 2 seconds between problems on hard
+      }
+
+      console.log(`Game started with ${difficultyLevel} difficulty - problem interval: ${problemInterval}ms`);
+
+      // Create subsequent problems at intervals
+      gameIntervalRef.current = setInterval(() => {
+        if (!gamePaused && gameActiveRef.current) {
+          const activeProblems = problems.filter(p => !p.answered);
+          if (activeProblems.length < maxProblemsOnScreen) {
+            createProblem();
+          }
+        }
+      }, problemInterval);
+    }, 1000);
+  }, [
+    createProblem, difficultyLevel, endGame, gamePaused,
+    problems, maxProblemsOnScreen
+  ]);
+
+  // Start game with countdown
   const startGameWithCountdown = useCallback(() => {
     resetGame();
     setCountdownActive(true);
     setCountdown(3);
 
-    // Запускаем обратный отсчет
+    // Start countdown
     const countdownTimer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(countdownTimer);
           setCountdownActive(false);
-
-          // Не устанавливаем здесь gameStarted
-          // т.к. это делается в startGame
-
           startGame();
           return 0;
         }
@@ -550,33 +536,52 @@ const DerivFall: React.FC<DerivFallProps> = ({
     }, 1000);
   }, [resetGame, startGame]);
 
-  // Поставить игру на паузу
+  // Toggle pause
   const togglePause = useCallback(() => {
-    setGamePaused(prev => !prev);
+    setGamePaused(prev => {
+      const newPausedState = !prev;
+
+      // When pausing:
+      if (newPausedState) {
+        // Store current positions of all problems
+        document.documentElement.style.setProperty('--animations-paused', 'paused');
+      } else {
+        // When unpausing:
+        document.documentElement.style.setProperty('--animations-paused', 'running');
+      }
+
+      return newPausedState;
+    });
   }, []);
 
-  // Очистка интервалов при размонтировании
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log("Размонтирование компонента, очистка ресурсов");
       if (timerRef.current) clearInterval(timerRef.current);
       if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
-
-      // Очищаем таймеры для задач
       Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
     };
   }, []);
 
-  // Форматирование времени
+  // Format time display
   const formatTime = (seconds: number): string => {
+    // Ensure we display exactly 1:00 for 60 seconds
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
 
+  // Get difficulty display text
+  const getDifficultyDisplayText = useCallback(() => {
+    // Use the raw difficulty value rather than the mapped enum for better display
+    if (difficulty <= 2) return 'Легкий';
+    if (difficulty >= 5) return 'Сложный';
+    return 'Средний';
+  }, [difficulty]);
+
   return (
       <div className="w-full h-full flex flex-col bg-gray-700 dark:bg-gray-200 rounded-lg overflow-hidden transition-colors">
-        {/* Верхняя панель */}
+        {/* Header panel */}
         <div className="px-4 py-3 flex justify-between items-center bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
           <div className="flex items-center space-x-6">
             <div className="text-gray-100 dark:text-gray-900 font-medium transition-colors">
@@ -607,18 +612,18 @@ const DerivFall: React.FC<DerivFallProps> = ({
             )}
 
             <div className="px-2 py-1 rounded-md text-sm font-medium bg-gray-500 dark:bg-gray-400 text-white dark:text-gray-900 transition-colors">
-              {difficultyLevel === 'easy' ? 'Легкий' : difficultyLevel === 'medium' ? 'Средний' : 'Сложный'}
+              {getDifficultyDisplayText()} ({difficulty}/5)
             </div>
           </div>
         </div>
 
-        {/* Игровая область */}
+        {/* Game area */}
         <div
             ref={gameAreaRef}
             className="relative flex-1 overflow-hidden bg-gray-700 dark:bg-gray-200 transition-colors"
-            style={{height: '500px', position: 'relative'}} // Добавляем position: 'relative'
+            style={{height: '500px'}}
         >
-          {/* Падающие задачи */}
+          {/* Falling problems */}
           {problems.map(problem => (
               !problem.answered ? (
                   <div
@@ -627,10 +632,15 @@ const DerivFall: React.FC<DerivFallProps> = ({
                       style={{
                         left: `${problem.left}%`,
                         top: '-80px',
-                        width: '250px', // Фиксированная ширина
-                        transform: `translateX(-50%)`, // Центрирование относительно позиции
-                        animation: gamePaused ? 'none' : `fallNew ${speed / 1000}s linear forwards`,
-                        zIndex: parseInt(problem.id.split('-')[1]) % 10, // Разные уровни z-index
+                        width: '200px', // Fixed width to avoid going off-screen
+                        transform: 'translateX(-50%)', // Center based on left position
+                        // Use CSS variable to control animation state
+                        animation: gamePaused
+                            ? 'none'
+                            : `fallNew ${speed / 1000}s linear forwards`,
+                        // Store current position when paused
+                        animationPlayState: gamePaused ? 'paused' : 'running',
+                        zIndex: parseInt(problem.id.split('-')[1]) % 10,
                       }}
                   >
                     <div className="text-lg mb-2 font-medium text-white dark:text-gray-900 transition-colors">
@@ -640,9 +650,10 @@ const DerivFall: React.FC<DerivFallProps> = ({
                       {problem.options.map((option, idx) => (
                           <button
                               key={idx}
-                              className="bg-purple-700 dark:bg-purple-200 text-white dark:text-gray-900 hover:bg-purple-600 dark:hover:bg-purple-300 px-2 py-1 rounded-lg transition-colors"
+                              className="bg-purple-700 dark:bg-purple-200 text-white dark:text-gray-900 hover:bg-purple-600 dark:hover:bg-purple-300 px-2 py-1 rounded-lg transition-colors truncate overflow-hidden h-10 flex items-center justify-center text-sm"
                               onClick={() => handleAnswerSelect(problem.id, option, problem.answer)}
                               disabled={gamePaused}
+                              title={option} // Show full text on hover
                           >
                             {option}
                           </button>
@@ -652,10 +663,12 @@ const DerivFall: React.FC<DerivFallProps> = ({
               ) : (
                   <div
                       key={problem.id}
-                      className="absolute p-3 rounded-lg shadow-lg text-center w-64 transition-colors"
+                      className="absolute p-3 rounded-lg shadow-lg text-center transition-colors"
                       style={{
                         left: `${problem.left}%`,
                         top: `${problem.top}%`,
+                        width: '200px',
+                        transform: 'translateX(-50%)',
                         animation: 'fadeOut 0.8s forwards',
                         backgroundColor: problem.correct
                             ? 'var(--bg-green-700, rgb(21, 128, 61))'
@@ -673,10 +686,9 @@ const DerivFall: React.FC<DerivFallProps> = ({
               )
           ))}
 
-          {/* Наложение паузы */}
+          {/* Pause overlay */}
           {gamePaused && gameStarted && !gameOver && (
-              <div
-                  className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
+              <div className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
                 <div className="text-4xl font-bold text-white mb-6">ПАУЗА</div>
                 <Button
                     onClick={togglePause}
@@ -687,34 +699,43 @@ const DerivFall: React.FC<DerivFallProps> = ({
               </div>
           )}
 
-          {/* Экран окончания игры */}
+          {/* Game over screen */}
           {gameOver && (
-              <div
-                  className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 dark:bg-opacity-70 z-20 transition-colors">
-                <div
-                    className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
-                  <h2 className="text-2xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">Игра
-                    окончена!</h2>
-                  <p className="mb-6 text-xl text-white dark:text-gray-900 transition-colors">
-                    Итоговый счет: <span className="font-bold">{score}</span>
+              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 dark:bg-opacity-70 z-20 transition-colors">
+                <div className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
+                  <h2 className="text-2xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">
+                    Игра окончена!
+                  </h2>
+                  <p className="mb-3 text-xl text-white dark:text-gray-900 transition-colors">
+                    Итоговый счет: <span className="font-bold">{currentScoreRef.current}</span>
                   </p>
-                  <p className="mb-6 text-gray-300 dark:text-gray-700 transition-colors">
-                    Решено задач: <span className="font-bold">{problemsCompleted}</span>
-                  </p>
-                  <Button
-                      onClick={startGameWithCountdown}
-                  >
+                  <div className="mb-6 grid grid-cols-2 gap-2 text-gray-300 dark:text-gray-700">
+                    <div>Заработано очков:</div>
+                    <div className="font-bold text-green-500">+{pointsEarned}</div>
+
+                    <div>Потеряно очков:</div>
+                    <div className="font-bold text-red-500">-{pointsLost}</div>
+
+                    <div>Правильных ответов:</div>
+                    <div className="font-bold">{problemsCompleted}</div>
+
+                    <div>Неправильных ответов:</div>
+                    <div className="font-bold">{problemsIncorrect}</div>
+
+                    <div>Пропущенных задач:</div>
+                    <div className="font-bold">{3 - lives}</div>
+                  </div>
+                  <Button onClick={startGameWithCountdown}>
                     Играть снова
                   </Button>
                 </div>
               </div>
           )}
 
-          {/* Экран начала игры */}
+          {/* Start screen */}
           {!gameStarted && !gameOver && !countdownActive && (
               <div className="absolute inset-0 flex items-center justify-center z-20">
-                <div
-                    className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
+                <div className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
                   <h2 className="text-xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">
                     Игра "Падающие производные"
                   </h2>
@@ -723,72 +744,66 @@ const DerivFall: React.FC<DerivFallProps> = ({
                   </p>
                   <p className="mb-6 text-gray-200 dark:text-gray-800 transition-colors">
                     Сложность: <span className="font-medium">
-                  {difficultyLevel === 'easy' ? 'Легкая' : difficultyLevel === 'medium' ? 'Средняя' : 'Сложная'}
-                </span>
+                    {getDifficultyDisplayText()} ({difficulty}/5)
+                  </span>
                   </p>
                   <div className="mb-4 p-4 bg-gray-500 dark:bg-gray-400 rounded-lg transition-colors">
                     <h3 className="font-bold text-white dark:text-gray-900 mb-2 transition-colors">Как играть:</h3>
                     <ul className="text-left text-gray-200 dark:text-gray-800 list-disc pl-5 transition-colors">
                       <li>Выбирайте правильный ответ из вариантов</li>
-                      <li>Выберите до того, как задача упадет</li>
-                      <li>За каждый правильный ответ +10 очков</li>
-                      <li>3 упущенные задачи = конец игры</li>
+                      <li>За каждый правильный ответ: +10 очков</li>
+                      <li>За каждый неправильный ответ: -5 очков</li>
+                      <li>За пропущенную задачу: -5 очков и -1 жизнь</li>
+                      <li>3 пропущенные задачи = конец игры</li>
+                      <li>У вас ровно 1 минута!</li>
                     </ul>
                   </div>
-                  <Button
-                      onClick={startGameWithCountdown}
-                  >
+                  <Button onClick={startGameWithCountdown}>
                     Начать игру
                   </Button>
                 </div>
               </div>
           )}
 
-          {/* Обратный отсчет перед началом */}
+          {/* Countdown screen */}
           {countdownActive && (
               <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 z-30">
-                <div className="text-9xl font-bold text-white" style={{animation: 'pulse 1.5s infinite'}}>
+                <div className="text-9xl font-bold text-white animate-pulse">
                   {countdown}
                 </div>
               </div>
           )}
 
-          {/* Уведомление с обратной связью */}
+          {/* Feedback notification */}
           {showFeedback && (
-              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-40"
-                   style={{
-                     animation: 'bounce 0.5s',
-                     backgroundColor: feedbackType === 'success'
-                         ? 'var(--bg-green-700, rgb(21, 128, 61))'
-                         : 'var(--bg-red-700, rgb(185, 28, 28))',
-                     color: 'white'
-                   }}>
+              <div
+                  className="absolute bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-40"
+                  style={{
+                    animation: 'bounce 0.5s',
+                    backgroundColor: feedbackType === 'success'
+                        ? 'var(--bg-green-700, rgb(21, 128, 61))'
+                        : 'var(--bg-red-700, rgb(185, 28, 28))',
+                    color: 'white'
+                  }}
+              >
                 {feedbackMessage}
               </div>
           )}
 
-          {/* Добавляем фоновую сетку для лучшего визуального восприятия */}
+          {/* Background grid */}
           <div className="absolute inset-0 grid grid-cols-8 grid-rows-6 gap-0.5 pointer-events-none">
             {Array(48).fill(0).map((_, idx) => (
-                <div key={idx}
-                     className="bg-gray-600 dark:bg-gray-300 bg-opacity-20 dark:bg-opacity-20 transition-colors"></div>
+                <div
+                    key={idx}
+                    className="bg-gray-600 dark:bg-gray-300 bg-opacity-20 dark:bg-opacity-20 transition-colors"
+                ></div>
             ))}
           </div>
         </div>
 
-        {/* Стили для анимаций */}
+        {/* Animation styles */}
         <style>
           {`
-          @keyframes fall {
-            from { top: -20px; }
-            to { top: 100%; }
-          }
-          
-          @keyframes fallTransform {
-            from { transform: translateY(-20px); }
-            to { transform: translateY(calc(100vh - 100px)); }
-          }
-          
           @keyframes fallNew {
             0% { top: -80px; }
             100% { top: 100%; }
@@ -808,6 +823,10 @@ const DerivFall: React.FC<DerivFallProps> = ({
           @keyframes bounce {
             0%, 100% { transform: translateX(-50%) translateY(0); }
             50% { transform: translateX(-50%) translateY(-10px); }
+          }
+          
+          .animate-pulse {
+            animation: pulse 1.5s infinite;
           }
         `}
         </style>

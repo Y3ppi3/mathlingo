@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchMapData } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
+
 
 interface TaskGroup {
     id: number;
@@ -51,6 +53,34 @@ interface AdventureMapProps {
     subjectId: number;
 }
 
+const fetchWithErrorHandling = async (url: string) => {
+    console.log(`📡 Fetching: ${url}`); // Log all API requests
+
+    try {
+        const response = await fetch(url, {
+            credentials: 'include', // Include cookies for authentication
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log(`📡 Response status: ${response.status} for ${url}`);
+
+        if (!response.ok) {
+            const errorText = await response.text(); // Get error text for debugging
+            console.error(`📡 Error response: ${errorText}`);
+            throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log(`📡 Success for ${url}`, data);
+        return data;
+    } catch (error) {
+        console.error(`📡 Fetch error for ${url}:`, error);
+        throw error;
+    }
+};
+
 const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
     const [locations, setLocations] = useState<Location[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -58,38 +88,72 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
     const [mapName, setMapName] = useState<string>('');
     const navigate = useNavigate();
+    const { isAuthenticated } = useAuth(); // Add this line
+    const API_URL = import.meta.env.VITE_API_URL || '';
 
     useEffect(() => {
         const loadMapData = async () => {
             try {
                 setLoading(true);
-                const data = await fetchMapData(subjectId) as MapResponse;
+                setError(null);
 
-                // Сохраняем имя карты
-                setMapName(data.map.name || 'Карта приключений');
+                console.log(`🗺️ Loading map data for subject ${subjectId}`);
 
-                // Преобразуем данные, учитывая прогресс пользователя
-                const processedLocations = data.map.locations.map((loc) => ({
-                    ...loc,
-                    unlocked: data.userProgress.unlockedLocations.includes(loc.id),
-                    completed: data.userProgress.completedLocations.includes(loc.id),
-                    taskGroups: loc.taskGroups.map((group) => ({
-                        ...group,
-                        completed: data.userProgress.completedLocations.includes(group.id)
-                    }))
-                }));
+                // Step 1: Get maps for the subject
+                let mapsData: any[];
+                try {
+                    const mapsEndpoint = `${API_URL}/gamification/maps/${subjectId}`;
+                    mapsData = await fetchWithErrorHandling(mapsEndpoint);
 
-                setLocations(processedLocations);
+                    console.log(`🗺️ Found ${mapsData.length} maps for subject ${subjectId}`);
+
+                    if (!mapsData || mapsData.length === 0) {
+                        setError('No maps found for this subject');
+                        setLoading(false);
+                        return;
+                    }
+                } catch (err) {
+                    console.error('Failed to load maps list:', err);
+                    setError('Could not load maps for this subject');
+                    setLoading(false);
+                    return;
+                }
+
+                // Step 2: Load data for the first map
+                try {
+                    const mapId = mapsData[0].id;
+                    const mapDataEndpoint = `${API_URL}/gamification/maps/${mapId}/data`;
+                    const data = await fetchWithErrorHandling(mapDataEndpoint);
+
+                    // Set map name from data
+                    setMapName(data.map.name || 'Adventure Map');
+
+                    // Process locations with user progress
+                    const processedLocations = data.map.locations.map((loc: any) => ({
+                        ...loc,
+                        unlocked: data.userProgress.unlockedLocations.includes(loc.id),
+                        completed: data.userProgress.completedLocations.includes(loc.id),
+                        taskGroups: (loc.taskGroups || []).map((group: any) => ({
+                            ...group,
+                            completed: data.userProgress.completedLocations.includes(group.id)
+                        }))
+                    }));
+
+                    setLocations(processedLocations);
+                } catch (err) {
+                    console.error('Failed to load map data:', err);
+                    setError('Could not load adventure map data');
+                }
             } catch (err) {
-                setError('Не удалось загрузить карту приключений. Попробуйте позже.');
-                console.error(err);
+                console.error('Error in loadMapData:', err);
+                setError('Failed to load adventure map. Please try again later.');
             } finally {
                 setLoading(false);
             }
         };
 
         loadMapData();
-    }, [subjectId]);
+    }, [subjectId, API_URL]);
 
     const handleLocationClick = (location: Location) => {
         if (location.unlocked) {
@@ -99,9 +163,14 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
         }
     };
 
-    const openGamesPage = () => {
-        // Переходим на страницу с играми для текущего предмета
-        navigate(`/subject/${subjectId}/games`);
+    const openGamesPage = (taskGroup: TaskGroup) => {
+        // Pass difficulty and reward points as URL parameters
+        navigate(`/subject/${subjectId}/games?difficulty=${taskGroup.difficulty}&reward=${taskGroup.reward_points}`);
+    };
+
+    const launchGameDirectly = (taskGroup: TaskGroup) => {
+        // Here we directly pass the settings to the game page for the "deriv-fall" game
+        navigate(`/subject/${subjectId}/game/deriv-fall?difficulty=${taskGroup.difficulty}&reward=${taskGroup.reward_points}`);
     };
 
     if (loading) return <div className="flex justify-center items-center h-96">Загрузка карты приключений...</div>;
@@ -178,7 +247,7 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                         <div className="mb-6">
                             <button
                                 className="w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
-                                onClick={openGamesPage}
+                                onClick={() => navigate(`/subject/${subjectId}/games`)}
                             >
                                 Открыть игры
                             </button>
@@ -206,8 +275,8 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                                                         key={i}
                                                         className={`w-4 h-4 ${
                                                             i < group.difficulty
-                                                                ? 'text-yellow-400'  // Ярче для лучшей видимости
-                                                                : 'text-gray-600'    // Темнее для неактивных
+                                                                ? 'text-yellow-400'
+                                                                : 'text-gray-600'
                                                         }`}
                                                     >
                                                         ★
@@ -218,6 +287,20 @@ const AdventureMap: React.FC<AdventureMapProps> = ({ subjectId }) => {
                                                 {group.tasks.length} задани{group.tasks.length === 1 ? 'е' : 'й'}
                                             </span>
                                         </div>
+                                        {/* Add button for each task group */}
+                                        <button
+                                            className="w-full mt-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors text-sm"
+                                            onClick={() => openGamesPage(group)}
+                                        >
+                                            Начать игру
+                                        </button>
+                                        {/* Quick start button */}
+                                        <button
+                                            className="w-full mt-2 px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm"
+                                            onClick={() => launchGameDirectly(group)}
+                                        >
+                                            Быстрый старт
+                                        </button>
                                     </div>
                                 ))}
                             </div>

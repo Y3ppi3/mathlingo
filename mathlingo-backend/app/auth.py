@@ -1,12 +1,15 @@
+import os
 from datetime import datetime, timedelta
 from typing import Optional
-import os
+
+import bcrypt
+from passlib.handlers.bcrypt import bcrypt_sha256
 import jwt
+from dotenv import load_dotenv
 from fastapi import Request, Depends, HTTPException, status
 from jose import JWTError
-from sqlalchemy.orm import Session
-from dotenv import load_dotenv
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, Admin
@@ -22,7 +25,12 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__ident="2b"
+)
 
 
 def hash_password(password: str) -> str:
@@ -35,24 +43,21 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
-    Генерирует JWT-токен.
+    Generates a JWT token.
     """
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
 
+    # Print data for debugging
+    print(f"\n➡️ Creating access token with data: {to_encode}", flush=True)
+    print(f"🔑 Using SECRET_KEY: {SECRET_KEY[:5]}...", flush=True)
+
     token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-    # ✅ Логируем создание токена
-    log_data = f"\n➡️ Вызван create_access_token:\n" \
-               f"   Данные: {data}\n" \
-               f"   Токен: {token}\n"
-
-    print(log_data, flush=True)
-
-    # ✅ Записываем в файл (если print не работает в Docker)
-    with open("debug.log", "a") as f:
-        f.write(log_data)
+    # Log token for debugging
+    token_preview = token[:20] + "..." if len(token) > 20 else token
+    print(f"🔖 Generated token: {token_preview}", flush=True)
 
     return token
 
