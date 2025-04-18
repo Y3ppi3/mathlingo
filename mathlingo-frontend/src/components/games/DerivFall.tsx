@@ -967,8 +967,8 @@ const DerivFall: React.FC<DerivFallProps> = ({
         <style>
           {`
           @keyframes fallNew {
-            0% { top: -80px; }
-            100% { top: 100%; }
+            0% { top: -80px; transform: translateX(-50%); }
+            100% { top: 100%; transform: translateX(-50%); }
           }
           
           @keyframes fadeOut {

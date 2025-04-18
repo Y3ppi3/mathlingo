@@ -68,9 +68,15 @@ const GameLauncherPage: React.FC = () => {
                     subjectId === '1') {
                     subjectTheme = 'derivatives';
                     console.log(`Определена тема: ПРОИЗВОДНЫЕ (id: ${subjectId})`);
-                } else {
+                } else if (subjectNameLower.includes('интеграл') ||
+                    subjectId === '2' ||
+                    subjectId === '3') {
                     subjectTheme = 'integrals';
                     console.log(`Определена тема: ИНТЕГРАЛЫ (id: ${subjectId})`);
+                } else {
+                    // Если не смогли определить по имени - считаем интегралами для безопасности
+                    subjectTheme = 'integrals';
+                    console.log(`Невозможно точно определить тему, используем ИНТЕГРАЛЫ (id: ${subjectId})`);
                 }
 
                 // Здесь в реальном приложении вы бы загружали список игр с сервера

@@ -938,6 +938,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                             dataKey="y"
                             name="f(x)"
                             stroke="#8884d8"
+                            strokeWidth={3}
                             dot={false}
                             isAnimationActive={false}
                         />
@@ -949,6 +950,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                                 dataKey="y"
                                 name="f'(x)"
                                 stroke="#82ca9d"
+                                strokeWidth={3} // Увеличиваем толщину линии
                                 dot={false}
                                 isAnimationActive={false}
                             />
@@ -963,6 +965,7 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
                                 stroke="#ffc658"
                                 fill="#ffc658"
                                 fillOpacity={0.3}
+                                strokeWidth={3} // Увеличиваем толщину линии
                                 dot={false}
                                 isAnimationActive={false}
                             />
