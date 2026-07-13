@@ -1,6 +1,23 @@
 from tests.conftest import authorization_header
 
 
+def test_login_attempt_is_audited_with_target_email(client, admin, db):
+    from app.models import AuditLog
+
+    client.post("/admin/login", json={"email": admin.email, "password": "wrong-password"})
+    client.post("/admin/login", json={"email": admin.email, "password": "password123"})
+
+    entries = db.query(AuditLog).filter(AuditLog.path == "/admin/login").order_by(AuditLog.id).all()
+    assert len(entries) == 2
+    assert entries[0].status_code == 401
+    assert entries[1].status_code == 200
+    assert entries[0].entity_id == admin.email
+    assert entries[1].entity_id == admin.email
+    # login никогда не может знать актёра до выдачи токена — это архитектурно,
+    # а не баг; entity_id (email) — единственный способ понять, чей это запрос
+    assert entries[0].actor_admin_id is None
+
+
 def test_legacy_api_tasks_mutation_is_also_audited(client, content_manager_admin, db):
     # POST /api/tasks/ (app/routes/tasks.py) requires admin auth but lives
     # under /api, not /admin — the audit middleware has an explicit
