@@ -9,8 +9,9 @@ import os
 from dotenv import load_dotenv
 
 from app.database import get_db
-from app.models import Admin, Attempt, User, Task, TaskGroup, MapLocation, AdventureMap, UserProgress, Achievement
+from app.models import Admin, Attempt, MasteryState, User, Task, TaskGroup, MapLocation, AdventureMap, UserProgress, Achievement
 from app.auth import get_admin_current_user, get_current_user, get_token_from_request, require_role
+from app.services import mastery
 from app.schemas import (
     AdminCreate,
     AdminResponse,
@@ -24,7 +25,8 @@ from app.schemas import (
     UserProgressResponse,
     AchievementResponse,
     TaskSubmissionRequest,
-    TaskSubmissionResponse
+    TaskSubmissionResponse,
+    MasteryStateResponse,
 )
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -481,8 +483,37 @@ def submit_answer(
 
     db.commit()
 
+    # Пересчёт mastery — синхронно, сразу после попытки (R2 task 2). Только
+    # если у задания вообще есть тема: без skill_id некуда писать состояние.
+    if task.skill_id is not None:
+        mastery.recompute(db, current_user.id, task.skill_id)
+
     return TaskSubmissionResponse(
         isCorrect=is_correct,
         points=points,
         feedback=None if is_correct else "Попробуйте ещё раз",
     )
+
+
+@router.get("/skills/{skill_id}/mastery", response_model=MasteryStateResponse)
+def get_skill_mastery(
+        skill_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    """
+    Текущее mastery_state ученика по теме — только для себя (current_user),
+    не по чужому user_id. Полноценный UI "почему такая рекомендация" и
+    временный выбор соседнего уровня — R2 task 4, здесь только данные.
+    """
+    state = (
+        db.query(MasteryState)
+        .filter(MasteryState.user_id == current_user.id, MasteryState.skill_id == skill_id)
+        .first()
+    )
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ещё нет данных по этой теме — нужна хотя бы одна попытка",
+        )
+    return state
