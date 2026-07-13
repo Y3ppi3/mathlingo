@@ -1,17 +1,21 @@
 
+import csv
+import io
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.database import get_db
-from app.models import Admin, ContentStatusHistory, Task, User, Subject, AdventureMap, MapLocation, TaskGroup
+from app.models import Admin, AuditLog, ContentStatusHistory, Task, User, Subject, AdventureMap, MapLocation, TaskGroup
 from app.schemas import (
-    AdminCreate, AdminResponse, TaskChangeRequest, TaskCreate, TaskResponse, TaskUpdate,
-    AdminLogin, UserResponse, SubjectCreate, SubjectUpdate, SubjectResponse)
+    AdminAccountResponse, AdminCreate, AdminResponse, AuditLogResponse, BulkActionFailure,
+    TaskBulkActionRequest, TaskBulkActionResult, TaskChangeRequest, TaskCreate, TaskImportRequest,
+    TaskImportResult, TaskImportRowFailure, TaskResponse, TaskUpdate, AdminLogin,
+    UserBulkStatusUpdate, UserResponse, SubjectCreate, SubjectUpdate, SubjectResponse)
 from app.auth import get_admin_current_user, get_admin_current_user_optional, create_access_token, hash_password, verify_password, require_role
 from typing import Optional
 
@@ -304,6 +308,143 @@ def archive_task(
     return _apply_task_transition("archive", task_id, db, current_admin)
 
 
+# Массовое действие над набором заданий. Каждый id обрабатывается независимо
+# (частичный успех — нормальный исход: одно задание может быть не в том
+# статусе, остальные при этом всё равно применяются), а не всё-или-ничего —
+# так удобнее для модерации большого списка контента.
+@router.post("/tasks/bulk", response_model=TaskBulkActionResult)
+def bulk_task_action(
+        body: TaskBulkActionRequest,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user),
+):
+    succeeded: List[int] = []
+    failed: List[BulkActionFailure] = []
+    for task_id in body.ids:
+        try:
+            _apply_task_transition(body.action, task_id, db, current_admin, comment=body.comment)
+            succeeded.append(task_id)
+        except HTTPException as e:
+            failed.append(BulkActionFailure(id=task_id, detail=str(e.detail)))
+    return TaskBulkActionResult(succeeded=succeeded, failed=failed)
+
+
+_TASK_EXPORT_FIELDS = [
+    "id", "title", "description", "subject", "subject_id", "skill_id", "owner_id",
+    "level", "status", "version", "source", "created_by_admin_id",
+    "approved_by_admin_id", "published_at", "archived_at",
+]
+
+
+@router.get("/tasks/export")
+def export_tasks(
+        format: str = "json",
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user),
+):
+    tasks = db.query(Task).all()
+
+    if format == "csv":
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=_TASK_EXPORT_FIELDS)
+        writer.writeheader()
+        for t in tasks:
+            writer.writerow({field: getattr(t, field) for field in _TASK_EXPORT_FIELDS})
+        buffer.seek(0)
+        return StreamingResponse(
+            iter([buffer.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=tasks.csv"},
+        )
+
+    if format != "json":
+        raise HTTPException(status_code=400, detail="format должен быть 'json' или 'csv'")
+
+    return [{field: getattr(t, field) for field in _TASK_EXPORT_FIELDS} for t in tasks]
+
+
+def _import_task_row(row: dict, index: int, db: Session, current_admin: Admin):
+    """
+    Валидация схемой (TaskCreate) перед вставкой — если строка не проходит
+    Pydantic-валидацию, дальше она вообще не доходит до Task(...)/db.add().
+    Возвращает (created_id, error) — ровно один из двух непустой.
+    """
+    try:
+        item = TaskCreate(**row)
+    except ValidationError as e:
+        return None, TaskImportRowFailure(row=index, detail=str(e))
+
+    try:
+        subject = db.query(Subject).filter(Subject.code == item.subject).first()
+        subject_id = subject.id if subject else None
+        _validate_skill_for_subject(db, item.skill_id, subject_id)
+
+        db_task = Task(
+            title=item.title,
+            description=item.description,
+            subject=item.subject,
+            subject_id=subject_id,
+            owner_id=item.owner_id,
+            skill_id=item.skill_id,
+            level=item.level,
+            status="draft",
+            version=1,
+            source="manual",
+            created_by_admin_id=current_admin.id,
+        )
+        db.add(db_task)
+        db.commit()
+        db.refresh(db_task)
+        return db_task.id, None
+    except HTTPException as e:
+        db.rollback()
+        return None, TaskImportRowFailure(row=index, detail=str(e.detail))
+
+
+# Импорт из JSON — как и bulk-действия, каждая строка независима: невалидная
+# по бизнес-правилам строка (напр. skill из чужого subject) не блокирует
+# остальные. Схемная валидация (TaskCreate) — на уровне каждой строки, а не
+# всего массива целиком, ради того же партиального успеха.
+@router.post("/tasks/import", response_model=TaskImportResult)
+def import_tasks_json(
+        body: TaskImportRequest,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT),
+):
+    created: List[int] = []
+    failed: List[TaskImportRowFailure] = []
+    for index, row in enumerate(body.rows):
+        task_id, error = _import_task_row(row, index, db, current_admin)
+        if error:
+            failed.append(error)
+        else:
+            created.append(task_id)
+    return TaskImportResult(created=created, failed=failed)
+
+
+@router.post("/tasks/import-csv", response_model=TaskImportResult)
+async def import_tasks_csv(
+        file: UploadFile = File(...),
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT),
+):
+    raw = (await file.read()).decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(raw))
+
+    created: List[int] = []
+    failed: List[TaskImportRowFailure] = []
+    for index, raw_row in enumerate(reader):
+        # Пустая ячейка CSV -> "" -> невалидно для Optional[int] полей
+        # (skill_id/owner_id) в Pydantic; приводим "" к None перед валидацией.
+        row = {k: (v if v not in (None, "") else None) for k, v in raw_row.items()}
+        task_id, error = _import_task_row(row, index, db, current_admin)
+        if error:
+            failed.append(error)
+        else:
+            created.append(task_id)
+    return TaskImportResult(created=created, failed=failed)
+
+
 '''
 @router.put("/tasks/{task_id}", response_model=TaskResponse)
 def update_task(
@@ -456,12 +597,16 @@ def delete_subject(
     return None
 
 
+# Управление учётками пользователей — только superadmin. teacher/content_manager
+# работают с учащимися только на чтение (просмотр прогресса), см.
+# docs/roadmap/product-technical-plan.md (R1, §5). Тронуто заодно с bulk-status
+# ниже, чтобы не оставлять одиночный и массовый эндпоинты с разными правами.
 @router.put("/users/{user_id}/status")
 def update_user_status(
         user_id: int,
         status_update: UserStatusUpdate,  # Используем модель Pydantic
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(require_role("superadmin"))
 ):
     """Обновление статуса пользователя"""
     user = db.query(User).filter(User.id == user_id).first()
@@ -473,11 +618,26 @@ def update_user_status(
     return {"message": f"Пользователь {'активирован' if status_update.is_active else 'деактивирован'} успешно"}
 
 
+@router.post("/users/bulk-status")
+def bulk_update_user_status(
+        body: UserBulkStatusUpdate,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(require_role("superadmin")),
+):
+    updated = (
+        db.query(User)
+        .filter(User.id.in_(body.ids))
+        .update({"is_active": body.is_active}, synchronize_session=False)
+    )
+    db.commit()
+    return {"updated_count": updated}
+
+
 @router.delete("/users/{user_id}")
 def delete_user(
         user_id: int,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(require_role("superadmin"))
 ):
     """Delete a user"""
     user = db.query(User).filter(User.id == user_id).first()
@@ -546,3 +706,42 @@ def admin_delete_subject(
             status_code=500,
             detail=f"Ошибка при удалении раздела: {str(e)}"
         )
+
+
+# Список staff-аккаунтов для зоны "Пользователи и роли" — управление ролями
+# целиком в руках superadmin, поэтому и список только для superadmin.
+@router.get("/admins", response_model=List[AdminAccountResponse])
+def list_admins(
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(require_role("superadmin")),
+):
+    return db.query(Admin).order_by(Admin.id).all()
+
+
+# Просмотр аудита: superadmin видит всё, content_manager — только свои
+# действия, teacher не видит вовсе (см. docs/roadmap/product-technical-plan.md,
+# R1 §5 — "Просмотр аудита | ✅ | частично (свои действия) | ❌").
+@router.get("/audit-log", response_model=List[AuditLogResponse])
+def list_audit_log(
+        skip: int = 0,
+        limit: int = 100,
+        entity_type: Optional[str] = None,
+        actor_admin_id: Optional[int] = None,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user),
+):
+    if current_admin.role == "teacher":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Аудит недоступен для роли teacher")
+
+    if current_admin.role == "content_manager":
+        if actor_admin_id is not None and actor_admin_id != current_admin.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Доступны только свои действия")
+        actor_admin_id = current_admin.id
+
+    query = db.query(AuditLog)
+    if entity_type is not None:
+        query = query.filter(AuditLog.entity_type == entity_type)
+    if actor_admin_id is not None:
+        query = query.filter(AuditLog.actor_admin_id == actor_admin_id)
+
+    return query.order_by(AuditLog.id.desc()).offset(skip).limit(limit).all()

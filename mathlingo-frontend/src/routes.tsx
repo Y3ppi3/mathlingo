@@ -14,9 +14,15 @@ import ProfilePage from "./pages/ProfilePage";
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 
 import AdminLogin from "./pages/AdminLogin";
-import AdminDashboard from "./pages/AdminDashboard";
+import AdminLayout from "./pages/AdminLayout";
 import AdminTaskForm from "./pages/AdminTaskForm";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminOverviewPanel from "./components/admin/AdminOverviewPanel";
+import ContentZonePanel from "./components/admin/ContentZonePanel";
+import UsersPanel from "./components/admin/UsersPanel";
+import StaffPanel from "./components/admin/StaffPanel";
+import AuditLogPanel from "./components/admin/AuditLogPanel";
+import StubZonePanel from "./components/admin/StubZonePanel";
 
 // Компонент для защиты маршрутов админа
 function AdminProtectedRoute({ children }: { children: JSX.Element }) {
@@ -117,16 +123,8 @@ function AppRoutes() {
                 }
             />
 
-            {/* Маршруты для админ-панели */}
+            {/* Маршруты для админ-панели ("God Mode" — см. docs/roadmap/product-technical-plan.md, R1 §3) */}
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route
-                path="/admin/dashboard"
-                element={
-                    <AdminProtectedRoute>
-                        <AdminDashboard />
-                    </AdminProtectedRoute>
-                }
-            />
             <Route
                 path="/admin/task/:taskId"
                 element={
@@ -135,16 +133,46 @@ function AppRoutes() {
                     </AdminProtectedRoute>
                 }
             />
-            {/* Маршрут для админ-панели геймификации */}
+            {/* Обратная совместимость со старыми путями */}
+            <Route path="/admin/dashboard" element={<Navigate to="/admin/overview" replace />} />
+            <Route path="/admin/gamification" element={<Navigate to="/admin/games" replace />} />
+
             <Route
-                path="/admin/gamification"
+                path="/admin"
                 element={
                     <AdminProtectedRoute>
-                        <GamificationPanel />
+                        <AdminLayout />
                     </AdminProtectedRoute>
                 }
-            />
-            <Route path="/admin" element={<Navigate to="/admin/login" />} />
+            >
+                <Route index element={<Navigate to="overview" replace />} />
+                <Route path="overview" element={<AdminOverviewPanel />} />
+                <Route path="content" element={<ContentZonePanel />} />
+                <Route
+                    path="ai-queue"
+                    element={
+                        <StubZonePanel
+                            title="AI-очередь"
+                            availableFrom="R2"
+                            description="Пакетные заказы на AI-генерацию заданий, конвейер проверки и публикации. Появится вместе с адаптивной моделью освоения."
+                        />
+                    }
+                />
+                <Route path="games" element={<GamificationPanel />} />
+                <Route path="students" element={<UsersPanel />} />
+                <Route
+                    path="quality"
+                    element={
+                        <StubZonePanel
+                            title="Аналитика качества"
+                            availableFrom="R2"
+                            description="Точность, время решения, жалобы и оценки преподавателей по AI-сгенерированным заданиям."
+                        />
+                    }
+                />
+                <Route path="staff" element={<StaffPanel />} />
+                <Route path="audit" element={<AuditLogPanel />} />
+            </Route>
         </Routes>
     );
 }

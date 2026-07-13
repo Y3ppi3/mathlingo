@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 AdminRole = Literal["superadmin", "content_manager", "teacher"]
 
@@ -29,6 +29,34 @@ class AdminResponse(AdminBase):
     is_active: bool
     created_at: datetime
     token: str
+
+    class Config:
+        from_attributes = True
+
+
+# Для списков staff-аккаунтов — без token (это не сам вошедший админ, а
+# запись в списке, выдавать чужой токен незачем и небезопасно).
+class AdminAccountResponse(AdminBase):
+    id: int
+    role: AdminRole
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AuditLogResponse(BaseModel):
+    id: int
+    actor_admin_id: Optional[int] = None
+    actor_role: Optional[str] = None
+    method: str
+    path: str
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    action: Optional[str] = None
+    status_code: int
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -121,6 +149,41 @@ class TaskResponse(TaskBase):
 
 class TaskChangeRequest(BaseModel):
     comment: Optional[str] = None
+
+
+class TaskBulkActionRequest(BaseModel):
+    ids: List[int]
+    action: Literal["submit_review", "approve", "request_changes", "publish", "archive"]
+    comment: Optional[str] = None
+
+
+class BulkActionFailure(BaseModel):
+    id: int
+    detail: str
+
+
+class TaskBulkActionResult(BaseModel):
+    succeeded: List[int]
+    failed: List[BulkActionFailure]
+
+
+class TaskImportRowFailure(BaseModel):
+    row: int
+    detail: str
+
+
+class TaskImportResult(BaseModel):
+    created: List[int]
+    failed: List[TaskImportRowFailure]
+
+
+class TaskImportRequest(BaseModel):
+    rows: List[Dict[str, Any]]
+
+
+class UserBulkStatusUpdate(BaseModel):
+    ids: List[int]
+    is_active: bool
 
 
 class ContentStatusHistoryResponse(BaseModel):
