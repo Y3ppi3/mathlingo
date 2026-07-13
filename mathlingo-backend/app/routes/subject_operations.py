@@ -4,7 +4,7 @@ from typing import Optional
 
 from app.database import get_db
 from app.models import Subject, Task, AdventureMap
-from app.auth import get_admin_current_user
+from app.auth import require_role
 
 router = APIRouter(prefix="/admin/subject-ops", tags=["subject_operations"])
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/admin/subject-ops", tags=["subject_operations"])
 async def delete_subject_operation(
         subject_id: int,
         db: Session = Depends(get_db),
-        current_admin=Depends(get_admin_current_user)
+        current_admin=Depends(require_role("superadmin"))
 ):
     """Simple operation to delete a subject by ID"""
 

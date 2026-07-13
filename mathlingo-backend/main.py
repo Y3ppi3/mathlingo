@@ -83,14 +83,22 @@ async def csrf_protection(request: Request, call_next):
 
 AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
+# Единственный admin-only мутирующий эндпоинт вне префикса /admin — легаси
+# POST /api/tasks/ в app/routes/tasks.py (require_role, но смонтирован под
+# /api вместе со студенческими роутами). Явно перечисляем, а не расширяем
+# правило до "любой /api путь с admin-ролью", чтобы не аудировать студенческие
+# мутации (/api/login/, /api/me/update и т.д.) заодно.
+AUDITED_NON_ADMIN_PATHS = {"/api/tasks/"}
+
 
 def _parse_admin_audit_path(path: str):
     """
-    Best-effort разбор /admin/<entity_type>[/<id>[/<action>]] — не полноценная
-    семантическая классификация, просто удобные для фильтрации поля поверх
-    того, что и так есть в path/method.
+    Best-effort разбор <prefix>/<entity_type>[/<id>[/<action>]] — не
+    полноценная семантическая классификация, просто удобные для фильтрации
+    поля поверх того, что и так есть в path/method.
     """
-    segments = [s for s in path[len("/admin"):].split("/") if s]
+    prefix = "/admin" if path.startswith("/admin") else "/api"
+    segments = [s for s in path[len(prefix):].split("/") if s]
     if not segments:
         return None, None, None
 
@@ -117,7 +125,8 @@ async def audit_logging(request: Request, call_next):
     """
     response = await call_next(request)
 
-    if request.method in AUDIT_METHODS and request.url.path.startswith("/admin"):
+    is_audited_path = request.url.path.startswith("/admin") or request.url.path in AUDITED_NON_ADMIN_PATHS
+    if request.method in AUDIT_METHODS and is_audited_path:
         # Уважаем app.dependency_overrides[get_db], чтобы в тестах мидлварь
         # писала в ту же (тестовую) БД, что и остальное приложение, а не в
         # отдельную "боевую" — мидлварь не проходит через DI и иначе взяла

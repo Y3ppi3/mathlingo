@@ -1,6 +1,24 @@
 from tests.conftest import authorization_header
 
 
+def test_legacy_api_tasks_mutation_is_also_audited(client, content_manager_admin, db):
+    # POST /api/tasks/ (app/routes/tasks.py) requires admin auth but lives
+    # under /api, not /admin — the audit middleware has an explicit
+    # allowlist entry for it so this doesn't silently fall outside coverage.
+    from app.models import AuditLog
+
+    response = client.post(
+        "/api/tasks/",
+        headers=authorization_header(content_manager_admin),
+        json={"title": "x", "subject": "algebra"},
+    )
+    assert response.status_code == 200
+
+    entry = db.query(AuditLog).filter(AuditLog.path == "/api/tasks/").one()
+    assert entry.actor_admin_id == content_manager_admin.id
+    assert entry.entity_type == "tasks"
+
+
 def test_successful_mutation_is_logged_with_actor(client, content_manager_admin, subject, db):
     from app.models import AuditLog
 

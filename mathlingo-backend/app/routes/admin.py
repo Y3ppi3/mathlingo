@@ -518,7 +518,7 @@ def get_all_subjects(
 def create_subject(
         subject: SubjectCreate,
         db: Session = Depends(get_db),
-        current_admin: User = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     """Создание нового раздела математики"""
     # Проверка на уникальность кода раздела
@@ -558,7 +558,7 @@ def update_subject(
         subject_id: int,
         subject_update: SubjectUpdate,
         db: Session = Depends(get_db),
-        current_admin: User = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     """Обновление информации о разделе"""
     db_subject = db.query(Subject).filter(Subject.id == subject_id).first()
@@ -577,7 +577,7 @@ def update_subject(
 def delete_subject(
         subject_id: int,
         db: Session = Depends(get_db),
-        current_admin: User = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(require_role("superadmin"))
 ):
     """Удаление раздела"""
     db_subject = db.query(Subject).filter(Subject.id == subject_id).first()
@@ -657,7 +657,7 @@ def admin_delete_subject(
         subject_id: int,
         force: bool = False,
         db: Session = Depends(get_db),
-        current_admin: User = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(require_role("superadmin"))
 ):
     """Удаление раздела с поддержкой параметра force для каскадного удаления"""
     # Проверяем существование раздела
