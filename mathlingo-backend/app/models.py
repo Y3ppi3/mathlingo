@@ -174,6 +174,34 @@ class Attempt(Base):
     skill = relationship("Skill")
 
 
+class MasteryState(Base):
+    """
+    R2 task 2: один пересчитанный уровень освоения на (user, skill). Пишется
+    сервисом app/services/mastery.py — не вручную из роутов. factors хранит
+    сырые сигналы (accuracy/avg_time_ratio/hints_rate), из которых считается
+    level — это и есть "причина рекомендации", которую увидит ученик (R2
+    task 4 строит UI поверх этого поля, здесь только данные).
+    """
+    __tablename__ = "mastery_state"
+    __table_args__ = (
+        UniqueConstraint("user_id", "skill_id", name="uq_mastery_state_user_id_skill_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    skill_id = Column(Integer, ForeignKey("skills.id"), nullable=False)
+    level = Column(String, nullable=False)
+    confidence = Column(Integer, nullable=False, default=0)  # 0..100, см. app/services/mastery.py
+    sample_size = Column(Integer, nullable=False, default=0)
+    factors = Column(JSON, nullable=True)
+    window_from = Column(DateTime, nullable=True)
+    window_to = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+    skill = relationship("Skill")
+
+
 class AuditLog(Base):
     """
     Пишется автоматически мидлварью audit_logging в main.py для КАЖДОГО

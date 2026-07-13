@@ -215,6 +215,18 @@ class ContentStatusHistoryResponse(BaseModel):
         from_attributes = True
 
 
+class MasteryStateResponse(BaseModel):
+    skill_id: int
+    level: TaskLevel
+    confidence: int
+    sample_size: int
+    factors: Optional[Dict[str, Any]] = None
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # Схемы для разделов математики
 class SubjectBase(BaseModel):
     name: str

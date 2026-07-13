@@ -265,3 +265,89 @@ def test_submit_answer_requires_authentication(client, db, subject):
     )
 
     assert response.status_code == 401
+
+
+# --- Интеграция с mastery (R2 task 2): submit-answer должен реально
+# триггерить mastery.recompute(), а не только сама функция сервиса вызываться
+# напрямую (это уже покрыто golden-тестами в test_mastery_service.py).
+
+def _make_skill_row(db, subject):
+    from app.models import Skill
+
+    skill = Skill(subject_id=subject.id, name="Skill", code="mastery-skill")
+    db.add(skill)
+    db.commit()
+    db.refresh(skill)
+    return skill
+
+
+def test_submit_answer_triggers_mastery_recompute(client, user, db, subject):
+    from app.models import MasteryState
+    from app.auth import create_access_token
+
+    skill = _make_skill_row(db, subject)
+    task = _make_published_task(db, subject, skill_id=skill.id)
+
+    token = create_access_token({"sub": user.email})
+    client.post(
+        "/gamification/submit-answer",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"task_id": task.id, "answer": "2x"},
+    )
+
+    state = db.query(MasteryState).filter(
+        MasteryState.user_id == user.id, MasteryState.skill_id == skill.id
+    ).one()
+    assert state.sample_size == 1
+
+
+def test_submit_answer_without_skill_does_not_create_mastery_state(client, user, db, subject):
+    from app.models import MasteryState
+    from app.auth import create_access_token
+
+    task = _make_published_task(db, subject, skill_id=None)
+    token = create_access_token({"sub": user.email})
+    client.post(
+        "/gamification/submit-answer",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"task_id": task.id, "answer": "2x"},
+    )
+
+    assert db.query(MasteryState).count() == 0
+
+
+def test_get_skill_mastery_returns_state_after_attempt(client, user, db, subject):
+    from app.auth import create_access_token
+
+    skill = _make_skill_row(db, subject)
+    task = _make_published_task(db, subject, skill_id=skill.id)
+    token = create_access_token({"sub": user.email})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    client.post("/gamification/submit-answer", headers=headers, json={"task_id": task.id, "answer": "2x"})
+    response = client.get(f"/gamification/skills/{skill.id}/mastery", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["skill_id"] == skill.id
+    assert body["sample_size"] == 1
+    assert "accuracy" in body["factors"]
+
+
+def test_get_skill_mastery_404_before_any_attempt(client, user, db, subject):
+    from app.auth import create_access_token
+
+    skill = _make_skill_row(db, subject)
+    token = create_access_token({"sub": user.email})
+    response = client.get(
+        f"/gamification/skills/{skill.id}/mastery",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_get_skill_mastery_requires_authentication(client, db, subject):
+    skill = _make_skill_row(db, subject)
+    response = client.get(f"/gamification/skills/{skill.id}/mastery")
+    assert response.status_code == 401
