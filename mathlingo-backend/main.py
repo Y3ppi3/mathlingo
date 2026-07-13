@@ -7,6 +7,9 @@ from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.database import get_db
+from app.models import AuditLog
+from app.auth import get_admin_current_user_optional
 from app.routes import users, tasks, admin, gamification, subjects, subject_operations, skills
 from app.routes.admin_gamification import router as admin_gamification_router
 
@@ -76,6 +79,73 @@ async def csrf_protection(request: Request, call_next):
                 status_code=403
             )
     return await call_next(request)
+
+
+AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _parse_admin_audit_path(path: str):
+    """
+    Best-effort разбор /admin/<entity_type>[/<id>[/<action>]] — не полноценная
+    семантическая классификация, просто удобные для фильтрации поля поверх
+    того, что и так есть в path/method.
+    """
+    segments = [s for s in path[len("/admin"):].split("/") if s]
+    if not segments:
+        return None, None, None
+
+    entity_type = segments[0]
+    entity_id = None
+    action = None
+    if len(segments) >= 2 and segments[1].isdigit():
+        entity_id = segments[1]
+        if len(segments) >= 3:
+            action = segments[2]
+    elif len(segments) >= 2:
+        action = segments[1]
+    return entity_type, entity_id, action
+
+
+@app.middleware("http")
+async def audit_logging(request: Request, call_next):
+    """
+    Пишет audit_log для КАЖДОГО мутирующего запроса под /admin — успешного
+    или нет (включая 401/403 — попытка тоже сигнал). Реализовано мидлварью,
+    а не точечными вызовами в эндпоинтах, чтобы покрытие не зависело от
+    того, вспомнил ли автор нового роута про логирование (см.
+    docs/roadmap/product-technical-plan.md, R1 §1.3 и DoD).
+    """
+    response = await call_next(request)
+
+    if request.method in AUDIT_METHODS and request.url.path.startswith("/admin"):
+        # Уважаем app.dependency_overrides[get_db], чтобы в тестах мидлварь
+        # писала в ту же (тестовую) БД, что и остальное приложение, а не в
+        # отдельную "боевую" — мидлварь не проходит через DI и иначе взяла
+        # бы реальный get_db в обход подмены.
+        db_dependency = app.dependency_overrides.get(get_db, get_db)
+        db_gen = db_dependency()
+        db = next(db_gen)
+        try:
+            current_admin = get_admin_current_user_optional(request, db)
+            entity_type, entity_id, action = _parse_admin_audit_path(request.url.path)
+            db.add(AuditLog(
+                actor_admin_id=current_admin.id if current_admin else None,
+                actor_role=current_admin.role if current_admin else None,
+                method=request.method,
+                path=request.url.path,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                action=action,
+                status_code=response.status_code,
+            ))
+            db.commit()
+        finally:
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
+
+    return response
 
 #CORS configuration
 origins = [
