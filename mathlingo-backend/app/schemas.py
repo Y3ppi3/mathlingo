@@ -1,6 +1,8 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
+
+AdminRole = Literal["superadmin", "content_manager", "teacher"]
 
 
 # Схемы для администратора
@@ -11,6 +13,9 @@ class AdminBase(BaseModel):
 
 class AdminCreate(AdminBase):
     password: str
+    # Игнорируется при бутстрапе первого админа (тот всегда становится
+    # superadmin). После бутстрапа обязателен — см. register_admin().
+    role: Optional[AdminRole] = None
 
 
 class AdminLogin(BaseModel):
@@ -20,6 +25,7 @@ class AdminLogin(BaseModel):
 
 class AdminResponse(AdminBase):
     id: int
+    role: AdminRole
     is_active: bool
     created_at: datetime
     token: str
