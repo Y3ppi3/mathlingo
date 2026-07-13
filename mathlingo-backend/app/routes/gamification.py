@@ -9,7 +9,7 @@ import os
 from dotenv import load_dotenv
 
 from app.database import get_db
-from app.models import Admin, Attempt, MasteryState, User, Task, TaskGroup, MapLocation, AdventureMap, UserProgress, Achievement
+from app.models import Admin, Attempt, Diagnostic, MasteryState, User, Task, TaskGroup, MapLocation, AdventureMap, UserProgress, Achievement
 from app.auth import get_admin_current_user, get_current_user, get_token_from_request, require_role
 from app.services import mastery
 from app.schemas import (
@@ -27,6 +27,10 @@ from app.schemas import (
     TaskSubmissionRequest,
     TaskSubmissionResponse,
     MasteryStateResponse,
+    DiagnosticView,
+    DiagnosticSubmitRequest,
+    DiagnosticSubmitResponse,
+    DiagnosticSubmitResult,
 )
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -517,3 +521,96 @@ def get_skill_mastery(
             detail="Ещё нет данных по этой теме — нужна хотя бы одна попытка",
         )
     return state
+
+
+# --- Диагностика (R2 task 3) ---
+
+@router.get("/skills/{skill_id}/diagnostic", response_model=DiagnosticView)
+def get_skill_diagnostic(
+        skill_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    diagnostic = (
+        db.query(Diagnostic)
+        .filter(Diagnostic.skill_id == skill_id, Diagnostic.is_active == True)
+        .order_by(Diagnostic.id.desc())
+        .first()
+    )
+    if not diagnostic:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Диагностика по этой теме недоступна")
+
+    tasks = db.query(Task).filter(Task.id.in_(diagnostic.task_ids)).all()
+    tasks_by_id = {t.id: t for t in tasks}
+    # Порядок задаётся diagnostic.task_ids, а не порядком в БД
+    ordered_tasks = [tasks_by_id[tid] for tid in diagnostic.task_ids if tid in tasks_by_id]
+
+    return DiagnosticView(
+        id=diagnostic.id,
+        skill_id=diagnostic.skill_id,
+        tasks=[
+            {
+                "id": t.id,
+                "title": t.title,
+                "content": t.content or "",
+                "options": t.options,
+                "answer_type": t.answer_type,
+            }
+            for t in ordered_tasks
+        ],
+    )
+
+
+@router.post("/diagnostics/{diagnostic_id}/submit", response_model=DiagnosticSubmitResponse)
+def submit_diagnostic(
+        diagnostic_id: int,
+        body: DiagnosticSubmitRequest,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    diagnostic = db.query(Diagnostic).filter(Diagnostic.id == diagnostic_id).first()
+    if not diagnostic or not diagnostic.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Диагностика не найдена")
+
+    valid_task_ids = set(diagnostic.task_ids)
+    results = []
+    correct_count = 0
+
+    for item in body.answers:
+        if item.task_id not in valid_task_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Задание {item.task_id} не входит в эту диагностику",
+            )
+        task = db.query(Task).filter(Task.id == item.task_id).first()
+        if not task:
+            continue
+
+        is_correct = _is_answer_correct(task, item.answer)
+        if is_correct:
+            correct_count += 1
+        results.append(DiagnosticSubmitResult(task_id=item.task_id, is_correct=is_correct))
+
+        db.add(Attempt(
+            user_id=current_user.id,
+            content_type="diagnostic",
+            content_id=diagnostic.id,
+            skill_id=diagnostic.skill_id,
+            is_correct=is_correct,
+            time_spent_ms=item.time_spent_ms,
+            hints_used=item.hints_used,
+            source="manual",
+        ))
+
+    db.commit()
+
+    # Один пересчёт на всю диагностику, не по каждому ответу — это и есть
+    # момент "видит стартовый уровень" из решений задачи.
+    mastery_state = mastery.recompute(db, current_user.id, diagnostic.skill_id)
+
+    return DiagnosticSubmitResponse(
+        results=results,
+        correct_count=correct_count,
+        total_count=len(results),
+        mastery=mastery_state,
+    )

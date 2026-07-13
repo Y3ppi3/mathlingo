@@ -7,6 +7,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import LogoutPage from "./pages/LogoutPage";
 import AdventureMapPage from "./pages/AdventureMapPage";
+import DiagnosticSolver from "./components/adventure/DiagnosticSolver";
 import GamificationPanel from "./components/admin/GamificationPanel";
 import GameLauncherPage from "./pages/GameLauncherPage";
 import GamePage from "./pages/GamePage";
@@ -93,6 +94,16 @@ function AppRoutes() {
                 element={
                     <ProtectedRoute>
                         <TaskGroupRedirect />
+                    </ProtectedRoute>
+                }
+            />
+
+            {/* Диагностика по теме (R2 task 3) */}
+            <Route
+                path="/subject/:subjectId/skill/:skillId/diagnostic"
+                element={
+                    <ProtectedRoute>
+                        <DiagnosticSolver />
                     </ProtectedRoute>
                 }
             />

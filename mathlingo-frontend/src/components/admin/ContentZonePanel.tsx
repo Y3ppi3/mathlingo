@@ -3,8 +3,9 @@ import { useState } from 'react';
 import TasksPanel from './TasksPanel';
 import SubjectsPanel from './SubjectsPanel';
 import SkillsPanel from './SkillsPanel';
+import DiagnosticsPanel from './DiagnosticsPanel';
 
-type SubTab = 'tasks' | 'subjects' | 'skills';
+type SubTab = 'tasks' | 'subjects' | 'skills' | 'diagnostics';
 
 // "Каталог учебного контента" объединяет задания, разделы и темы — все три
 // части одной content-модели (см. docs/roadmap/product-technical-plan.md, R1 §3).
@@ -18,6 +19,7 @@ const ContentZonePanel = () => {
                     ['tasks', 'Задания'],
                     ['subjects', 'Разделы'],
                     ['skills', 'Темы'],
+                    ['diagnostics', 'Диагностика'],
                 ] as [SubTab, string][]).map(([id, label]) => (
                     <button
                         key={id}
@@ -36,6 +38,7 @@ const ContentZonePanel = () => {
             {tab === 'tasks' && <TasksPanel />}
             {tab === 'subjects' && <SubjectsPanel />}
             {tab === 'skills' && <SkillsPanel />}
+            {tab === 'diagnostics' && <DiagnosticsPanel />}
         </div>
     );
 };

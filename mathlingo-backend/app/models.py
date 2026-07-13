@@ -202,6 +202,27 @@ class MasteryState(Base):
     skill = relationship("Skill")
 
 
+class Diagnostic(Base):
+    """
+    R2 task 3: куратор собирает набор УЖЕ опубликованных заданий темы в один
+    диагностический тест — не отдельный тип контента, ревью на самих
+    заданиях уже пройдено. task_ids — JSON-список id (не M2M-таблица: набор
+    маленький, порядок важен, отдельная таблица связи была бы overkill).
+    is_active вместо статус-workflow — как у Subject/Skill, без draft/review
+    (эта простота отличает Diagnostic от Task, тут разница осознанная).
+    """
+    __tablename__ = "diagnostics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    skill_id = Column(Integer, ForeignKey("skills.id"), nullable=False)
+    task_ids = Column(JSON, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_by_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    skill = relationship("Skill")
+
+
 class AuditLog(Base):
     """
     Пишется автоматически мидлварью audit_logging в main.py для КАЖДОГО
