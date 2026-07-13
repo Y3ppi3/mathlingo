@@ -223,6 +223,137 @@ class Diagnostic(Base):
     skill = relationship("Skill")
 
 
+class LevelOverride(Base):
+    """
+    R2 task 4: ученик временно выбирает СОСЕДНИЙ (не любой) уровень
+    относительно computed mastery_state.level — проверка соседства и срок
+    действия считаются в app/services/mastery.py, не здесь. Один активный
+    override на (user, skill) — новый вызов апсертит старый, а не плодит
+    историю (история переходов тут не нужна, в отличие от Task/ContentStatusHistory).
+    """
+    __tablename__ = "level_overrides"
+    __table_args__ = (
+        UniqueConstraint("user_id", "skill_id", name="uq_level_overrides_user_id_skill_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    skill_id = Column(Integer, ForeignKey("skills.id"), nullable=False)
+    chosen_level = Column(String, nullable=False)
+    reason = Column(String, nullable=False, default="manual")
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    skill = relationship("Skill")
+
+
+class PromptTemplate(Base):
+    """
+    R2 task 5: именованный шаблон промпта для AI-заказов. version — по
+    названию + версии можно проследить, каким именно шаблоном сгенерирован
+    конкретный AIGenerationItem (см. requested_by/prompt_template_id ниже) —
+    требование "хранить... prompt template, версию модели" из решений.
+    """
+    __tablename__ = "prompt_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    version = Column(Integer, nullable=False, default=1)
+    template_text = Column(String, nullable=False)
+    task_type = Column(String, nullable=False)  # single_answer | multiple_choice
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AIGenerationOrder(Base):
+    """
+    R2 task 5: пакетный заказ на AI-генерацию. Выбор провайдера не принят
+    (decision gate, см. docs/roadmap/product-technical-plan.md R2 §7) —
+    model_version здесь всегда указывает на MockAIProvider
+    (app/services/ai_provider.py), пока решение не закрыто. Обработка
+    заказа — синхронная (см. app/services/ai_pipeline.py); очереди задач
+    в проекте нет, при реальном провайдере и больших count это надо будет
+    вынести в фон — сознательно не делаю этого сейчас.
+    """
+    __tablename__ = "ai_generation_orders"
+
+    STATUSES = ("queued", "processing", "completed", "failed")
+
+    id = Column(Integer, primary_key=True, index=True)
+    subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=False)
+    skill_id = Column(Integer, ForeignKey("skills.id"), nullable=False)
+    level = Column(String, nullable=False, default="standard")
+    task_type = Column(String, nullable=False)  # single_answer | multiple_choice
+    count = Column(Integer, nullable=False)
+    constraints = Column(JSON, nullable=True)
+    prompt_template_id = Column(Integer, ForeignKey("prompt_templates.id"), nullable=False)
+    model_version = Column(String, nullable=False, default="mock-v1")
+    requested_by_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    status = Column(String, nullable=False, default="queued")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    subject = relationship("Subject")
+    skill = relationship("Skill")
+    prompt_template = relationship("PromptTemplate")
+    requested_by = relationship("Admin")
+    items = relationship("AIGenerationItem", back_populates="order", order_by="AIGenerationItem.index_in_order")
+
+
+class AIGenerationItem(Base):
+    """
+    Одно сгенерированное задание внутри заказа — трассировка по каждой
+    стадии конвейера отдельно (validation/sanitization/deterministic
+    check/critic), не одним булевым "прошло/не прошло". task_id
+    заполняется, ТОЛЬКО когда все автоматические стадии пройдены и создан
+    черновик Task(source="ai", status="draft") — дальше этот Task живёт по
+    ОБЫЧНОМУ R1 workflow (submit_review/approve/publish), отдельного
+    "review UI" для AI не строится, это и есть "используются наравне
+    с ручными" из решений. AI НИКОГДА не публикует сам — до draft доводит
+    только автоматика, дальше только человек.
+    """
+    __tablename__ = "ai_generation_items"
+
+    STATUSES = ("pending", "ready", "failed_generation", "failed_validation", "failed_answer_check")
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("ai_generation_orders.id"), nullable=False)
+    index_in_order = Column(Integer, nullable=False)
+    status = Column(String, nullable=False, default="pending")
+    failure_reason = Column(String, nullable=True)
+    draft_json = Column(JSON, nullable=True)
+    validation_result = Column(JSON, nullable=True)
+    sanitization_result = Column(JSON, nullable=True)
+    deterministic_check_result = Column(JSON, nullable=True)
+    ai_critic_result = Column(JSON, nullable=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    order = relationship("AIGenerationOrder", back_populates="items")
+    task = relationship("Task")
+
+
+class AIQuota(Base):
+    """
+    R2 task 6: месячная квота на AI-генерацию, одна строка на админа.
+    period — "YYYY-MM" текущего отслеживаемого месяца; при обращении в
+    новом месяце app/services/ai_quota.py сам сбрасывает used и сдвигает
+    period, отдельного cron/job для сброса нет. Списывается по количеству
+    ЗАПРОШЕННЫХ item'ов заказа (order.count), а не по успешно
+    сгенерированным — вызов провайдера произошёл независимо от того, прошёл
+    ли черновик валидацию (см. app/services/ai_pipeline.py).
+    """
+    __tablename__ = "ai_quotas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"), nullable=False, unique=True)
+    period = Column(String, nullable=False)
+    monthly_limit = Column(Integer, nullable=False)
+    used = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    admin = relationship("Admin")
+
+
 class AuditLog(Base):
     """
     Пишется автоматически мидлварью audit_logging в main.py для КАЖДОГО

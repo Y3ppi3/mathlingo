@@ -24,6 +24,7 @@ import UsersPanel from "./components/admin/UsersPanel";
 import StaffPanel from "./components/admin/StaffPanel";
 import AuditLogPanel from "./components/admin/AuditLogPanel";
 import StubZonePanel from "./components/admin/StubZonePanel";
+import AiQueuePanel from "./components/admin/AiQueuePanel";
 
 // Компонент для защиты маршрутов админа
 function AdminProtectedRoute({ children }: { children: JSX.Element }) {
@@ -159,16 +160,7 @@ function AppRoutes() {
                 <Route index element={<Navigate to="overview" replace />} />
                 <Route path="overview" element={<AdminOverviewPanel />} />
                 <Route path="content" element={<ContentZonePanel />} />
-                <Route
-                    path="ai-queue"
-                    element={
-                        <StubZonePanel
-                            title="AI-очередь"
-                            availableFrom="R2"
-                            description="Пакетные заказы на AI-генерацию заданий, конвейер проверки и публикации. Появится вместе с адаптивной моделью освоения."
-                        />
-                    }
-                />
+                <Route path="ai-queue" element={<AiQueuePanel />} />
                 <Route path="games" element={<GamificationPanel />} />
                 <Route path="students" element={<UsersPanel />} />
                 <Route

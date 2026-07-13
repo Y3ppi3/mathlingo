@@ -227,6 +227,118 @@ class MasteryStateResponse(BaseModel):
         from_attributes = True
 
 
+# R2 task 4: рекомендация уровня с "причиной" + временный выбор соседнего
+class LevelOverrideResponse(BaseModel):
+    chosen_level: TaskLevel
+    reason: str
+    expires_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SkillLevelResponse(BaseModel):
+    skill_id: int
+    computed_level: Optional[TaskLevel] = None
+    confidence: int = 0
+    sample_size: int = 0
+    factors: Optional[Dict[str, Any]] = None
+    override: Optional[LevelOverrideResponse] = None
+    effective_level: Optional[TaskLevel] = None
+
+
+class LevelOverrideRequest(BaseModel):
+    chosen_level: TaskLevel
+
+
+# Схемы AI-конвейера (R2 task 5)
+TaskType = Literal["single_answer", "multiple_choice"]
+AIOrderStatus = Literal["queued", "processing", "completed", "failed"]
+AIItemStatus = Literal["pending", "ready", "failed_generation", "failed_validation", "failed_answer_check"]
+
+
+class PromptTemplateCreate(BaseModel):
+    name: str
+    template_text: str
+    task_type: TaskType
+    version: int = 1
+
+
+class PromptTemplateResponse(BaseModel):
+    id: int
+    name: str
+    version: int
+    template_text: str
+    task_type: TaskType
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AIGenerationOrderCreate(BaseModel):
+    subject_id: int
+    skill_id: int
+    level: TaskLevel = "standard"
+    task_type: TaskType
+    count: int
+    constraints: Optional[Dict[str, Any]] = None
+    prompt_template_id: int
+
+
+class AIGenerationItemResponse(BaseModel):
+    id: int
+    index_in_order: int
+    status: AIItemStatus
+    failure_reason: Optional[str] = None
+    draft_json: Optional[Dict[str, Any]] = None
+    validation_result: Optional[Dict[str, Any]] = None
+    sanitization_result: Optional[Dict[str, Any]] = None
+    deterministic_check_result: Optional[Dict[str, Any]] = None
+    ai_critic_result: Optional[Dict[str, Any]] = None
+    task_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AIGenerationOrderResponse(BaseModel):
+    id: int
+    subject_id: int
+    skill_id: int
+    level: TaskLevel
+    task_type: TaskType
+    count: int
+    constraints: Optional[Dict[str, Any]] = None
+    prompt_template_id: int
+    model_version: str
+    requested_by_admin_id: Optional[int] = None
+    status: AIOrderStatus
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AIGenerationOrderDetailResponse(AIGenerationOrderResponse):
+    items: List[AIGenerationItemResponse] = []
+
+
+# Квоты (R2 task 6)
+class AIQuotaResponse(BaseModel):
+    admin_id: int
+    period: str
+    monthly_limit: int
+    used: int
+
+    class Config:
+        from_attributes = True
+
+
+class AIQuotaUpdateRequest(BaseModel):
+    monthly_limit: int
+
+
 # Схемы диагностики (R2 task 3)
 class DiagnosticCreate(BaseModel):
     skill_id: int

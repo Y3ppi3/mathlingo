@@ -472,3 +472,99 @@ export const updateDiagnostic = async (id: number, data: Partial<Pick<Diagnostic
     const response = await adminApi.put(`/admin/diagnostics/${id}`, data);
     return response.data;
 };
+
+// AI-конвейер (R2 task 5) — провайдер всегда MockAIProvider, пока не
+// закрыт decision gate по выбору реального провайдера.
+export interface PromptTemplate {
+    id: number;
+    name: string;
+    version: number;
+    template_text: string;
+    task_type: TaskAnswerType;
+    created_at: string;
+}
+
+export interface AIGenerationItem {
+    id: number;
+    index_in_order: number;
+    status: 'pending' | 'ready' | 'failed_generation' | 'failed_validation' | 'failed_answer_check';
+    failure_reason?: string | null;
+    draft_json?: Record<string, unknown> | null;
+    validation_result?: Record<string, unknown> | null;
+    sanitization_result?: Record<string, unknown> | null;
+    deterministic_check_result?: Record<string, unknown> | null;
+    ai_critic_result?: Record<string, unknown> | null;
+    task_id?: number | null;
+}
+
+export interface AIGenerationOrder {
+    id: number;
+    subject_id: number;
+    skill_id: number;
+    level: TaskLevel;
+    task_type: TaskAnswerType;
+    count: number;
+    prompt_template_id: number;
+    model_version: string;
+    status: 'queued' | 'processing' | 'completed' | 'failed';
+    created_at: string;
+}
+
+export interface AIGenerationOrderDetail extends AIGenerationOrder {
+    items: AIGenerationItem[];
+}
+
+export const fetchPromptTemplates = async (): Promise<PromptTemplate[]> => {
+    const response = await adminApi.get('/admin/ai/prompt-templates');
+    return response.data;
+};
+
+export const createPromptTemplate = async (data: { name: string; template_text: string; task_type: TaskAnswerType }): Promise<PromptTemplate> => {
+    const response = await adminApi.post('/admin/ai/prompt-templates', data);
+    return response.data;
+};
+
+export const fetchAiOrders = async (skillId?: number): Promise<AIGenerationOrder[]> => {
+    const response = await adminApi.get('/admin/ai/orders', { params: skillId ? { skill_id: skillId } : {} });
+    return response.data;
+};
+
+export const fetchAiOrder = async (id: number): Promise<AIGenerationOrderDetail> => {
+    const response = await adminApi.get(`/admin/ai/orders/${id}`);
+    return response.data;
+};
+
+export const createAiOrder = async (data: {
+    subject_id: number;
+    skill_id: number;
+    level: TaskLevel;
+    task_type: TaskAnswerType;
+    count: number;
+    prompt_template_id: number;
+}): Promise<AIGenerationOrderDetail> => {
+    const response = await adminApi.post('/admin/ai/orders', data);
+    return response.data;
+};
+
+// Квоты (R2 task 6)
+export interface AIQuota {
+    admin_id: number;
+    period: string;
+    monthly_limit: number;
+    used: number;
+}
+
+export const fetchMyAiQuota = async (): Promise<AIQuota> => {
+    const response = await adminApi.get('/admin/ai/quota');
+    return response.data;
+};
+
+export const fetchAllAiQuotas = async (): Promise<AIQuota[]> => {
+    const response = await adminApi.get('/admin/ai/quotas');
+    return response.data;
+};
+
+export const setAiQuota = async (adminId: number, monthlyLimit: number): Promise<AIQuota> => {
+    const response = await adminApi.put(`/admin/ai/quota/${adminId}`, { monthly_limit: monthlyLimit });
+    return response.data;
+};

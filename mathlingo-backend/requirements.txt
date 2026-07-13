@@ -11,3 +11,4 @@ bcrypt==4.1.2
 pydantic[email]
 python-jose[cryptography]
 python-multipart
+bleach
