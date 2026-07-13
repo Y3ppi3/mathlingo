@@ -129,6 +129,31 @@ class Task(Base):
     archived_at = Column(DateTime, nullable=True)
 
 
+class AuditLog(Base):
+    """
+    Пишется автоматически мидлварью audit_logging в main.py для КАЖДОГО
+    мутирующего запроса под /admin (POST/PUT/PATCH/DELETE), успешного или
+    нет — покрытие не зависит от того, вспомнил ли автор нового эндпоинта
+    вызвать логирование вручную. entity_type/entity_id/action — best-effort
+    разбор пути (/admin/tasks/42/publish -> tasks/42/publish), не путать с
+    полноценной семантической классификацией.
+    """
+    __tablename__ = "audit_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    actor_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    actor_role = Column(String, nullable=True)
+    method = Column(String, nullable=False)
+    path = Column(String, nullable=False)
+    entity_type = Column(String, nullable=True)
+    entity_id = Column(String, nullable=True)
+    action = Column(String, nullable=True)
+    status_code = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    actor_admin = relationship("Admin")
+
+
 class ContentStatusHistory(Base):
     __tablename__ = "content_status_history"
 
