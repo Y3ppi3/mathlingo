@@ -90,6 +90,13 @@ AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 # мутации (/api/login/, /api/me/update и т.д.) заодно.
 AUDITED_NON_ADMIN_PATHS = {"/api/tasks/"}
 
+# На момент запроса login/register ещё нет токена, поэтому actor_admin_id
+# всегда NULL ("аноним") — это архитектурно неизбежно, а не баг. Но потерять
+# ЧЕЙ это был login-запрос было бы плохо для security-аудита (нельзя увидеть
+# перебор пароля к конкретному аккаунту), поэтому для этих двух путей кладём
+# email из тела запроса в entity_id.
+LOGIN_LIKE_PATHS = {"/admin/login", "/admin/register"}
+
 
 def _parse_admin_audit_path(path: str):
     """
@@ -123,6 +130,18 @@ async def audit_logging(request: Request, call_next):
     того, вспомнил ли автор нового роута про логирование (см.
     docs/roadmap/product-technical-plan.md, R1 §1.3 и DoD).
     """
+    # Тело запроса нужно прочитать ДО call_next: BaseHTTPMiddleware кэширует
+    # поток запроса только в этом порядке (читаешь -> он реплеится вниз по
+    # цепочке), а не наоборот — прочитать после call_next уже нечего, поток
+    # к этому моменту вычитан обработчиком ниже.
+    login_email = None
+    if request.url.path in LOGIN_LIKE_PATHS and request.method in AUDIT_METHODS:
+        try:
+            body = await request.json()
+            login_email = body.get("email")
+        except Exception:
+            pass
+
     response = await call_next(request)
 
     is_audited_path = request.url.path.startswith("/admin") or request.url.path in AUDITED_NON_ADMIN_PATHS
@@ -137,6 +156,8 @@ async def audit_logging(request: Request, call_next):
         try:
             current_admin = get_admin_current_user_optional(request, db)
             entity_type, entity_id, action = _parse_admin_audit_path(request.url.path)
+            if login_email:
+                entity_id = login_email
             db.add(AuditLog(
                 actor_admin_id=current_admin.id if current_admin else None,
                 actor_role=current_admin.role if current_admin else None,
