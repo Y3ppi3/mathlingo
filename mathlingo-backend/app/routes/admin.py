@@ -10,7 +10,8 @@ from app.models import Admin, Task, User, Subject, AdventureMap, MapLocation, Ta
 from app.schemas import (
     AdminCreate, AdminResponse, TaskCreate, TaskResponse, TaskUpdate,
     AdminLogin, UserResponse, SubjectCreate, SubjectUpdate, SubjectResponse)
-from app.auth import get_admin_current_user, create_access_token, hash_password, verify_password
+from app.auth import get_admin_current_user, get_admin_current_user_optional, create_access_token, hash_password, verify_password
+from typing import Optional
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -18,9 +19,42 @@ class UserStatusUpdate(BaseModel):
     is_active: bool
 
 
-# Регистрация администратора (можно сделать защищенным)
+# Регистрация администратора.
+# Разрешена БЕЗ авторизации только пока в БД нет ни одного админа (bootstrap
+# первого администратора при первом деплое). Как только хотя бы один админ
+# существует, создавать новых админов может только уже авторизованный админ.
 @router.post("/register", response_model=AdminResponse)
-def register_admin(admin: AdminCreate, db: Session = Depends(get_db)):
+def register_admin(
+    admin: AdminCreate,
+    db: Session = Depends(get_db),
+    current_admin: Optional[Admin] = Depends(get_admin_current_user_optional),
+):
+    admins_exist = db.query(Admin).first() is not None
+
+    if not admins_exist:
+        # Бутстрап первого админа: всегда superadmin, роль из запроса
+        # игнорируется — иначе первый же вызов мог бы создать учётку с
+        # заниженными правами или (хуже) кто-то мог бы претендовать на
+        # произвольную роль до появления хоть одного проверяющего.
+        role = "superadmin"
+    else:
+        if current_admin is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Регистрация нового администратора требует авторизации существующего администратора",
+            )
+        if current_admin.role != "superadmin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Только superadmin может создавать новых администраторов",
+            )
+        if admin.role is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Укажите роль нового администратора (superadmin/content_manager/teacher)",
+            )
+        role = admin.role
+
     # Проверка существования пользователя
     db_admin = db.query(Admin).filter(Admin.email == admin.email).first()
     if db_admin:
@@ -31,18 +65,21 @@ def register_admin(admin: AdminCreate, db: Session = Depends(get_db)):
     db_admin = Admin(
         username=admin.username,
         email=admin.email,
-        hashed_password=hashed_password
+        hashed_password=hashed_password,
+        role=role,
     )
     db.add(db_admin)
     db.commit()
     db.refresh(db_admin)
 
-    # Генерируем токен
-    token = create_access_token(data={"sub": db_admin.email, "role": "admin"})
+    # Генерируем токен. "role": "admin" — служебный claim, по которому
+    # get_admin_current_user отличает admin-токен от user-токена, НЕ путать
+    # с RBAC-ролью — та передаётся отдельным полем admin_role и в любом
+    # случае перепроверяется на сервере по Admin.role, а не по токену.
+    token = create_access_token(data={"sub": db_admin.email, "role": "admin", "admin_role": db_admin.role})
 
-    # Возвращаем данные нового админа с токеном
-    return {"id": db_admin.id, "username": db_admin.username, "email": db_admin.email, "token": token,
-            "is_active": db_admin.is_active, "created_at": db_admin.created_at}
+    return {"id": db_admin.id, "username": db_admin.username, "email": db_admin.email, "role": db_admin.role,
+            "token": token, "is_active": db_admin.is_active, "created_at": db_admin.created_at}
 
 
 # Вход администратора
@@ -56,9 +93,9 @@ def login_admin(admin_data: AdminLogin, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = create_access_token(data={"sub": admin.email, "role": "admin"})
-    return {"id": admin.id, "username": admin.username, "email": admin.email, "token": token,
-            "is_active": admin.is_active, "created_at": admin.created_at}
+    token = create_access_token(data={"sub": admin.email, "role": "admin", "admin_role": admin.role})
+    return {"id": admin.id, "username": admin.username, "email": admin.email, "role": admin.role,
+            "token": token, "is_active": admin.is_active, "created_at": admin.created_at}
 
 
 # Получение списка всех заданий (только для админа)

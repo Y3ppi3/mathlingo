@@ -9,10 +9,16 @@ from app.database import Base
 class Admin(Base):
     __tablename__ = "admins"
 
+    # superadmin | content_manager | teacher — см. require_role() в app/auth.py.
+    # Без Python-level default: роль должна назначаться явно в коде создания
+    # админа, а не подставляться молча.
+    ROLES = ("superadmin", "content_manager", "teacher")
+
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    role = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

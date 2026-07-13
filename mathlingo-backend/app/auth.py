@@ -1,12 +1,14 @@
+import os
 from datetime import datetime, timedelta
 from typing import Optional
-import os
+
+import bcrypt
+from passlib.handlers.bcrypt import bcrypt_sha256
 import jwt
-from fastapi import Request, Depends, HTTPException, status
-from jose import JWTError
-from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+from fastapi import Request, Depends, HTTPException, status
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, Admin
@@ -16,13 +18,20 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
-    print("⚠️ Внимание: SECRET_KEY не найден в .env! Используется значение по умолчанию.")
-    SECRET_KEY = "supersecretkey"  # Указываем значение по умолчанию
+    raise RuntimeError(
+        "SECRET_KEY не найден в .env! Задайте SECRET_KEY перед запуском "
+        "приложения — использование значения по умолчанию небезопасно."
+    )
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__ident="2b"
+)
 
 
 def hash_password(password: str) -> str:
@@ -35,24 +44,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
-    Генерирует JWT-токен.
+    Generates a JWT token.
     """
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
 
     token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-    # ✅ Логируем создание токена
-    log_data = f"\n➡️ Вызван create_access_token:\n" \
-               f"   Данные: {data}\n" \
-               f"   Токен: {token}\n"
-
-    print(log_data, flush=True)
-
-    # ✅ Записываем в файл (если print не работает в Docker)
-    with open("debug.log", "a") as f:
-        f.write(log_data)
 
     return token
 
@@ -92,7 +90,6 @@ def get_admin_current_user(request: Request, db: Session = Depends(get_db)):
         if user_role == "admin":
             admin = db.query(Admin).filter(Admin.email == user_email).first()
             if admin:
-                print(f"✅ Авторизован администратор: {admin.email} (ID {admin.id})", flush=True)
                 return admin
 
         # Если роль не админ или админ не найден, проверяем обычного пользователя
@@ -114,12 +111,43 @@ def get_admin_current_user(request: Request, db: Session = Depends(get_db)):
 
         return admin
 
-    except JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Недействительный токен авторизации",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
+
+def require_role(*roles: str):
+    """
+    Dependency factory для RBAC: пропускает только админов с одной из
+    перечисленных ролей. Проверяет Admin.role из БД (а не claim из JWT),
+    чтобы смена/понижение роли действовала немедленно, а не только после
+    истечения уже выданного токена.
+    """
+    def dependency(current_admin: Admin = Depends(get_admin_current_user)) -> Admin:
+        if current_admin.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Недостаточно прав для выполнения этого действия",
+            )
+        return current_admin
+
+    return dependency
+
+
+def get_admin_current_user_optional(request: Request, db: Session = Depends(get_db)) -> Optional[Admin]:
+    """
+    Как get_admin_current_user, но возвращает None вместо исключения,
+    если токен отсутствует/недействителен или пользователь не админ.
+    Используется там, где отсутствие авторизации — это не ошибка, а один
+    из допустимых сценариев (например, bootstrap первого администратора).
+    """
+    try:
+        return get_admin_current_user(request, db)
+    except HTTPException:
+        return None
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)):
@@ -129,7 +157,6 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     token = get_token_from_request(request)
 
     if not token:
-        print("⚠️ Ошибка: Токен отсутствует в заголовке и в куки", flush=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Токен отсутствует",
@@ -144,7 +171,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Недействительный токен"
             )
-    except JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Недействительный токен",
@@ -153,11 +180,9 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.email == user_email).first()
     if not user:
-        print(f"⚠️ Ошибка: Пользователь {user_email} не найден в БД", flush=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Пользователь не найден"
         )
 
-    print(f"✅ Авторизован пользователь: {user.email} (ID {user.id})", flush=True)
     return user
