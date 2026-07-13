@@ -7,12 +7,18 @@ docs/roadmap/product-technical-plan.md, R2 §7 — "холодный старт"
 в golden-тестах (tests/test_mastery_service.py) одним диффом, а не
 раскопками по всему сервисному слою.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.models import Attempt, MasteryState, Task
+from app.models import Attempt, LevelOverride, MasteryState, Task
+
+LEVELS_ORDER = ("basic", "standard", "advanced")
+
+# "Временно" из решения (R2 task 4) — конкретное число здесь, а не в роуте,
+# по той же причине, что и пороги алгоритма: один файл, один дифф при смене.
+OVERRIDE_DURATION_DAYS = 7
 
 # Последние N попыток по (user, skill) — попытки старше окна не влияют на
 # текущий уровень. Игровые попытки (source="game") участвуют наравне с
@@ -104,3 +110,60 @@ def recompute(db: Session, user_id: int, skill_id: int) -> Optional[MasteryState
     db.commit()
     db.refresh(state)
     return state
+
+
+def is_adjacent_level(a: str, b: str) -> bool:
+    """basic<->standard и standard<->advanced — соседние; basic<->advanced — нет."""
+    return abs(LEVELS_ORDER.index(a) - LEVELS_ORDER.index(b)) == 1
+
+
+def get_active_override(db: Session, user_id: int, skill_id: int) -> Optional[LevelOverride]:
+    override = (
+        db.query(LevelOverride)
+        .filter(LevelOverride.user_id == user_id, LevelOverride.skill_id == skill_id)
+        .first()
+    )
+    if override and override.expires_at <= datetime.utcnow():
+        return None  # истёк — не активен, но строку не трогаем (не нужен отдельный cleanup job)
+    return override
+
+
+def set_override(db: Session, user_id: int, skill_id: int, chosen_level: str) -> LevelOverride:
+    """
+    Требует существующий mastery_state — "соседний" уровень бессмысленен без
+    базовой рекомендации, с которой сравнивать. Поднимает ValueError, если
+    chosen_level не сосед текущего computed level (роут превращает это в 409).
+    """
+    state = (
+        db.query(MasteryState)
+        .filter(MasteryState.user_id == user_id, MasteryState.skill_id == skill_id)
+        .first()
+    )
+    if not state:
+        raise ValueError("no_mastery_state")
+    if not is_adjacent_level(chosen_level, state.level):
+        raise ValueError("not_adjacent")
+
+    override = (
+        db.query(LevelOverride)
+        .filter(LevelOverride.user_id == user_id, LevelOverride.skill_id == skill_id)
+        .first()
+    )
+    if not override:
+        override = LevelOverride(user_id=user_id, skill_id=skill_id)
+        db.add(override)
+
+    override.chosen_level = chosen_level
+    override.reason = "manual"
+    override.expires_at = datetime.utcnow() + timedelta(days=OVERRIDE_DURATION_DAYS)
+
+    db.commit()
+    db.refresh(override)
+    return override
+
+
+def clear_override(db: Session, user_id: int, skill_id: int) -> None:
+    db.query(LevelOverride).filter(
+        LevelOverride.user_id == user_id, LevelOverride.skill_id == skill_id
+    ).delete()
+    db.commit()

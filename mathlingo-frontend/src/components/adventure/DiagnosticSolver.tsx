@@ -3,12 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchSkillDiagnostic, submitDiagnostic, DiagnosticData, DiagnosticAnswer, DiagnosticSubmitResult } from '../../utils/api';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
-
-const LEVEL_LABELS: Record<string, string> = {
-    basic: 'Базовый',
-    standard: 'Стандартный',
-    advanced: 'Продвинутый',
-};
+import LevelPicker from './LevelPicker';
 
 // В отличие от TaskSolver — без немедленной обратной связи "верно/неверно"
 // по каждому вопросу (это диагностика, не тренировка) и без начисления
@@ -84,20 +79,8 @@ const DiagnosticSolver = () => {
                 <p className="text-gray-500 dark:text-gray-400 mb-6">
                     Правильных ответов: {result.correct_count} из {result.total_count}
                 </p>
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg mb-6">
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Стартовый уровень по теме</div>
-                    <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 mb-3">
-                        {LEVEL_LABELS[result.mastery.level] ?? result.mastery.level}
-                    </div>
-                    {result.mastery.factors && (
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
-                            точность {(result.mastery.factors.accuracy * 100).toFixed(0)}%
-                            {result.mastery.factors.avg_time_ratio != null && (
-                                <> · среднее время {(result.mastery.factors.avg_time_ratio * 100).toFixed(0)}% от расчётного</>
-                            )}
-                            {' '}· подсказки в {(result.mastery.factors.hints_rate * 100).toFixed(0)}% попыток
-                        </p>
-                    )}
+                <div className="mb-6 text-left">
+                    <LevelPicker skillId={diagnostic.skill_id} />
                 </div>
                 <button
                     className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"

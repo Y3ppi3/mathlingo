@@ -31,6 +31,9 @@ from app.schemas import (
     DiagnosticSubmitRequest,
     DiagnosticSubmitResponse,
     DiagnosticSubmitResult,
+    SkillLevelResponse,
+    LevelOverrideRequest,
+    LevelOverrideResponse,
 )
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -614,3 +617,69 @@ def submit_diagnostic(
         total_count=len(results),
         mastery=mastery_state,
     )
+
+
+# --- Рекомендация уровня "с причиной" + временный выбор соседнего (R2 task 4) ---
+
+@router.get("/skills/{skill_id}/level", response_model=SkillLevelResponse)
+def get_skill_level(
+        skill_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    """
+    В отличие от /mastery — всегда 200, даже без единой попытки (nullable
+    поля), потому что это основной эндпоинт для экрана "твой уровень",
+    который должен показать осмысленное "пока нет данных", а не ошибку.
+    """
+    state = (
+        db.query(MasteryState)
+        .filter(MasteryState.user_id == current_user.id, MasteryState.skill_id == skill_id)
+        .first()
+    )
+    override = mastery.get_active_override(db, current_user.id, skill_id)
+
+    computed_level = state.level if state else None
+    effective_level = override.chosen_level if override else computed_level
+
+    return SkillLevelResponse(
+        skill_id=skill_id,
+        computed_level=computed_level,
+        confidence=state.confidence if state else 0,
+        sample_size=state.sample_size if state else 0,
+        factors=state.factors if state else None,
+        override=override,
+        effective_level=effective_level,
+    )
+
+
+@router.post("/skills/{skill_id}/level-override", response_model=SkillLevelResponse)
+def set_skill_level_override(
+        skill_id: int,
+        body: LevelOverrideRequest,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    try:
+        mastery.set_override(db, current_user.id, skill_id, body.chosen_level)
+    except ValueError as e:
+        if str(e) == "no_mastery_state":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Нужна хотя бы одна попытка или диагностика, прежде чем выбирать уровень вручную",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Можно выбрать только соседний уровень относительно рекомендованного",
+        )
+    return get_skill_level(skill_id, db, current_user)
+
+
+@router.delete("/skills/{skill_id}/level-override", response_model=SkillLevelResponse)
+def clear_skill_level_override(
+        skill_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    mastery.clear_override(db, current_user.id, skill_id)
+    return get_skill_level(skill_id, db, current_user)

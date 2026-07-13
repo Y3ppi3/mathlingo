@@ -351,3 +351,110 @@ def test_get_skill_mastery_requires_authentication(client, db, subject):
     skill = _make_skill_row(db, subject)
     response = client.get(f"/gamification/skills/{skill.id}/mastery")
     assert response.status_code == 401
+
+
+# --- Уровень с "причиной" + override (R2 task 4) ---
+
+def test_get_skill_level_returns_nulls_before_any_attempt(client, user, db, subject):
+    from app.auth import create_access_token
+
+    skill = _make_skill_row(db, subject)
+    token = create_access_token({"sub": user.email})
+    response = client.get(
+        f"/gamification/skills/{skill.id}/level",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    # В отличие от /mastery — 200, не 404, чтобы UI мог показать
+    # "пока нет данных" вместо ошибки.
+    assert response.status_code == 200
+    body = response.json()
+    assert body["computed_level"] is None
+    assert body["effective_level"] is None
+    assert body["override"] is None
+
+
+def test_get_skill_level_after_attempts_shows_computed_as_effective(client, user, db, subject):
+    from app.auth import create_access_token
+
+    skill = _make_skill_row(db, subject)
+    task = _make_published_task(db, subject, skill_id=skill.id)
+    token = create_access_token({"sub": user.email})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    client.post("/gamification/submit-answer", headers=headers, json={"task_id": task.id, "answer": "2x"})
+    response = client.get(f"/gamification/skills/{skill.id}/level", headers=headers)
+
+    body = response.json()
+    assert body["computed_level"] == body["effective_level"]
+    assert body["override"] is None
+
+
+def test_set_level_override_requires_mastery_state_first(client, user, db, subject):
+    from app.auth import create_access_token
+
+    skill = _make_skill_row(db, subject)
+    token = create_access_token({"sub": user.email})
+    response = client.post(
+        f"/gamification/skills/{skill.id}/level-override",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"chosen_level": "standard"},
+    )
+    assert response.status_code == 409
+
+
+def test_set_level_override_rejects_non_adjacent(client, user, db, subject):
+    from app.auth import create_access_token
+
+    skill = _make_skill_row(db, subject)
+    task = _make_published_task(db, subject, skill_id=skill.id, correct_answer="wrong-on-purpose")
+    token = create_access_token({"sub": user.email})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for _ in range(10):
+        client.post("/gamification/submit-answer", headers=headers, json={"task_id": task.id, "answer": "no"})
+    # 10 неверных подряд -> basic; advanced не сосед
+
+    response = client.post(
+        f"/gamification/skills/{skill.id}/level-override",
+        headers=headers,
+        json={"chosen_level": "advanced"},
+    )
+    assert response.status_code == 409
+
+
+def test_set_and_clear_level_override_changes_effective_level(client, user, db, subject):
+    from app.auth import create_access_token
+
+    skill = _make_skill_row(db, subject)
+    task = _make_published_task(db, subject, skill_id=skill.id, correct_answer="wrong-on-purpose")
+    token = create_access_token({"sub": user.email})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for _ in range(10):
+        client.post("/gamification/submit-answer", headers=headers, json={"task_id": task.id, "answer": "no"})
+    # -> basic
+
+    override_response = client.post(
+        f"/gamification/skills/{skill.id}/level-override",
+        headers=headers,
+        json={"chosen_level": "standard"},
+    )
+    assert override_response.status_code == 200
+    assert override_response.json()["effective_level"] == "standard"
+    assert override_response.json()["computed_level"] == "basic"
+    assert override_response.json()["override"]["chosen_level"] == "standard"
+
+    clear_response = client.delete(f"/gamification/skills/{skill.id}/level-override", headers=headers)
+    assert clear_response.status_code == 200
+    assert clear_response.json()["effective_level"] == "basic"
+    assert clear_response.json()["override"] is None
+
+
+def test_level_override_requires_authentication(client, db, subject):
+    skill = _make_skill_row(db, subject)
+    response = client.post(
+        f"/gamification/skills/{skill.id}/level-override",
+        json={"chosen_level": "standard"},
+    )
+    assert response.status_code == 401

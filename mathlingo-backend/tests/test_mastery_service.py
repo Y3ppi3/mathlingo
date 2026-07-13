@@ -182,3 +182,109 @@ def test_recompute_upserts_single_row_per_user_skill(client, db, user, subject):
     ).all()
     assert len(rows) == 1
     assert rows[0].sample_size == 2
+
+
+# --- level_override (R2 task 4) ---
+
+def test_is_adjacent_level_basic_standard():
+    assert mastery.is_adjacent_level("basic", "standard") is True
+    assert mastery.is_adjacent_level("standard", "basic") is True
+
+
+def test_is_adjacent_level_standard_advanced():
+    assert mastery.is_adjacent_level("standard", "advanced") is True
+
+
+def test_is_adjacent_level_basic_advanced_not_adjacent():
+    assert mastery.is_adjacent_level("basic", "advanced") is False
+
+
+def test_set_override_requires_existing_mastery_state(client, db, user, subject):
+    skill = _make_skill(db, subject)
+    try:
+        mastery.set_override(db, user.id, skill["id"], "standard")
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert str(e) == "no_mastery_state"
+
+
+def test_set_override_rejects_non_adjacent_level(client, db, user, subject):
+    skill = _make_skill(db, subject)
+    task = _make_task(db, subject)
+    for _ in range(10):
+        _add_attempt(db, user, skill, task, is_correct=False)  # -> basic
+    mastery.recompute(db, user.id, skill["id"])
+
+    try:
+        mastery.set_override(db, user.id, skill["id"], "advanced")  # basic->advanced не сосед
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert str(e) == "not_adjacent"
+
+
+def test_set_override_accepts_adjacent_level(client, db, user, subject):
+    from app.models import LevelOverride
+
+    skill = _make_skill(db, subject)
+    task = _make_task(db, subject)
+    for _ in range(10):
+        _add_attempt(db, user, skill, task, is_correct=False)  # -> basic
+    mastery.recompute(db, user.id, skill["id"])
+
+    override = mastery.set_override(db, user.id, skill["id"], "standard")
+    assert override.chosen_level == "standard"
+    assert override.expires_at > datetime.utcnow()
+
+    rows = db.query(LevelOverride).filter(
+        LevelOverride.user_id == user.id, LevelOverride.skill_id == skill["id"]
+    ).all()
+    assert len(rows) == 1
+
+
+def test_set_override_upserts_not_duplicates(client, db, user, subject):
+    from app.models import LevelOverride
+
+    skill = _make_skill(db, subject)
+    task = _make_task(db, subject)
+    for _ in range(10):
+        _add_attempt(db, user, skill, task, is_correct=True)  # -> advanced
+    mastery.recompute(db, user.id, skill["id"])
+
+    mastery.set_override(db, user.id, skill["id"], "standard")
+    mastery.set_override(db, user.id, skill["id"], "standard")
+
+    rows = db.query(LevelOverride).filter(
+        LevelOverride.user_id == user.id, LevelOverride.skill_id == skill["id"]
+    ).all()
+    assert len(rows) == 1
+
+
+def test_clear_override_removes_row(client, db, user, subject):
+    from app.models import LevelOverride
+
+    skill = _make_skill(db, subject)
+    task = _make_task(db, subject)
+    for _ in range(10):
+        _add_attempt(db, user, skill, task, is_correct=True)
+    mastery.recompute(db, user.id, skill["id"])
+    mastery.set_override(db, user.id, skill["id"], "standard")
+
+    mastery.clear_override(db, user.id, skill["id"])
+
+    assert db.query(LevelOverride).filter(
+        LevelOverride.user_id == user.id, LevelOverride.skill_id == skill["id"]
+    ).count() == 0
+
+
+def test_get_active_override_ignores_expired(client, db, user, subject):
+    from app.models import LevelOverride
+
+    skill = _make_skill(db, subject)
+    expired = LevelOverride(
+        user_id=user.id, skill_id=skill["id"], chosen_level="standard",
+        expires_at=datetime.utcnow() - timedelta(days=1),
+    )
+    db.add(expired)
+    db.commit()
+
+    assert mastery.get_active_override(db, user.id, skill["id"]) is None
