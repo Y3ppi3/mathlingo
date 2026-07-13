@@ -76,6 +76,10 @@ class UserRegisterResponse(UserResponse):
     token: str
 
 
+TaskLevel = Literal["basic", "standard", "advanced"]
+TaskStatus = Literal["draft", "in_review", "needs_revision", "approved", "published", "archived"]
+
+
 # Схема заданий
 class TaskBase(BaseModel):
     title: str
@@ -85,6 +89,8 @@ class TaskBase(BaseModel):
 
 class TaskCreate(TaskBase):
     owner_id: Optional[int] = None
+    skill_id: Optional[int] = None
+    level: TaskLevel = "standard"
 
 
 class TaskUpdate(BaseModel):
@@ -92,11 +98,39 @@ class TaskUpdate(BaseModel):
     description: Optional[str] = None
     subject: Optional[str] = None
     owner_id: Optional[int] = None
+    skill_id: Optional[int] = None
+    level: Optional[TaskLevel] = None
 
 
 class TaskResponse(TaskBase):
     id: int
     owner_id: Optional[int]
+    skill_id: Optional[int] = None
+    level: TaskLevel
+    status: TaskStatus
+    version: int
+    source: Literal["manual", "ai"]
+    created_by_admin_id: Optional[int] = None
+    approved_by_admin_id: Optional[int] = None
+    published_at: Optional[datetime] = None
+    archived_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TaskChangeRequest(BaseModel):
+    comment: Optional[str] = None
+
+
+class ContentStatusHistoryResponse(BaseModel):
+    id: int
+    task_id: int
+    from_status: Optional[str] = None
+    to_status: str
+    actor_admin_id: Optional[int] = None
+    comment: Optional[str] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -127,6 +161,34 @@ class SubjectResponse(SubjectBase):
     is_active: bool
     created_at: datetime
     tasks_count: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Схемы для тем (Skill) внутри раздела
+class SkillBase(BaseModel):
+    name: str
+    code: str
+    order: Optional[int] = 0
+
+
+class SkillCreate(SkillBase):
+    subject_id: int
+
+
+class SkillUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class SkillResponse(SkillBase):
+    id: int
+    subject_id: int
+    is_active: bool
+    created_at: datetime
 
     class Config:
         from_attributes = True

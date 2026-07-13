@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
-from app.models import Admin, User
+from app.models import Admin, Subject, User
 from main import app, csrf_tokens
 
 
@@ -97,3 +97,35 @@ def content_manager_admin(db):
     db.commit()
     db.refresh(item)
     return item
+
+
+@pytest.fixture
+def teacher_admin(db):
+    from app.auth import hash_password
+
+    item = Admin(
+        username="teacher",
+        email="teacher@example.com",
+        hashed_password=hash_password("password123"),
+        role="teacher",
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@pytest.fixture
+def subject(db):
+    item = Subject(name="Derivatives", code="derivatives")
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def authorization_header(admin):
+    from app.auth import create_access_token
+
+    token = create_access_token({"sub": admin.email, "role": "admin"})
+    return {"Authorization": f"Bearer {token}"}
