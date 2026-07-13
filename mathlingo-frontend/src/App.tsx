@@ -1,15 +1,19 @@
 // App.tsx
-import AppRoutes from "./routes";
-import Navbar from "./components/Navbar";
+import { useLocation } from 'react-router-dom';
+import AppRoutes from './routes';
+import Navbar from './components/Navbar';
 
 function App() {
-    return (
-        <div className="bg-gray-900 dark:bg-white text-gray-100 dark:text-gray-900 min-h-screen flex flex-col transition-colors">
-            {/* Шапка */}
-            <Navbar />
+    const { pathname } = useLocation();
 
-            {/* Основной контент */}
-            <main className="flex-grow container mx-auto px-4 py-6">
+    // На страницах /admin/* Navbar не нужен —
+    // у AdminLogin и AdminLayout есть собственные шапки
+    const hideNavbar = pathname.startsWith('/admin');
+
+    return (
+        <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex flex-col transition-colors">
+            {!hideNavbar && <Navbar />}
+            <main className="flex-grow">
                 <AppRoutes />
             </main>
         </div>

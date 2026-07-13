@@ -1,8 +1,6 @@
-// В файле src/components/admin/TaskForm.tsx
-import React, { useState, useEffect } from 'react';
-import { createTask, updateTask, Task, fetchUsers, User, fetchSubjects, Subject } from '../../utils/adminApi';
-import Input from '../Input';
-import Button from '../Button';
+// src/components/admin/TaskForm.tsx
+import { useState, useEffect } from 'react';
+import { createTask, updateTask, fetchSkills, Task, TaskLevel, User, fetchUsers, Skill, fetchSubjects, Subject } from '../../utils/adminApi';
 
 interface TaskFormProps {
     task: Task | null;
@@ -10,38 +8,39 @@ interface TaskFormProps {
     onCancel: () => void;
 }
 
-const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [subject, setSubject] = useState('');
-    const [ownerId, setOwnerId] = useState<string | null>(null);
-    const [users, setUsers] = useState<User[]>([]);
-    const [subjects, setSubjects] = useState<Subject[]>([]); // Добавляем состояние для предметов
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+const inputCls = "w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors";
+const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 transition-colors";
 
-    // Загружаем список пользователей и предметов при монтировании компонента
+const LEVEL_LABELS: Record<TaskLevel, string> = {
+    basic: 'Базовый',
+    standard: 'Стандартный',
+    advanced: 'Продвинутый',
+};
+
+const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
+    const [title, setTitle]           = useState('');
+    const [description, setDescription] = useState('');
+    const [subject, setSubject]       = useState('');
+    const [level, setLevel]           = useState<TaskLevel>('standard');
+    const [skillId, setSkillId]       = useState<string>('');
+    const [ownerId, setOwnerId]       = useState<string | null>(null);
+    const [users, setUsers]           = useState<User[]>([]);
+    const [subjects, setSubjects]     = useState<Subject[]>([]);
+    const [skills, setSkills]         = useState<Skill[]>([]);
+    const [error, setError]           = useState('');
+    const [loading, setLoading]       = useState(false);
+
     useEffect(() => {
         const loadData = async () => {
             try {
-                // Загружаем пользователей
-                const usersData = await fetchUsers();
+                const [usersData, subjectsData] = await Promise.all([fetchUsers(), fetchSubjects()]);
                 setUsers(usersData);
-
-                // Загружаем предметы
-                const subjectsData = await fetchSubjects();
                 setSubjects(subjectsData);
-
-                // Если пользователи есть, и не задан owner_id, устанавливаем первого пользователя по умолчанию
-                if (usersData.length > 0 && !ownerId) {
-                    setOwnerId(usersData[0].id.toString());
-                }
-            } catch (err) {
-                console.error('Ошибка при загрузке данных:', err);
+                if (usersData.length > 0 && !ownerId) setOwnerId(usersData[0].id.toString());
+            } catch {
                 setError('Не удалось загрузить необходимые данные');
             }
         };
-
         loadData();
     }, []);
 
@@ -50,32 +49,46 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
             setTitle(task.title);
             setDescription(task.description || '');
             setSubject(task.subject);
+            setLevel(task.level ?? 'standard');
+            setSkillId(task.skill_id ? task.skill_id.toString() : '');
             setOwnerId(task.owner_id ? task.owner_id.toString() : '');
         }
     }, [task]);
+
+    // Темы зависят от выбранного раздела — перезагружаем список при смене
+    // subject и сбрасываем выбор, если он больше не принадлежит разделу.
+    useEffect(() => {
+        const subjectEntry = subjects.find(s => s.code === subject);
+        if (!subjectEntry?.id) {
+            setSkills([]);
+            return;
+        }
+        fetchSkills(subjectEntry.id)
+            .then(list => {
+                setSkills(list);
+                if (skillId && !list.some(s => s.id?.toString() === skillId)) setSkillId('');
+            })
+            .catch(() => setSkills([]));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [subject, subjects]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
-
         try {
-            const taskData = {
+            const data = {
                 title,
                 description: description || undefined,
-                subject, // Код предмета (например, "derivatives", "integrals" и т.д.)
-                owner_id: ownerId ? parseInt(ownerId) : undefined
+                subject,
+                level,
+                skill_id: skillId ? parseInt(skillId) : undefined,
+                owner_id: ownerId ? parseInt(ownerId) : undefined,
             };
-
-            if (task && task.id) {
-                await updateTask(task.id, taskData);
-            } else {
-                await createTask(taskData);
-            }
-
+            if (task?.id) await updateTask(task.id, data);
+            else           await createTask(data);
             onSubmit();
-        } catch (err) {
-            console.error('Ошибка при сохранении задания:', err);
+        } catch {
             setError('Не удалось сохранить задание');
         } finally {
             setLoading(false);
@@ -83,89 +96,132 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
     };
 
     return (
-        <div className="text-white dark:text-gray-900 transition-colors">
-            <h3 className="text-lg font-medium mb-4">
+        <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-5 transition-colors">
                 {task ? 'Редактирование задания' : 'Создание нового задания'}
             </h3>
 
-            {error && <div className="bg-red-900/50 dark:bg-red-100 text-red-200 dark:text-red-700 p-3 rounded mb-4 transition-colors">{error}</div>}
+            {/* Ошибка */}
+            {error && (
+                <div className="mb-5 flex items-center gap-2.5 px-4 py-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl transition-colors">
+                    <svg className="w-4 h-4 text-red-500 dark:text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
+                </div>
+            )}
 
-            <form onSubmit={handleSubmit}>
-                <div className="mb-4">
-                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Название задания</label>
-                    <Input
+            <form onSubmit={handleSubmit} className="space-y-4">
+
+                {/* Название */}
+                <div>
+                    <label className={labelCls}>Название задания</label>
+                    <input
                         type="text"
                         value={title}
-                        onChange={(e) => setTitle(e.target.value)}
+                        onChange={e => setTitle(e.target.value)}
                         required
                         placeholder="Введите название задания"
+                        className={inputCls}
                     />
                 </div>
 
-                <div className="mb-4">
-                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Предмет</label>
+                {/* Предмет */}
+                <div>
+                    <label className={labelCls}>Предмет</label>
                     <select
                         value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
+                        onChange={e => setSubject(e.target.value)}
                         required
-                        className="w-full p-2 border rounded bg-gray-700 dark:bg-white border-gray-600 dark:border-gray-300 text-white dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        className={inputCls}
                     >
                         <option value="">Выберите предмет</option>
-                        {subjects.map(subject => (
-                            <option key={subject.id} value={subject.code}>
-                                {subject.name}
-                            </option>
+                        {subjects.map(s => (
+                            <option key={s.id} value={s.code}>{s.name}</option>
                         ))}
                     </select>
                 </div>
 
-                <div className="mb-4">
-                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">Описание</label>
+                {/* Уровень и тема */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className={labelCls}>Уровень</label>
+                        <select value={level} onChange={e => setLevel(e.target.value as TaskLevel)} className={inputCls}>
+                            {(['basic', 'standard', 'advanced'] as TaskLevel[]).map(l => (
+                                <option key={l} value={l}>{LEVEL_LABELS[l]}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className={labelCls}>
+                            Тема
+                            <span className="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500">необязательно</span>
+                        </label>
+                        <select
+                            value={skillId}
+                            onChange={e => setSkillId(e.target.value)}
+                            disabled={!subject || skills.length === 0}
+                            className={inputCls}
+                        >
+                            <option value="">Без темы</option>
+                            {skills.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* Описание */}
+                <div>
+                    <label className={labelCls}>Описание</label>
                     <textarea
                         value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="w-full p-2 border rounded bg-gray-700 border-gray-600 text-white dark:bg-gray-200 dark:border-gray-300 dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        onChange={e => setDescription(e.target.value)}
                         rows={5}
                         placeholder="Введите описание задания"
+                        className={inputCls}
+                        style={{ resize: 'vertical' }}
                     />
                 </div>
 
-                <div className="mb-6">
-                    <label className="block text-gray-300 dark:text-gray-700 mb-2 transition-colors">
-                        Владелец задания (необязательно)
+                {/* Владелец */}
+                <div>
+                    <label className={labelCls}>
+                        Владелец задания
+                        <span className="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500">необязательно</span>
                     </label>
                     <select
                         value={ownerId || ''}
-                        onChange={(e) => setOwnerId(e.target.value || null)}
-                        className="w-full p-2 border rounded bg-gray-700 border-gray-600 text-white dark:bg-gray-200 dark:border-gray-300 dark:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        onChange={e => setOwnerId(e.target.value || null)}
+                        className={inputCls}
                     >
                         <option value="">Без владельца</option>
-                        {users.map(user => (
-                            <option key={user.id} value={user.id}>
-                                {user.username} ({user.email})
-                            </option>
+                        {users.map(u => (
+                            <option key={u.id} value={u.id}>{u.username} ({u.email})</option>
                         ))}
                     </select>
-                    <p className="mt-1 text-sm text-gray-400 dark:text-gray-500 transition-colors">
-                        Можно оставить без владельца
-                    </p>
                 </div>
 
-                <div className="flex justify-end space-x-4">
-                    <Button
-                        variant="outline"
-                        onClick={onCancel}
+                {/* Кнопки */}
+                <div className="flex justify-end gap-3 pt-2">
+                    <button
                         type="button"
                         disabled={loading}
+                        style={{ padding: '0.625rem 1.25rem' }}
+                        onClick={onCancel}
+                        className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50"
                     >
                         Отмена
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                         type="submit"
                         disabled={loading}
+                        style={{ padding: '0.625rem 1.25rem' }}
+                        className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-all flex items-center gap-2"
                     >
-                        {loading ? 'Сохранение...' : (task ? 'Сохранить изменения' : 'Создать задание')}
-                    </Button>
+                        {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        {loading ? 'Сохранение...' : task ? 'Сохранить изменения' : 'Создать задание'}
+                    </button>
                 </div>
             </form>
         </div>
