@@ -290,6 +290,58 @@ export const submitTaskAnswer = async (
     }
 };
 
+// Диагностика по теме (R2 task 3)
+export interface DiagnosticTask {
+    id: number;
+    title: string;
+    content: string;
+    options?: string[];
+    answer_type: 'single_answer' | 'multiple_choice';
+}
+
+export interface DiagnosticData {
+    id: number;
+    skill_id: number;
+    tasks: DiagnosticTask[];
+}
+
+export interface DiagnosticAnswer {
+    task_id: number;
+    answer: string;
+    time_spent_ms?: number;
+    hints_used?: number;
+}
+
+export interface MasteryResult {
+    skill_id: number;
+    level: 'basic' | 'standard' | 'advanced';
+    confidence: number;
+    sample_size: number;
+    factors: { accuracy: number; avg_time_ratio: number | null; hints_rate: number } | null;
+}
+
+export interface DiagnosticSubmitResult {
+    results: { task_id: number; is_correct: boolean }[];
+    correct_count: number;
+    total_count: number;
+    mastery: MasteryResult;
+}
+
+export const fetchSkillDiagnostic = async (skillId: number): Promise<DiagnosticData> => {
+    const response = await api.get(`/gamification/skills/${skillId}/diagnostic`);
+    return response.data;
+};
+
+export const submitDiagnostic = async (diagnosticId: number, answers: DiagnosticAnswer[]): Promise<DiagnosticSubmitResult> => {
+    const response = await api.post(`/gamification/diagnostics/${diagnosticId}/submit`, { answers });
+    return response.data;
+};
+
+export const fetchSkillMastery = async (skillId: number): Promise<MasteryResult> => {
+    const response = await api.get(`/gamification/skills/${skillId}/mastery`);
+    return response.data;
+};
+
 // API для прогресса пользователя
 export const fetchUserProgress = async () => {
     try {

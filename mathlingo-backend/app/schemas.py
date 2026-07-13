@@ -227,6 +227,68 @@ class MasteryStateResponse(BaseModel):
         from_attributes = True
 
 
+# Схемы диагностики (R2 task 3)
+class DiagnosticCreate(BaseModel):
+    skill_id: int
+    task_ids: List[int]
+
+
+class DiagnosticUpdate(BaseModel):
+    task_ids: Optional[List[int]] = None
+    is_active: Optional[bool] = None
+
+
+class DiagnosticResponse(BaseModel):
+    id: int
+    skill_id: int
+    task_ids: List[int]
+    is_active: bool
+    created_by_admin_id: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Student-facing: то же самое, что задание в task-groups/data — без
+# correct_answer.
+class DiagnosticTaskView(BaseModel):
+    id: int
+    title: str
+    content: str
+    options: Optional[List[str]] = None
+    answer_type: TaskAnswerType
+
+
+class DiagnosticView(BaseModel):
+    id: int
+    skill_id: int
+    tasks: List[DiagnosticTaskView]
+
+
+class DiagnosticAnswerItem(BaseModel):
+    task_id: int
+    answer: str
+    time_spent_ms: Optional[int] = None
+    hints_used: int = 0
+
+
+class DiagnosticSubmitRequest(BaseModel):
+    answers: List[DiagnosticAnswerItem]
+
+
+class DiagnosticSubmitResult(BaseModel):
+    task_id: int
+    is_correct: bool
+
+
+class DiagnosticSubmitResponse(BaseModel):
+    results: List[DiagnosticSubmitResult]
+    correct_count: int
+    total_count: int
+    mastery: MasteryStateResponse
+
+
 # Схемы для разделов математики
 class SubjectBase(BaseModel):
     name: str

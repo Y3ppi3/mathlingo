@@ -10,9 +10,10 @@ from typing import List
 from pydantic import BaseModel, ValidationError
 
 from app.database import get_db
-from app.models import Admin, AuditLog, ContentStatusHistory, Task, User, Subject, AdventureMap, MapLocation, TaskGroup
+from app.models import Admin, AuditLog, ContentStatusHistory, Diagnostic, Skill, Task, User, Subject, AdventureMap, MapLocation, TaskGroup
 from app.schemas import (
     AdminAccountResponse, AdminCreate, AdminResponse, AuditLogResponse, BulkActionFailure,
+    DiagnosticCreate, DiagnosticResponse, DiagnosticUpdate,
     TaskBulkActionRequest, TaskBulkActionResult, TaskChangeRequest, TaskCreate, TaskImportRequest,
     TaskImportResult, TaskImportRowFailure, TaskResponse, TaskUpdate, AdminLogin,
     UserBulkStatusUpdate, UserResponse, SubjectCreate, SubjectUpdate, SubjectResponse)
@@ -173,11 +174,17 @@ def login_admin(admin_data: AdminLogin, db: Session = Depends(get_db)):
 def get_all_tasks(
         skip: int = 0,
         limit: int = 100,
+        skill_id: Optional[int] = None,
+        status_filter: Optional[str] = None,
         db: Session = Depends(get_db),
         current_admin: Admin = Depends(get_admin_current_user)
 ):
-    tasks = db.query(Task).offset(skip).limit(limit).all()
-    return tasks
+    query = db.query(Task)
+    if skill_id is not None:
+        query = query.filter(Task.skill_id == skill_id)
+    if status_filter is not None:
+        query = query.filter(Task.status == status_filter)
+    return query.offset(skip).limit(limit).all()
 
 
 def _validate_skill_for_subject(db: Session, skill_id: Optional[int], subject_id: Optional[int]) -> None:
@@ -771,3 +778,80 @@ def list_audit_log(
         query = query.filter(AuditLog.actor_admin_id == actor_admin_id)
 
     return query.order_by(AuditLog.id.desc()).offset(skip).limit(limit).all()
+
+
+# --- Диагностика (R2 task 3) ---
+# Куратор собирает набор УЖЕ опубликованных заданий темы — отдельного
+# review-цикла для диагностики нет, ревью прошли сами задания.
+
+def _validate_diagnostic_tasks(db: Session, skill_id: int, task_ids: List[int]) -> None:
+    if not task_ids:
+        raise HTTPException(status_code=400, detail="Диагностика не может быть пустой")
+    tasks = db.query(Task).filter(Task.id.in_(task_ids)).all()
+    found_ids = {t.id for t in tasks}
+    missing = set(task_ids) - found_ids
+    if missing:
+        raise HTTPException(status_code=404, detail=f"Задания не найдены: {sorted(missing)}")
+    not_published = [t.id for t in tasks if t.status != "published"]
+    if not_published:
+        raise HTTPException(status_code=400, detail=f"Задания не опубликованы: {sorted(not_published)}")
+    wrong_skill = [t.id for t in tasks if t.skill_id != skill_id]
+    if wrong_skill:
+        raise HTTPException(status_code=400, detail=f"Задания не относятся к теме: {sorted(wrong_skill)}")
+
+
+@router.post("/diagnostics", response_model=DiagnosticResponse)
+def create_diagnostic(
+        body: DiagnosticCreate,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT),
+):
+    skill = db.query(Skill).filter(Skill.id == body.skill_id).first()
+    if not skill:
+        raise HTTPException(status_code=404, detail="Тема не найдена")
+    _validate_diagnostic_tasks(db, body.skill_id, body.task_ids)
+
+    diagnostic = Diagnostic(
+        skill_id=body.skill_id,
+        task_ids=body.task_ids,
+        created_by_admin_id=current_admin.id,
+    )
+    db.add(diagnostic)
+    db.commit()
+    db.refresh(diagnostic)
+    return diagnostic
+
+
+@router.get("/diagnostics", response_model=List[DiagnosticResponse])
+def list_diagnostics(
+        skill_id: Optional[int] = None,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user),
+):
+    query = db.query(Diagnostic)
+    if skill_id is not None:
+        query = query.filter(Diagnostic.skill_id == skill_id)
+    return query.order_by(Diagnostic.id.desc()).all()
+
+
+@router.put("/diagnostics/{diagnostic_id}", response_model=DiagnosticResponse)
+def update_diagnostic(
+        diagnostic_id: int,
+        body: DiagnosticUpdate,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT),
+):
+    diagnostic = db.query(Diagnostic).filter(Diagnostic.id == diagnostic_id).first()
+    if not diagnostic:
+        raise HTTPException(status_code=404, detail="Диагностика не найдена")
+
+    update_data = body.dict(exclude_unset=True)
+    if "task_ids" in update_data:
+        _validate_diagnostic_tasks(db, diagnostic.skill_id, update_data["task_ids"])
+
+    for key, value in update_data.items():
+        setattr(diagnostic, key, value)
+
+    db.commit()
+    db.refresh(diagnostic)
+    return diagnostic

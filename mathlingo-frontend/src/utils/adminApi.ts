@@ -124,9 +124,9 @@ export interface User {
 }
 
 // Task functions
-export const fetchTasks = async (): Promise<Task[]> => {
+export const fetchTasks = async (filters?: { skill_id?: number; status_filter?: TaskStatus }): Promise<Task[]> => {
     try {
-        const response = await adminApi.get("/admin/tasks");
+        const response = await adminApi.get("/admin/tasks", { params: filters });
         return response.data;
     } catch (error) {
         console.error('Error fetching tasks:', error);
@@ -446,4 +446,29 @@ export const deleteSubjectOperation = async (id: number): Promise<any> => {
         }
         throw error;
     }
+};
+
+// Diagnostics (R2 task 3)
+export interface Diagnostic {
+    id: number;
+    skill_id: number;
+    task_ids: number[];
+    is_active: boolean;
+    created_by_admin_id?: number | null;
+    created_at: string;
+}
+
+export const fetchDiagnostics = async (skillId?: number): Promise<Diagnostic[]> => {
+    const response = await adminApi.get('/admin/diagnostics', { params: skillId ? { skill_id: skillId } : {} });
+    return response.data;
+};
+
+export const createDiagnostic = async (skillId: number, taskIds: number[]): Promise<Diagnostic> => {
+    const response = await adminApi.post('/admin/diagnostics', { skill_id: skillId, task_ids: taskIds });
+    return response.data;
+};
+
+export const updateDiagnostic = async (id: number, data: Partial<Pick<Diagnostic, 'task_ids' | 'is_active'>>): Promise<Diagnostic> => {
+    const response = await adminApi.put(`/admin/diagnostics/${id}`, data);
+    return response.data;
 };
