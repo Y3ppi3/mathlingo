@@ -1,6 +1,6 @@
 // src/components/admin/TaskForm.tsx
 import { useState, useEffect } from 'react';
-import { createTask, updateTask, fetchSkills, Task, TaskLevel, User, fetchUsers, Skill, fetchSubjects, Subject } from '../../utils/adminApi';
+import { createTask, updateTask, fetchSkills, Task, TaskLevel, TaskAnswerType, User, fetchUsers, Skill, fetchSubjects, Subject } from '../../utils/adminApi';
 
 interface TaskFormProps {
     task: Task | null;
@@ -17,6 +17,11 @@ const LEVEL_LABELS: Record<TaskLevel, string> = {
     advanced: 'Продвинутый',
 };
 
+const ANSWER_TYPE_LABELS: Record<TaskAnswerType, string> = {
+    single_answer: 'Ответ строкой',
+    multiple_choice: 'Варианты ответа',
+};
+
 const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
     const [title, setTitle]           = useState('');
     const [description, setDescription] = useState('');
@@ -24,6 +29,11 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
     const [level, setLevel]           = useState<TaskLevel>('standard');
     const [skillId, setSkillId]       = useState<string>('');
     const [ownerId, setOwnerId]       = useState<string | null>(null);
+    const [content, setContent]       = useState('');
+    const [answerType, setAnswerType] = useState<TaskAnswerType>('single_answer');
+    const [options, setOptions]       = useState<string[]>(['', '']);
+    const [correctIndex, setCorrectIndex] = useState<number>(0);
+    const [correctAnswer, setCorrectAnswer] = useState('');
     const [users, setUsers]           = useState<User[]>([]);
     const [subjects, setSubjects]     = useState<Subject[]>([]);
     const [skills, setSkills]         = useState<Skill[]>([]);
@@ -52,6 +62,14 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
             setLevel(task.level ?? 'standard');
             setSkillId(task.skill_id ? task.skill_id.toString() : '');
             setOwnerId(task.owner_id ? task.owner_id.toString() : '');
+            setContent(task.content || '');
+            setAnswerType(task.answer_type ?? 'single_answer');
+            if (task.answer_type === 'multiple_choice') {
+                setOptions(task.options && task.options.length > 0 ? task.options : ['', '']);
+                setCorrectIndex(task.correct_answer ? parseInt(task.correct_answer) || 0 : 0);
+            } else {
+                setCorrectAnswer(task.correct_answer || '');
+            }
         }
     }, [task]);
 
@@ -75,6 +93,15 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+
+        if (answerType === 'multiple_choice') {
+            const filled = options.filter(o => o.trim());
+            if (filled.length < 2) {
+                setError('Нужно минимум 2 варианта ответа');
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             const data = {
@@ -84,6 +111,10 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
                 level,
                 skill_id: skillId ? parseInt(skillId) : undefined,
                 owner_id: ownerId ? parseInt(ownerId) : undefined,
+                content: content || undefined,
+                answer_type: answerType,
+                options: answerType === 'multiple_choice' ? options.filter(o => o.trim()) : undefined,
+                correct_answer: answerType === 'multiple_choice' ? correctIndex.toString() : (correctAnswer || undefined),
             };
             if (task?.id) await updateTask(task.id, data);
             else           await createTask(data);
@@ -93,6 +124,17 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const updateOption = (index: number, value: string) => {
+        setOptions(prev => prev.map((o, i) => i === index ? value : o));
+    };
+
+    const addOption = () => setOptions(prev => [...prev, '']);
+
+    const removeOption = (index: number) => {
+        setOptions(prev => prev.filter((_, i) => i !== index));
+        setCorrectIndex(prev => (prev >= index && prev > 0 ? prev - 1 : prev));
     };
 
     return (
@@ -183,6 +225,89 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
                         style={{ resize: 'vertical' }}
                     />
                 </div>
+
+                {/* Условие задания (то, что видит ученик) */}
+                <div>
+                    <label className={labelCls}>
+                        Условие
+                        <span className="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500">HTML, то, что увидит ученик</span>
+                    </label>
+                    <textarea
+                        value={content}
+                        onChange={e => setContent(e.target.value)}
+                        rows={4}
+                        placeholder="Найдите производную функции..."
+                        className={inputCls}
+                        style={{ resize: 'vertical' }}
+                    />
+                </div>
+
+                {/* Тип ответа */}
+                <div>
+                    <label className={labelCls}>Тип ответа</label>
+                    <select value={answerType} onChange={e => setAnswerType(e.target.value as TaskAnswerType)} className={inputCls}>
+                        {(['single_answer', 'multiple_choice'] as TaskAnswerType[]).map(t => (
+                            <option key={t} value={t}>{ANSWER_TYPE_LABELS[t]}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {answerType === 'multiple_choice' ? (
+                    <div>
+                        <label className={labelCls}>Варианты ответа (отметьте правильный)</label>
+                        <div className="space-y-2">
+                            {options.map((opt, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                    <input
+                                        type="radio"
+                                        name="correctOption"
+                                        checked={correctIndex === i}
+                                        onChange={() => setCorrectIndex(i)}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={opt}
+                                        onChange={e => updateOption(i, e.target.value)}
+                                        placeholder={`Вариант ${i + 1}`}
+                                        className={inputCls}
+                                    />
+                                    {options.length > 2 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeOption(i)}
+                                            className="text-red-500 dark:text-red-400 text-xs font-medium flex-shrink-0"
+                                        >
+                                            Убрать
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={addOption}
+                            className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                            + Добавить вариант
+                        </button>
+                    </div>
+                ) : (
+                    <div>
+                        <label className={labelCls}>
+                            Правильный ответ
+                            <span className="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500">
+                                сравнение без учёта регистра и пробелов
+                            </span>
+                        </label>
+                        <input
+                            type="text"
+                            value={correctAnswer}
+                            onChange={e => setCorrectAnswer(e.target.value)}
+                            placeholder="3x^2"
+                            className={inputCls}
+                        />
+                    </div>
+                )}
 
                 {/* Владелец */}
                 <div>

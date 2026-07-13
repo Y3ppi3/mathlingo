@@ -270,11 +270,18 @@ export const fetchTaskGroup = async (groupId: number) => {
 };
 
 // API для отправки ответов на задания
-export const submitTaskAnswer = async (taskId: number, answer: string) => {
+export const submitTaskAnswer = async (
+    taskId: number,
+    answer: string,
+    timeSpentMs?: number,
+    hintsUsed: number = 0,
+) => {
     try {
         const response = await api.post('/gamification/submit-answer', {
             task_id: taskId,
-            answer: answer
+            answer: answer,
+            time_spent_ms: timeSpentMs,
+            hints_used: hintsUsed,
         });
         return response.data;
     } catch (error) {

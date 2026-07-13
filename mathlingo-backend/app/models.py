@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -94,6 +94,11 @@ class Task(Base):
     # (R1, §1.2) и require_role() в app/auth.py для прав на переходы.
     STATUSES = ("draft", "in_review", "needs_revision", "approved", "published", "archived")
     SOURCES = ("manual", "ai")
+    # R2 AI-generation decisions: "первый набор типов — с одним ответом и
+    # multiple choice". single_answer сравнивается как строка (case/пробелы
+    # игнорируются); настоящая математическая эквивалентность — отдельный
+    # detereministic-checker в AI-конвейере, не эта проверка.
+    ANSWER_TYPES = ("single_answer", "multiple_choice")
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True, nullable=False)
@@ -127,6 +132,46 @@ class Task(Base):
     approved_by_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
     published_at = Column(DateTime, nullable=True)
     archived_at = Column(DateTime, nullable=True)
+
+    # Само содержимое вопроса (R2 task 1 prerequisite) — до этого в Task не
+    # было ничего для реальной проверки ответа ученика, хотя student-facing
+    # TaskSolver.tsx уже ожидал ровно эти поля (content/options/answer_type).
+    # correct_answer НИКОГДА не должен попадать в student-facing ответ
+    # (см. app/routes/gamification.py) — только в admin-эндпоинты.
+    content = Column(String, nullable=True)
+    answer_type = Column(String, nullable=False, default="single_answer")
+    options = Column(JSON, nullable=True)  # только для multiple_choice
+    correct_answer = Column(String, nullable=True)  # multiple_choice: индекс варианта строкой
+
+
+class Attempt(Base):
+    """
+    R2 task 1: центральная таблица попыток — от неё зависят диагностика и
+    mastery_state. content_type/content_id — generic-ссылка (сейчас только
+    "task", в R3 добавится "game" на ту же таблицу), не строгий FK, т.к.
+    content_type определяет, на какую таблицу смотрит content_id. source
+    разделяет обычные попытки от игровых — при пересчёте mastery игровые
+    учитываются только агрегированно, не 1:1 с обычной попыткой (см.
+    docs/roadmap/product-technical-plan.md, R2 §2).
+    """
+    __tablename__ = "attempts"
+
+    CONTENT_TYPES = ("task", "diagnostic", "game")
+    SOURCES = ("manual", "game")
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    content_type = Column(String, nullable=False, default="task")
+    content_id = Column(Integer, nullable=False)
+    skill_id = Column(Integer, ForeignKey("skills.id"), nullable=True)
+    is_correct = Column(Boolean, nullable=False)
+    time_spent_ms = Column(Integer, nullable=True)
+    hints_used = Column(Integer, nullable=False, default=0)
+    source = Column(String, nullable=False, default="manual")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    skill = relationship("Skill")
 
 
 class AuditLog(Base):

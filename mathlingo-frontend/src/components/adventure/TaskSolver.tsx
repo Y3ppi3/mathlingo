@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fetchTaskGroup, submitTaskAnswer } from '../../utils/api';
 import ProgressBar from '../ui/ProgressBar';
 import RewardPopup from './RewardPopup';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 interface Task {
     id: number;
@@ -130,8 +131,11 @@ const TaskSolver: React.FC = () => {
             answer = userAnswer;
         }
 
+        const initialSeconds = currentTask.estimated_time_seconds || 60;
+        const elapsedMs = Math.max(0, (initialSeconds - (timeRemaining ?? initialSeconds)) * 1000);
+
         try {
-            const result = await submitTaskAnswer(currentTask.id, answer);
+            const result = await submitTaskAnswer(currentTask.id, answer, elapsedMs);
             setIsCorrect(result.isCorrect);
 
             if (result.isCorrect) {
@@ -208,7 +212,7 @@ const TaskSolver: React.FC = () => {
                 showFeedback ? (isCorrect ? 'ring-4 ring-green-500' : 'ring-4 ring-red-500') : ''
             }`}>
                 <h3 className="text-lg font-semibold mb-4">{currentTask.title}</h3>
-                <div className="mb-6" dangerouslySetInnerHTML={{ __html: currentTask.content }}></div>
+                <div className="mb-6" dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentTask.content) }}></div>
 
                 {currentTask.answer_type === 'multiple_choice' && currentTask.options ? (
                     <div className="space-y-3">
@@ -230,7 +234,7 @@ const TaskSolver: React.FC = () => {
                                     }`}>
                                         {selectedOption === index && '✓'}
                                     </div>
-                                    <span className="ml-3" dangerouslySetInnerHTML={{ __html: option }}></span>
+                                    <span className="ml-3" dangerouslySetInnerHTML={{ __html: sanitizeHtml(option) }}></span>
                                 </div>
                             </div>
                         ))}

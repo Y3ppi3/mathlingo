@@ -106,6 +106,7 @@ class UserRegisterResponse(UserResponse):
 
 TaskLevel = Literal["basic", "standard", "advanced"]
 TaskStatus = Literal["draft", "in_review", "needs_revision", "approved", "published", "archived"]
+TaskAnswerType = Literal["single_answer", "multiple_choice"]
 
 
 # Схема заданий
@@ -119,6 +120,10 @@ class TaskCreate(TaskBase):
     owner_id: Optional[int] = None
     skill_id: Optional[int] = None
     level: TaskLevel = "standard"
+    content: Optional[str] = None
+    answer_type: TaskAnswerType = "single_answer"
+    options: Optional[List[str]] = None
+    correct_answer: Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
@@ -128,6 +133,10 @@ class TaskUpdate(BaseModel):
     owner_id: Optional[int] = None
     skill_id: Optional[int] = None
     level: Optional[TaskLevel] = None
+    content: Optional[str] = None
+    answer_type: Optional[TaskAnswerType] = None
+    options: Optional[List[str]] = None
+    correct_answer: Optional[str] = None
 
 
 class TaskResponse(TaskBase):
@@ -142,6 +151,13 @@ class TaskResponse(TaskBase):
     approved_by_admin_id: Optional[int] = None
     published_at: Optional[datetime] = None
     archived_at: Optional[datetime] = None
+    content: Optional[str] = None
+    answer_type: TaskAnswerType = "single_answer"
+    options: Optional[List[str]] = None
+    # correct_answer сознательно ЕСТЬ в admin-схеме (автор должен видеть, что
+    # он написал) — но НЕ используется ни в одном student-facing эндпоинте
+    # (см. app/routes/gamification.py, там свой облегчённый dict, не эта схема).
+    correct_answer: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -360,6 +376,8 @@ class UserProgressResponse(UserProgressBase):
 class TaskSubmissionRequest(BaseModel):
     task_id: int
     answer: str
+    time_spent_ms: Optional[int] = None
+    hints_used: int = 0
 
 
 class TaskSubmissionResponse(BaseModel):
