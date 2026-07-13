@@ -339,6 +339,46 @@ class AIQuotaUpdateRequest(BaseModel):
     monthly_limit: int
 
 
+# Пост-публикационный мониторинг (R2 task 7)
+ContentFlagType = Literal["anomaly", "complaint"]
+ContentFlagStatus = Literal["open", "resolved", "dismissed"]
+
+
+class ContentFlagCreate(BaseModel):
+    comment: str
+
+
+class ContentFlagResponse(BaseModel):
+    id: int
+    task_id: int
+    flag_type: ContentFlagType
+    details: Optional[Dict[str, Any]] = None
+    status: ContentFlagStatus
+    created_by_admin_id: Optional[int] = None
+    resolved_by_admin_id: Optional[int] = None
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ContentFlagUpdate(BaseModel):
+    status: Literal["resolved", "dismissed"]
+
+
+class TaskQualityResponse(BaseModel):
+    task_id: int
+    title: str
+    status: str
+    sample_size: int
+    accuracy: Optional[float] = None
+    avg_time_spent_ms: Optional[float] = None
+    avg_hints_used: Optional[float] = None
+    open_flags: int
+    flags: List[ContentFlagResponse] = []
+
+
 # Схемы диагностики (R2 task 3)
 class DiagnosticCreate(BaseModel):
     skill_id: int
@@ -360,6 +400,50 @@ class DiagnosticResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Игровые сценарии (R3 task 2)
+GameTemplateKey = Literal["derivfall", "integralbuilder", "mathlab"]
+GameScenarioStatus = Literal["draft", "published", "archived"]
+
+
+class GameScenarioCreate(BaseModel):
+    template_key: GameTemplateKey
+    config: Dict[str, Any]
+    level_range: Optional[List[int]] = None
+    availability_from: Optional[datetime] = None
+    availability_to: Optional[datetime] = None
+
+
+class GameScenarioUpdate(BaseModel):
+    config: Optional[Dict[str, Any]] = None
+    level_range: Optional[List[int]] = None
+    availability_from: Optional[datetime] = None
+    availability_to: Optional[datetime] = None
+
+
+class GameScenarioResponse(BaseModel):
+    id: int
+    template_key: GameTemplateKey
+    config: Dict[str, Any]
+    status: GameScenarioStatus
+    level_range: Optional[List[int]] = None
+    availability_from: Optional[datetime] = None
+    availability_to: Optional[datetime] = None
+    created_by_admin_id: Optional[int] = None
+    preview_passed_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class GameScenarioChecklistItemResponse(BaseModel):
+    item_key: str
+    checked_by_admin_id: Optional[int] = None
+    checked_at: Optional[datetime] = None
 
 
 # Student-facing: то же самое, что задание в task-groups/data — без

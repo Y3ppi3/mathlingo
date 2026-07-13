@@ -394,6 +394,96 @@ class ContentStatusHistory(Base):
     actor_admin = relationship("Admin")
 
 
+class GameScenario(Base):
+    """
+    R3 task 2: сценарий игрового шаблона, настраиваемый content_manager'ом
+    без кода. config хранит провалидированный (см. app/services/game_config.py)
+    template-специфичный конфиг — форма зависит от template_key. В отличие
+    от Task — только draft/published/archived, без four-eyes ревью: чек-лист
+    (game_scenario_checklist) и preview-гейт ниже заменяют собой approve.
+    updated_at нужен для staleness-проверки на публикации: чек-лист/preview,
+    пройденные ДО последнего редактирования конфига, публикацию не
+    разблокируют — иначе можно отредактировать текст после чек-листа и
+    опубликовать непроверенное.
+    """
+    __tablename__ = "game_scenarios"
+
+    TEMPLATE_KEYS = ("derivfall", "integralbuilder", "mathlab")
+    STATUSES = ("draft", "published", "archived")
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_key = Column(String, nullable=False)
+    config = Column(JSON, nullable=False)
+    status = Column(String, nullable=False, default="draft")
+    level_range = Column(JSON, nullable=True)  # [min, max], 1..5 — та же шкала, что difficulty-проп у всех трёх шаблонов
+    availability_from = Column(DateTime, nullable=True)
+    availability_to = Column(DateTime, nullable=True)
+    created_by_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    preview_passed_at = Column(DateTime, nullable=True)
+    published_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    # Без onupdate: должен двигаться ТОЛЬКО когда реально меняется config
+    # (см. update_scenario в app/routes/game_scenarios.py), а не при любом
+    # сохранении строки — иначе preview/checklist сами себя делают
+    # "устаревшими" сразу после прохождения (onupdate сработал бы и на них).
+    updated_at = Column(DateTime, nullable=True)
+
+    created_by_admin = relationship("Admin")
+
+
+class GameScenarioChecklistItem(Base):
+    """
+    R3 task 2: фиксация ручного контентного чек-листа перед публикацией
+    (аудируемо — см. docs/roadmap/product-technical-plan.md R3 §3). Строка
+    существует = пункт отмечен; checked_at сверяется с
+    GameScenario.updated_at на публикации (см. комментарий там же).
+    """
+    __tablename__ = "game_scenario_checklist"
+    __table_args__ = (
+        UniqueConstraint("scenario_id", "item_key", name="uq_game_scenario_checklist_scenario_item"),
+    )
+
+    ITEM_KEYS = ("texts_correct", "no_placeholders", "katex_renders")
+
+    id = Column(Integer, primary_key=True, index=True)
+    scenario_id = Column(Integer, ForeignKey("game_scenarios.id"), nullable=False)
+    item_key = Column(String, nullable=False)
+    checked_by_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    checked_at = Column(DateTime, default=datetime.utcnow)
+
+    scenario = relationship("GameScenario")
+    checked_by_admin = relationship("Admin")
+
+
+class ContentFlag(Base):
+    """
+    R2 task 7: пост-публикационный мониторинг. anomaly — создаётся системой
+    (app/services/content_quality.py) по агрегатам attempts опубликованного
+    AI-задания и автоматически возвращает Task в in_review — единственный
+    случай, когда статус контента меняет не человек, а система. complaint —
+    жалоба staff после публикации; сама по себе статус НЕ меняет (см.
+    docs/roadmap/product-technical-plan.md, R2 §7: "жалоба... статус меняет
+    только человек") — только видна на экране "аналитика качества", решение
+    принимает reviewer вручную (return_to_review/archive).
+    """
+    __tablename__ = "content_flags"
+
+    FLAG_TYPES = ("anomaly", "complaint")
+    STATUSES = ("open", "resolved", "dismissed")
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    flag_type = Column(String, nullable=False)
+    details = Column(JSON, nullable=True)
+    status = Column(String, nullable=False, default="open")
+    created_by_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    resolved_by_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+
+    task = relationship("Task")
+
+
 class UserProgress(Base):
     __tablename__ = "user_progress"
 
