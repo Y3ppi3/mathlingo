@@ -2,11 +2,12 @@
 import { useState } from 'react';
 import TasksPanel from './TasksPanel';
 import SubjectsPanel from './SubjectsPanel';
+import SkillsPanel from './SkillsPanel';
 
-type SubTab = 'tasks' | 'subjects';
+type SubTab = 'tasks' | 'subjects' | 'skills';
 
-// "Каталог учебного контента" объединяет задания и разделы/темы — обе части
-// одной content-модели (см. docs/roadmap/product-technical-plan.md, R1 §3).
+// "Каталог учебного контента" объединяет задания, разделы и темы — все три
+// части одной content-модели (см. docs/roadmap/product-technical-plan.md, R1 §3).
 const ContentZonePanel = () => {
     const [tab, setTab] = useState<SubTab>('tasks');
 
@@ -15,7 +16,8 @@ const ContentZonePanel = () => {
             <div className="flex items-center gap-1 px-6 pt-5">
                 {([
                     ['tasks', 'Задания'],
-                    ['subjects', 'Разделы и темы'],
+                    ['subjects', 'Разделы'],
+                    ['skills', 'Темы'],
                 ] as [SubTab, string][]).map(([id, label]) => (
                     <button
                         key={id}
@@ -31,7 +33,9 @@ const ContentZonePanel = () => {
                     </button>
                 ))}
             </div>
-            {tab === 'tasks' ? <TasksPanel /> : <SubjectsPanel />}
+            {tab === 'tasks' && <TasksPanel />}
+            {tab === 'subjects' && <SubjectsPanel />}
+            {tab === 'skills' && <SkillsPanel />}
         </div>
     );
 };

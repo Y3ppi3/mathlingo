@@ -10,7 +10,7 @@ from app.models import (
     AdventureMap, MapLocation, TaskGroup,
     Achievement, UserProgress
 )
-from app.auth import get_admin_current_user
+from app.auth import get_admin_current_user, require_role
 from app.schemas import (
     AdventureMapCreate, AdventureMapResponse,
     LocationCreate, LocationResponse,
@@ -19,6 +19,13 @@ from app.schemas import (
 
 router = APIRouter(prefix="/admin/gamification", tags=["admin_gamification"])
 
+# Карты/локации/группы заданий — контент "игры и карты", те же права, что и
+# на остальной контент (superadmin/content_manager создают и правят; hard
+# delete — только superadmin, у этих сущностей нет archive-поля). См.
+# docs/roadmap/product-technical-plan.md (R1, §5).
+CAN_MANAGE_CONTENT = require_role("superadmin", "content_manager")
+CAN_HARD_DELETE = require_role("superadmin")
+
 
 # --- Маршруты для управления картами приключений ---
 
@@ -26,7 +33,7 @@ router = APIRouter(prefix="/admin/gamification", tags=["admin_gamification"])
 def create_map(
     map_data: AdventureMapCreate,
     db: Session = Depends(get_db),
-    current_admin: Admin = Depends(get_admin_current_user)
+    current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     """Создать новую карту приключений"""
     new_map = AdventureMap(
@@ -58,7 +65,7 @@ def get_locations_by_map(
 def create_location(
         location_data: LocationCreate,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     """Создать новую локацию"""
     # Проверяем существование карты
@@ -96,7 +103,7 @@ def update_location(
         location_id: int,
         location_data: LocationCreate,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     """Обновить локацию"""
     location = db.query(MapLocation).filter(MapLocation.id == location_id).first()
@@ -124,7 +131,7 @@ def delete_location(
         location_id: int,
         force: bool = False,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_HARD_DELETE)
 ):
     """Удаление локации с каскадным удалением связанных данных"""
     location = db.query(MapLocation).filter(MapLocation.id == location_id).first()
@@ -205,7 +212,7 @@ def get_task_groups_by_location(
 def create_task_group(
         task_group_data: TaskGroupCreate,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     """Создать новую группу заданий"""
     # Проверяем существование локации
@@ -228,7 +235,7 @@ def update_task_group(
         task_group_id: int,
         task_group_data: TaskGroupCreate,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     """Обновить группу заданий"""
     task_group = db.query(TaskGroup).filter(TaskGroup.id == task_group_id).first()
@@ -251,7 +258,7 @@ def delete_task_group(
         task_group_id: int,
         force: bool = False,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_HARD_DELETE)
 ):
     """Удаление группы заданий с каскадным удалением или отвязкой связанных данных"""
     task_group = db.query(TaskGroup).filter(TaskGroup.id == task_group_id).first()
@@ -299,7 +306,7 @@ def assign_tasks_to_group(
         task_group_id: int,
         task_ids: List[int],
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     """Назначить задания группе"""
     task_group = db.query(TaskGroup).filter(TaskGroup.id == task_group_id).first()
@@ -339,7 +346,7 @@ def assign_tasks_to_group(
 def create_achievement(
         achievement_data: dict,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     """Создать новое достижение"""
     new_achievement = Achievement(
@@ -360,7 +367,7 @@ def create_achievement(
 def delete_achievement(
         achievement_id: int,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_HARD_DELETE)
 ):
     """Удалить достижение"""
     achievement = db.query(Achievement).filter(Achievement.id == achievement_id).first()
@@ -397,7 +404,7 @@ def delete_adventure_map(
         map_id: int,
         force: bool = False,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_HARD_DELETE)
 ):
     """Deletion of adventure map with proper cascade handling"""
     try:
