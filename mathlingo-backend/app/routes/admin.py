@@ -191,6 +191,20 @@ def _validate_skill_for_subject(db: Session, skill_id: Optional[int], subject_id
         raise HTTPException(status_code=400, detail="Тема не относится к указанному разделу")
 
 
+def _validate_answer_data(answer_type: str, options: Optional[List[str]], correct_answer: Optional[str]) -> None:
+    """
+    Не требует, чтобы черновик был полностью укомплектован (можно сохранить
+    контент раньше ответа) — проверяет только то, что УЖЕ указано, на
+    внутреннюю согласованность.
+    """
+    if answer_type == "multiple_choice" and options is not None and correct_answer is not None:
+        if not correct_answer.isdigit() or not (0 <= int(correct_answer) < len(options)):
+            raise HTTPException(
+                status_code=400,
+                detail="correct_answer должен быть индексом (строкой числа) в пределах options",
+            )
+
+
 # Создание нового задания. Всегда стартует как draft — опубликовать можно
 # только пройдя submit_review -> approve -> publish.
 @router.post("/tasks", response_model=TaskResponse)
@@ -202,6 +216,7 @@ def create_task(
     subject = db.query(Subject).filter(Subject.code == task.subject).first()
     subject_id = subject.id if subject else None
     _validate_skill_for_subject(db, task.skill_id, subject_id)
+    _validate_answer_data(task.answer_type, task.options, task.correct_answer)
 
     db_task = Task(
         title=task.title,
@@ -211,6 +226,10 @@ def create_task(
         owner_id=task.owner_id,
         skill_id=task.skill_id,
         level=task.level,
+        content=task.content,
+        answer_type=task.answer_type,
+        options=task.options,
+        correct_answer=task.correct_answer,
         status="draft",
         version=1,
         source="manual",
@@ -252,6 +271,13 @@ def update_task(
     if "skill_id" in update_data:
         _validate_skill_for_subject(
             db, update_data["skill_id"], update_data.get("subject_id", db_task.subject_id)
+        )
+
+    if "answer_type" in update_data or "options" in update_data or "correct_answer" in update_data:
+        _validate_answer_data(
+            update_data.get("answer_type", db_task.answer_type),
+            update_data.get("options", db_task.options),
+            update_data.get("correct_answer", db_task.correct_answer),
         )
 
     for key, value in update_data.items():

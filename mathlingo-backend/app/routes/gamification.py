@@ -9,7 +9,7 @@ import os
 from dotenv import load_dotenv
 
 from app.database import get_db
-from app.models import Admin, User, Task, TaskGroup, MapLocation, AdventureMap, UserProgress, Achievement
+from app.models import Admin, Attempt, User, Task, TaskGroup, MapLocation, AdventureMap, UserProgress, Achievement
 from app.auth import get_admin_current_user, get_current_user, get_token_from_request, require_role
 from app.schemas import (
     AdminCreate,
@@ -373,3 +373,116 @@ def get_map_data(
     }
 
     return response
+
+
+# --- Прохождение заданий учеником (R2 task 1 prerequisite) ---
+#
+# До этого POST /gamification/task-groups/{id}/data и /submit-answer не
+# существовали вообще, хотя фронтенд (TaskSolver.tsx, utils/api.ts) уже их
+# вызывал — весь student-facing флоу решения заданий был мёртв (404).
+
+@router.post("/task-groups/{group_id}/data")
+def get_task_group_data(
+        group_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    task_group = db.query(TaskGroup).filter(TaskGroup.id == group_id).first()
+    if not task_group:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Группа заданий не найдена")
+
+    location = db.query(MapLocation).filter(MapLocation.id == task_group.location_id).first()
+    adventure_map = (
+        db.query(AdventureMap).filter(AdventureMap.id == location.adventure_map_id).first()
+        if location else None
+    )
+
+    # Только опубликованный контент — черновики/на проверке ученику не видны.
+    tasks = db.query(Task).filter(
+        Task.task_group_id == group_id, Task.status == "published"
+    ).all()
+
+    return {
+        "id": task_group.id,
+        "name": task_group.name,
+        "description": task_group.description,
+        "locationName": location.name if location else "",
+        "subjectId": adventure_map.subject_id if adventure_map else None,
+        "tasks": [
+            {
+                "id": t.id,
+                "title": t.title,
+                # correct_answer сознательно не включён — это student-facing ответ
+                "content": t.content or "",
+                "options": t.options,
+                "answer_type": t.answer_type,
+                "difficulty_level": t.difficulty_level,
+                "reward_points": t.reward_points,
+                "estimated_time_seconds": t.estimated_time_seconds,
+            }
+            for t in tasks
+        ],
+        "totalPoints": sum(t.reward_points for t in tasks),
+    }
+
+
+def _is_answer_correct(task: Task, answer: str) -> bool:
+    if task.correct_answer is None:
+        return False
+    if task.answer_type == "multiple_choice":
+        return answer.strip() == task.correct_answer.strip()
+    # single_answer: точное сравнение без учёта регистра/пробелов по краям.
+    # Настоящая математическая эквивалентность ("x+1" == "1+x") — отдельный
+    # deterministic-checker в AI-конвейере (R2 §2), не эта проверка.
+    return answer.strip().lower() == task.correct_answer.strip().lower()
+
+
+@router.post("/submit-answer", response_model=TaskSubmissionResponse)
+def submit_answer(
+        body: TaskSubmissionRequest,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    task = db.query(Task).filter(Task.id == body.task_id).first()
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Задание не найдено")
+    if task.status != "published":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Задание недоступно для решения")
+
+    is_correct = _is_answer_correct(task, body.answer)
+    points = task.reward_points if is_correct else 0
+
+    db.add(Attempt(
+        user_id=current_user.id,
+        content_type="task",
+        content_id=task.id,
+        skill_id=task.skill_id,
+        is_correct=is_correct,
+        time_spent_ms=body.time_spent_ms,
+        hints_used=body.hints_used,
+        source="manual",
+    ))
+
+    if is_correct:
+        # UserProgress до этого создавался лениво только в get_map_data —
+        # если ученик решает задание, ни разу не открыв карту (например,
+        # прямой deep-link), строки могло не быть, и очки терялись молча.
+        progress = db.query(UserProgress).filter(UserProgress.user_id == current_user.id).first()
+        if not progress:
+            progress = UserProgress(
+                user_id=current_user.id,
+                current_level=1,
+                total_points=0,
+                completed_locations="[]",
+                unlocked_achievements="[]",
+            )
+            db.add(progress)
+        progress.total_points += points
+
+    db.commit()
+
+    return TaskSubmissionResponse(
+        isCorrect=is_correct,
+        points=points,
+        feedback=None if is_correct else "Попробуйте ещё раз",
+    )

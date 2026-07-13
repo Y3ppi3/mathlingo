@@ -48,6 +48,7 @@ adminApi.interceptors.response.use(
 export type TaskLevel = 'basic' | 'standard' | 'advanced';
 export type TaskStatus = 'draft' | 'in_review' | 'needs_revision' | 'approved' | 'published' | 'archived';
 export type TaskTransitionAction = 'submit_review' | 'approve' | 'request_changes' | 'publish' | 'archive';
+export type TaskAnswerType = 'single_answer' | 'multiple_choice';
 
 export interface Task {
     id?: number;
@@ -64,6 +65,10 @@ export interface Task {
     approved_by_admin_id?: number | null;
     published_at?: string | null;
     archived_at?: string | null;
+    content?: string | null;
+    answer_type?: TaskAnswerType;
+    options?: string[] | null;
+    correct_answer?: string | null;
 }
 
 export interface Skill {
