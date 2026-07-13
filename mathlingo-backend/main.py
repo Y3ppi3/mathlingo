@@ -1,18 +1,14 @@
 
 import os
-from fastapi import FastAPI, Depends, Response, Request
+import time
+import secrets
+
+from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import secrets
-import time
 
-from sqlalchemy.orm import Session
-
-from app.database import get_db
-from app.routes import users, tasks, admin, gamification, subjects, subject_operations
+from app.routes import users, tasks, admin, gamification, subjects, subject_operations, skills
 from app.routes.admin_gamification import router as admin_gamification_router
-from app.models import User, Task
-from app.auth import get_current_user
 
 app = FastAPI(title="MathLingo API")
 
@@ -26,8 +22,13 @@ async def csrf_protection(request: Request, call_next):
     # Пути, которые не требуют CSRF-защиты
     exempt_paths = ["/api/login/", "/api/register/", "/api/logout/"]
 
-    # Пропускаем проверку CSRF для исключенных путей или для безопасных методов
-    if request.url.path in exempt_paths or request.method in ["GET", "HEAD", "OPTIONS"]:
+    # Админка использует Bearer-токен в заголовке Authorization, а не cookie-сессию,
+    # поэтому она не подвержена CSRF (браузер не может подставить этот заголовок сам)
+    # и должна быть исключена из проверки независимо от посторонней cookie "token".
+    is_admin_path = request.url.path.startswith("/admin")
+
+    # Пропускаем проверку CSRF для исключенных путей, админки или для безопасных методов
+    if is_admin_path or request.url.path in exempt_paths or request.method in ["GET", "HEAD", "OPTIONS"]:
         response = await call_next(request)
 
         # Для запросов, которые возвращают информацию о пользователе, устанавливаем новый CSRF-токен
@@ -76,17 +77,21 @@ async def csrf_protection(request: Request, call_next):
             )
     return await call_next(request)
 
-
 #CORS configuration
 origins = [
+    "https://mathlingo.space",
+    "https://www.mathlingo.space",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://192.168.0.157:5173/",
-    "http://192.168.0.157:8000/"
+    "http://192.168.0.157:5173",
+    "http://192.168.0.157:8000",
+    "http://localhost:8000",
+    "http://localhost:8001",
+    "http://localhost:8080"
     # Добавьте здесь ваши production домены, когда перейдете в production
 ]
 
@@ -108,21 +113,9 @@ app.include_router(subjects.router, prefix="/api/subjects", tags=["subjects"])
 app.include_router(gamification.router, prefix="/gamification")
 app.include_router(admin_gamification_router)
 app.include_router(subject_operations.router)
+app.include_router(skills.router)
 
 
 @app.get("/")
 def home():
-    print("➡️ GET / вызван")
     return {"message": "Добро пожаловать в MathLingo API!"}
-
-
-@app.get("/users/")
-def get_users(db: Session = Depends(get_db)):
-    print("➡️ GET /users/ вызван")
-    return db.query(User).all()
-
-
-@app.get("/tasks/")
-def get_tasks(db: Session = Depends(get_db)):
-    print("➡️ GET /tasks/ вызван")
-    return db.query(Task).all()

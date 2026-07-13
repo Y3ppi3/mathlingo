@@ -1,9 +1,6 @@
 from app.auth import create_access_token
 
-
-def authorization_header(admin):
-    token = create_access_token({"sub": admin.email, "role": "admin"})
-    return {"Authorization": f"Bearer {token}"}
+from tests.conftest import authorization_header
 
 
 def test_first_admin_can_be_registered_without_authentication(client):

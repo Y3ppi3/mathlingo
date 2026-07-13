@@ -1,4 +1,6 @@
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -6,14 +8,78 @@ from typing import List
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import Admin, Task, User, Subject, AdventureMap, MapLocation, TaskGroup
+from app.models import Admin, ContentStatusHistory, Task, User, Subject, AdventureMap, MapLocation, TaskGroup
 from app.schemas import (
-    AdminCreate, AdminResponse, TaskCreate, TaskResponse, TaskUpdate,
+    AdminCreate, AdminResponse, TaskChangeRequest, TaskCreate, TaskResponse, TaskUpdate,
     AdminLogin, UserResponse, SubjectCreate, SubjectUpdate, SubjectResponse)
-from app.auth import get_admin_current_user, get_admin_current_user_optional, create_access_token, hash_password, verify_password
+from app.auth import get_admin_current_user, get_admin_current_user_optional, create_access_token, hash_password, verify_password, require_role
 from typing import Optional
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+# Создание/редактирование/публикация/архивация контента — superadmin и
+# content_manager. Approve/request-changes — намеренно НЕ content_manager
+# (four-eyes: автор черновика не проверяет сам себя), см.
+# docs/roadmap/product-technical-plan.md (R1, §5).
+CAN_MANAGE_CONTENT = require_role("superadmin", "content_manager")
+CAN_REVIEW_CONTENT = require_role("superadmin", "teacher")
+
+# from_status -> (to_status, кто может выполнить переход)
+TASK_TRANSITIONS = {
+    "submit_review": {"from": {"draft", "needs_revision"}, "to": "in_review", "roles": ("superadmin", "content_manager")},
+    "approve": {"from": {"in_review"}, "to": "approved", "roles": ("superadmin", "teacher")},
+    "request_changes": {"from": {"in_review"}, "to": "needs_revision", "roles": ("superadmin", "teacher")},
+    "publish": {"from": {"approved"}, "to": "published", "roles": ("superadmin", "content_manager")},
+    "archive": {"from": {"draft", "in_review", "needs_revision", "approved", "published"}, "to": "archived", "roles": ("superadmin", "content_manager")},
+}
+
+
+def _apply_task_transition(
+    action: str,
+    task_id: int,
+    db: Session,
+    current_admin: Admin,
+    comment: Optional[str] = None,
+) -> Task:
+    rule = TASK_TRANSITIONS[action]
+
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if current_admin.role not in rule["roles"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав для этого перехода статуса",
+        )
+
+    if db_task.status not in rule["from"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Переход '{action}' недоступен из статуса '{db_task.status}'",
+        )
+
+    from_status = db_task.status
+    db_task.status = rule["to"]
+
+    if action == "approve":
+        db_task.approved_by_admin_id = current_admin.id
+    elif action == "publish":
+        db_task.published_at = datetime.utcnow()
+    elif action == "archive":
+        db_task.archived_at = datetime.utcnow()
+
+    db.add(ContentStatusHistory(
+        task_id=db_task.id,
+        from_status=from_status,
+        to_status=db_task.status,
+        actor_admin_id=current_admin.id,
+        comment=comment,
+    ))
+    db.commit()
+    db.refresh(db_task)
+    return db_task
+
 
 class UserStatusUpdate(BaseModel):
     is_active: bool
@@ -110,58 +176,132 @@ def get_all_tasks(
     return tasks
 
 
-# Создание нового задания
+def _validate_skill_for_subject(db: Session, skill_id: Optional[int], subject_id: Optional[int]) -> None:
+    if skill_id is None:
+        return
+    from app.models import Skill
+    skill = db.query(Skill).filter(Skill.id == skill_id).first()
+    if not skill:
+        raise HTTPException(status_code=404, detail="Тема (skill) не найдена")
+    if subject_id is not None and skill.subject_id != subject_id:
+        raise HTTPException(status_code=400, detail="Тема не относится к указанному разделу")
+
+
+# Создание нового задания. Всегда стартует как draft — опубликовать можно
+# только пройдя submit_review -> approve -> publish.
 @router.post("/tasks", response_model=TaskResponse)
 def create_task(
         task: TaskCreate,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
-    # Look up the subject by code to get the subject_id
     subject = db.query(Subject).filter(Subject.code == task.subject).first()
+    subject_id = subject.id if subject else None
+    _validate_skill_for_subject(db, task.skill_id, subject_id)
 
-    # Create a new task dict with all the task data
-    task_data = task.dict()
-
-    # If subject was found, set the subject_id
-    if subject:
-        task_data["subject_id"] = subject.id
-
-    # Create the task with the updated data
-    db_task = Task(**task_data)
+    db_task = Task(
+        title=task.title,
+        description=task.description,
+        subject=task.subject,
+        subject_id=subject_id,
+        owner_id=task.owner_id,
+        skill_id=task.skill_id,
+        level=task.level,
+        status="draft",
+        version=1,
+        source="manual",
+        created_by_admin_id=current_admin.id,
+    )
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
     return db_task
 
 
+# Редактирование содержимого задания — только пока статус draft/
+# needs_revision. Изменить опубликованный/проверяемый айтем напрямую нельзя:
+# это обходило бы весь review-процесс. Для смены статуса — эндпоинты ниже.
 @router.put("/tasks/{task_id}", response_model=TaskResponse)
 def update_task(
         task_id: int,
         task_update: TaskUpdate,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(CAN_MANAGE_CONTENT)
 ):
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    # Создаем словарь с данными для обновления
+    if db_task.status not in ("draft", "needs_revision"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Нельзя редактировать задание в статусе '{db_task.status}' — только draft/needs_revision",
+        )
+
     update_data = task_update.dict(exclude_unset=True)
 
-    # Если обновляется предмет, соответственно обновляем subject_id
     if "subject" in update_data:
         subject = db.query(Subject).filter(Subject.code == update_data["subject"]).first()
         if subject:
             update_data["subject_id"] = subject.id
 
-    # Обновляем поля задания
+    if "skill_id" in update_data:
+        _validate_skill_for_subject(
+            db, update_data["skill_id"], update_data.get("subject_id", db_task.subject_id)
+        )
+
     for key, value in update_data.items():
         setattr(db_task, key, value)
 
     db.commit()
     db.refresh(db_task)
     return db_task
+
+
+@router.post("/tasks/{task_id}/submit-review", response_model=TaskResponse)
+def submit_task_for_review(
+        task_id: int,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user),
+):
+    return _apply_task_transition("submit_review", task_id, db, current_admin)
+
+
+@router.post("/tasks/{task_id}/approve", response_model=TaskResponse)
+def approve_task(
+        task_id: int,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user),
+):
+    return _apply_task_transition("approve", task_id, db, current_admin)
+
+
+@router.post("/tasks/{task_id}/request-changes", response_model=TaskResponse)
+def request_task_changes(
+        task_id: int,
+        body: TaskChangeRequest,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user),
+):
+    return _apply_task_transition("request_changes", task_id, db, current_admin, comment=body.comment)
+
+
+@router.post("/tasks/{task_id}/publish", response_model=TaskResponse)
+def publish_task(
+        task_id: int,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user),
+):
+    return _apply_task_transition("publish", task_id, db, current_admin)
+
+
+@router.post("/tasks/{task_id}/archive", response_model=TaskResponse)
+def archive_task(
+        task_id: int,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(get_admin_current_user),
+):
+    return _apply_task_transition("archive", task_id, db, current_admin)
 
 
 '''
@@ -185,12 +325,13 @@ def update_task(
 '''
 
 
-# Удаление задания
+# Необратимое удаление задания — только superadmin. Обычный сценарий вывода
+# контента из оборота — archive (см. /tasks/{id}/archive выше), а не delete.
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_task(
         task_id: int,
         db: Session = Depends(get_db),
-        current_admin: Admin = Depends(get_admin_current_user)
+        current_admin: Admin = Depends(require_role("superadmin"))
 ):
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
