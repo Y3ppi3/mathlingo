@@ -142,13 +142,12 @@ const Login = () => {
                                 />
                                 Запомнить меня
                             </label>
-                            <button
-                                type="button"
-                                style={{padding: 0}}
+                            <Link
+                                to="/forgot-password"
                                 className="text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
                             >
                                 Забыли пароль?
-                            </button>
+                            </Link>
                         </div>
 
                         <button

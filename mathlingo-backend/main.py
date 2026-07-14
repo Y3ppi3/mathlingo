@@ -14,7 +14,7 @@ from app.services import cache
 from app.routes import (
     users, tasks, admin, admin_tasks, admin_ai, admin_content_quality,
     gamification_maps, gamification_tasks, gamification_mastery,
-    subjects, subject_operations, skills, game_scenarios, dashboard,
+    subjects, subject_operations, skills, game_scenarios, dashboard, password_reset,
 )
 from app.routes.admin_gamification import router as admin_gamification_router
 
@@ -29,8 +29,14 @@ def _csrf_key(auth_token: str) -> str:
 
 @app.middleware("http")
 async def csrf_protection(request: Request, call_next):
-    # Пути, которые не требуют CSRF-защиты
-    exempt_paths = ["/api/login/", "/api/register/", "/api/logout/"]
+    # Пути, которые не требуют CSRF-защиты. Password-reset сюда попадает
+    # явно (не только "нет auth-cookie" по умолчанию) — сценарий нарочно
+    # рассчитан на анонимного пользователя, но стейл-cookie от истёкшей
+    # сессии не должна ломать этот флоу требованием CSRF-токена.
+    exempt_paths = [
+        "/api/login/", "/api/register/", "/api/logout/",
+        "/api/password-reset/request", "/api/password-reset/confirm",
+    ]
 
     # Админка использует Bearer-токен в заголовке Authorization, а не cookie-сессию,
     # поэтому она не подвержена CSRF (браузер не может подставить этот заголовок сам)
@@ -218,6 +224,7 @@ app.include_router(admin_tasks.router)
 app.include_router(admin_ai.router)
 app.include_router(admin_content_quality.router)
 app.include_router(users.router, prefix="/api", tags=["users"])
+app.include_router(password_reset.router)
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 app.include_router(subjects.router, prefix="/api/subjects", tags=["subjects"])
 app.include_router(gamification_maps.router)

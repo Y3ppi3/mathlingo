@@ -100,6 +100,16 @@ class UserResponse(UserBase):
         }
 
 
+# Сброс пароля (R4) — см. app/services/password_reset.py
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+
 class UserRegisterResponse(UserResponse):
     token: str
 

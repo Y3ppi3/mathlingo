@@ -107,6 +107,17 @@ export const getCurrentUser = async () => {
     }
 };
 
+// Сброс пароля (R4) — /request всегда 204 независимо от того, существует
+// ли email (см. app/routes/password_reset.py), поэтому фронтенду не нужно
+// (и не следует) различать "email не найден" от "письмо отправлено".
+export const requestPasswordReset = async (email: string): Promise<void> => {
+    await api.post("/api/password-reset/request", { email });
+};
+
+export const confirmPasswordReset = async (token: string, newPassword: string): Promise<void> => {
+    await api.post("/api/password-reset/confirm", { token, new_password: newPassword });
+};
+
 // --- Функции для администраторов ---
 
 export const loginAdmin = async (email: string, password: string) => {
