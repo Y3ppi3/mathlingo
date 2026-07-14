@@ -1,31 +1,42 @@
 // routes.tsx (обновленный)
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { JSX } from "react";
+import { JSX, lazy, Suspense } from "react";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import LogoutPage from "./pages/LogoutPage";
 import AdventureMapPage from "./pages/AdventureMapPage";
-import DiagnosticSolver from "./components/adventure/DiagnosticSolver";
-import GamificationPanel from "./components/admin/GamificationPanel";
-import GameLauncherPage from "./pages/GameLauncherPage";
-import GamePage from "./pages/GamePage";
 import ProfilePage from "./pages/ProfilePage";
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
-
-import AdminLogin from "./pages/AdminLogin";
-import AdminLayout from "./pages/AdminLayout";
-import AdminTaskForm from "./pages/AdminTaskForm";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminOverviewPanel from "./components/admin/AdminOverviewPanel";
-import ContentZonePanel from "./components/admin/ContentZonePanel";
-import UsersPanel from "./components/admin/UsersPanel";
-import StaffPanel from "./components/admin/StaffPanel";
-import AuditLogPanel from "./components/admin/AuditLogPanel";
-import AiQueuePanel from "./components/admin/AiQueuePanel";
-import QualityPanel from "./components/admin/QualityPanel";
-import GameScenariosPanel from "./components/admin/GameScenariosPanel";
+
+// R4: весь admin-поддерево и игровые компоненты (katex/mathjs/recharts/
+// dnd-kit/framer-motion) грузились уже на экране логина — эти маршруты
+// не нужны студенту/гостю. React.lazy выносит их в отдельные чанки,
+// подгружаемые только при заходе на конкретный маршрут.
+const DiagnosticSolver = lazy(() => import("./components/adventure/DiagnosticSolver"));
+const GamificationPanel = lazy(() => import("./components/admin/GamificationPanel"));
+const GameLauncherPage = lazy(() => import("./pages/GameLauncherPage"));
+const GamePage = lazy(() => import("./pages/GamePage"));
+
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const AdminLayout = lazy(() => import("./pages/AdminLayout"));
+const AdminTaskForm = lazy(() => import("./pages/AdminTaskForm"));
+const AdminOverviewPanel = lazy(() => import("./components/admin/AdminOverviewPanel"));
+const ContentZonePanel = lazy(() => import("./components/admin/ContentZonePanel"));
+const UsersPanel = lazy(() => import("./components/admin/UsersPanel"));
+const StaffPanel = lazy(() => import("./components/admin/StaffPanel"));
+const AuditLogPanel = lazy(() => import("./components/admin/AuditLogPanel"));
+const AiQueuePanel = lazy(() => import("./components/admin/AiQueuePanel"));
+const QualityPanel = lazy(() => import("./components/admin/QualityPanel"));
+const GameScenariosPanel = lazy(() => import("./components/admin/GameScenariosPanel"));
+
+const RouteFallback = () => (
+    <div className="flex items-center justify-center py-24">
+        <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+);
 
 // Компонент для защиты маршрутов админа
 function AdminProtectedRoute({ children }: { children: JSX.Element }) {
@@ -50,6 +61,7 @@ function TaskGroupRedirect() {
 
 function AppRoutes() {
     return (
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
@@ -170,6 +182,7 @@ function AppRoutes() {
                 <Route path="audit" element={<AuditLogPanel />} />
             </Route>
         </Routes>
+        </Suspense>
     );
 }
 
