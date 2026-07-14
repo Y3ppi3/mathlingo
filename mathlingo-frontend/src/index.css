@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Общий градиент бренда (R4) — раньше "from-indigo-500 to-violet-500"
+   просто повторялся в каждом файле (Login/Register/Dashboard/...).
+   Новые экраны используют эти классы вместо копирования утилит. */
+@layer components {
+  .brand-gradient {
+    @apply bg-gradient-to-r from-indigo-500 to-violet-500;
+  }
+  .brand-gradient-hover {
+    @apply hover:from-indigo-600 hover:to-violet-600;
+  }
+  .brand-icon-badge {
+    @apply inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500;
+  }
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

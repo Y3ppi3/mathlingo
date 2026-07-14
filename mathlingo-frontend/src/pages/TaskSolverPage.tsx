@@ -10,13 +10,14 @@ const TaskSolverPage: React.FC = () => {
 
     if (!taskGroupId) {
         return (
-            <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+            <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
                 <Navbar />
-                <div className="container mx-auto px-4 py-8">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
-                        <h2 className="text-xl text-red-500 mb-4">Группа заданий не найдена</h2>
+                <div className="mt-16 max-w-3xl mx-auto px-4 py-8">
+                    <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl backdrop-blur p-6 text-center transition-colors">
+                        <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-4">Группа заданий не найдена</h2>
                         <button
-                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            style={{ padding: '0.625rem 1.25rem' }}
+                            className="brand-gradient brand-gradient-hover text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25"
                             onClick={() => navigate('/dashboard')}
                         >
                             Вернуться на главную
@@ -28,10 +29,10 @@ const TaskSolverPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
             <Navbar />
-            <div className="container mx-auto px-4 py-8">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            <div className="mt-16 max-w-3xl mx-auto px-4 py-8">
+                <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl backdrop-blur p-6 transition-colors">
                     <TaskSolver />
                 </div>
             </div>

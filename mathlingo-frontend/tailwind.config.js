@@ -8,10 +8,14 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Синхронизировано с фактически используемым градиентом
+        // (indigo-500 -> violet-500) на Login/Register/Dashboard — раньше
+        // здесь были другие значения, которые нигде не применялись (R4).
         brand: {
-          DEFAULT: '#4F46E5',
-          light: '#6366F1',
-          dark: '#4338CA'
+          DEFAULT: '#6366F1', // indigo-500
+          light: '#818CF8',   // indigo-400
+          dark: '#4F46E5',    // indigo-600 (hover)
+          accent: '#8B5CF6',  // violet-500
         }
       },
       // Добавляем кастомные keyframes для анимаций
