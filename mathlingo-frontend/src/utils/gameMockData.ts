@@ -14,18 +14,11 @@ export const mockGameData = {
         difficulty: 4,
         rewardPoints: 150
     },
-    'math-lab-derivatives': {
-        title: 'MathLab: Производные',
-        description: 'Изучайте функции и их производные!',
-        difficulty: 3,
-        rewardPoints: 120
-    },
-    'math-lab-integrals': {
-        title: 'MathLab: Интегралы',
-        description: 'Изучайте функции и их интегралы!',
-        difficulty: 4,
-        rewardPoints: 150
-    },
+    // math-lab-derivatives/math-lab-integrals архивированы (R4): DerivFall/
+    // IntegralBuilder уже полноценно гамифицируют эти темы своими
+    // механиками, а старый "Задачи" MathLab был генерик-квизом без
+    // собственной визуальной идеи. MathLab теперь — новые режимы
+    // (limits/series/...), каждый со своей задумкой, как "Приближение".
     'limits-approach': {
         title: 'Приближение',
         description: 'Смотрите, к чему стремится функция, и угадывайте предел!',
