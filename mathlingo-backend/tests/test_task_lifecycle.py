@@ -182,3 +182,62 @@ def test_only_superadmin_can_hard_delete_task(client, admin, content_manager_adm
 
     allowed = client.delete(f"/admin/tasks/{task['id']}", headers=authorization_header(admin))
     assert allowed.status_code == 204
+
+
+# R4: DELETE /admin/tasks/{id} падал 500 (FK violation) для любого задания,
+# прошедшего хотя бы один переход статуса — content_status_history/
+# content_flags ссылались на tasks.id без ON DELETE (см. миграцию
+# d3ffe0419916_task_fk_ondelete_cascade). Черновик из теста выше никогда
+# не создавал ContentStatusHistory, поэтому не ловил баг.
+def test_hard_delete_cascades_status_history_and_flags(client, admin, content_manager_admin, teacher_admin, subject, db):
+    from app.models import AIGenerationItem, AIGenerationOrder, ContentFlag, ContentStatusHistory, PromptTemplate, Skill
+
+    task = _create_draft_task(client, content_manager_admin, subject)
+    task_id = task["id"]
+
+    for action in ("submit-review", "approve", "publish"):
+        actor = teacher_admin if action == "approve" else content_manager_admin
+        r = client.post(f"/admin/tasks/{task_id}/{action}", headers=authorization_header(actor))
+        assert r.status_code == 200, r.text
+
+    flag = client.post(
+        f"/admin/tasks/{task_id}/flags",
+        headers=authorization_header(teacher_admin),
+        json={"comment": "выглядит подозрительно"},
+    )
+    assert flag.status_code == 200, flag.text
+
+    skill = Skill(subject_id=subject.id, name="AI order skill", code="ai-order-skill")
+    db.add(skill)
+    db.commit()
+    db.refresh(skill)
+
+    template = PromptTemplate(name="t", version=1, template_text="x", task_type="single_answer")
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+    order = AIGenerationOrder(
+        subject_id=subject.id, skill_id=skill.id, task_type="single_answer", count=1,
+        prompt_template_id=template.id, status="completed",
+    )
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+    ai_item = AIGenerationItem(order_id=order.id, index_in_order=0, status="ready", task_id=task_id)
+    db.add(ai_item)
+    db.commit()
+    db.refresh(ai_item)
+
+    assert db.query(ContentStatusHistory).filter(ContentStatusHistory.task_id == task_id).count() == 3
+    assert db.query(ContentFlag).filter(ContentFlag.task_id == task_id).count() == 1
+
+    response = client.delete(f"/admin/tasks/{task_id}", headers=authorization_header(admin))
+    assert response.status_code == 204, response.text
+
+    # CASCADE — история и жалобы удаляются вместе с заданием.
+    assert db.query(ContentStatusHistory).filter(ContentStatusHistory.task_id == task_id).count() == 0
+    assert db.query(ContentFlag).filter(ContentFlag.task_id == task_id).count() == 0
+
+    # SET NULL — запись AI-генерации переживает удаление задания.
+    db.refresh(ai_item)
+    assert ai_item.task_id is None
