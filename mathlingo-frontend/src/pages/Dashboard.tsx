@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     BookOpen, Map, Sparkles, CheckCircle, Percent,
-    Flame, Clock, Sigma, TrendingUp
+    Flame, Clock, Sigma, TrendingUp, Star
 } from "lucide-react";
+import { fetchStudentDashboard, StudentDashboard } from "../api/studentApi";
 
 interface UserData {
     id: number;
@@ -20,56 +21,26 @@ interface Subject {
     is_active: boolean;
 }
 
-interface StatItem {
-    label: string;
-    value: string;
-    icon: React.ReactNode;
-    color: string;
-}
+const LEVEL_LABEL: Record<string, string> = {
+    basic: "Базовый", standard: "Стандартный", advanced: "Продвинутый",
+};
 
-interface RecentItem {
-    id: number;
-    expr: string;
-    topic: string;
-    result: "Верно" | "Неверно";
-    time: string;
-    date: string;
-}
+const formatRelativeTime = (ms: number | null): string => {
+    if (ms == null) return "—";
+    const seconds = Math.round(ms / 1000);
+    if (seconds < 60) return `${seconds} сек`;
+    return `${Math.round(seconds / 60)} мин`;
+};
 
-interface TopicProgress {
-    name: string;
-    val: number;
-    done: number;
-}
-
-const STATS: StatItem[] = [
-    { label: "Решено заданий",    value: "47",      icon: <CheckCircle className="w-5 h-5" />, color: "from-indigo-500 to-blue-500"    },
-    { label: "Правильных ответов", value: "78%",     icon: <Percent     className="w-5 h-5" />, color: "from-violet-500 to-purple-500"  },
-    { label: "Серия дней",         value: "5 дней",  icon: <Flame       className="w-5 h-5" />, color: "from-orange-500 to-red-500"     },
-    { label: "Время обучения",     value: "12.4 ч",  icon: <Clock       className="w-5 h-5" />, color: "from-emerald-500 to-teal-500"   },
-];
-
-const RECENT: RecentItem[] = [
-    { id: 1, expr: "∫₀¹ x² dx",        topic: "Интегралы",      result: "Верно",   time: "2 мин", date: "04.05.2025" },
-    { id: 2, expr: "lim(x→0) sin(x)/x", topic: "Пределы",        result: "Верно",   time: "1 мин", date: "04.05.2025" },
-    { id: 3, expr: "d/dx[x³·eˣ]",       topic: "Производные",    result: "Неверно", time: "5 мин", date: "03.05.2025" },
-    { id: 4, expr: "∑(1/n²)",           topic: "Ряды",           result: "Верно",   time: "3 мин", date: "03.05.2025" },
-    { id: 5, expr: "y'' + y = 0",        topic: "Диф. уравнения", result: "Верно",   time: "7 мин", date: "02.05.2025" },
-];
-
-const TOPICS_PROGRESS: TopicProgress[] = [
-    { name: "Пределы",          val: 85, done: 18 },
-    { name: "Производные",      val: 70, done: 14 },
-    { name: "Интегралы",        val: 60, done: 9  },
-    { name: "Ряды",             val: 40, done: 4  },
-    { name: "Диф. уравнения",   val: 20, done: 2  },
-];
+const formatDate = (isoDate: string): string =>
+    new Date(isoDate).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 const Dashboard = () => {
     const [userData, setUserData]   = useState<UserData | null>(null);
     const [subjects, setSubjects]   = useState<Subject[]>([]);
+    const [dashboard, setDashboard] = useState<StudentDashboard | null>(null);
     const [error, setError]         = useState("");
     const [isLoading, setIsLoading] = useState(true);
 
@@ -107,8 +78,25 @@ const Dashboard = () => {
             }
         };
 
-        Promise.all([fetchUserData(), fetchSubjects()]);
+        const loadDashboard = async () => {
+            try {
+                setDashboard(await fetchStudentDashboard());
+            } catch (err) {
+                console.error("Не удалось загрузить сводку активности:", err);
+            }
+        };
+
+        Promise.all([fetchUserData(), fetchSubjects(), loadDashboard()]);
     }, []);
+
+    const stats = dashboard?.activity;
+    const STATS = [
+        { label: "Решено заданий", value: String(stats?.total_attempts ?? 0), icon: <CheckCircle className="w-5 h-5" />, color: "from-indigo-500 to-blue-500" },
+        { label: "Правильных ответов", value: `${stats?.accuracy_pct ?? 0}%`, icon: <Percent className="w-5 h-5" />, color: "from-violet-500 to-purple-500" },
+        { label: "Серия дней", value: `${stats?.streak_days ?? 0} дн.`, icon: <Flame className="w-5 h-5" />, color: "from-orange-500 to-red-500" },
+        { label: "Время обучения", value: `${stats?.total_time_hours ?? 0} ч`, icon: <Clock className="w-5 h-5" />, color: "from-emerald-500 to-teal-500" },
+        { label: "Очки", value: String(stats?.total_points ?? 0), icon: <Star className="w-5 h-5" />, color: "from-amber-500 to-orange-500" },
+    ];
 
     if (error) {
         return (
@@ -149,7 +137,7 @@ const Dashboard = () => {
                 </div>
 
                 {/* Статистика */}
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                     {STATS.map((s) => (
                         <div
                             key={s.label}
@@ -177,6 +165,11 @@ const Dashboard = () => {
                             <TrendingUp className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
                             Последняя активность
                         </h2>
+                        {dashboard && dashboard.recent_activity.length === 0 ? (
+                            <p className="text-sm text-gray-400 dark:text-slate-500 py-6 text-center transition-colors">
+                                Пока нет решённых заданий — начните с любого предмета ниже.
+                            </p>
+                        ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
@@ -189,10 +182,10 @@ const Dashboard = () => {
                                 </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50 dark:divide-slate-800 transition-colors">
-                                {RECENT.map((r) => (
+                                {dashboard?.recent_activity.map((r) => (
                                     <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
-                                        <td className="py-3 font-mono text-sm text-indigo-600 dark:text-indigo-300 transition-colors">
-                                            {r.expr}
+                                        <td className="py-3 text-sm text-indigo-600 dark:text-indigo-300 transition-colors">
+                                            {r.title}
                                         </td>
                                         <td className="py-3">
                                                 <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-full px-2.5 py-1 transition-colors">
@@ -201,24 +194,25 @@ const Dashboard = () => {
                                         </td>
                                         <td className="py-3">
                                                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                                                    r.result === "Верно"
+                                                    r.is_correct
                                                         ? "bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400"
                                                         : "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400"
                                                 } transition-colors`}>
-                                                    {r.result}
+                                                    {r.is_correct ? "Верно" : "Неверно"}
                                                 </span>
                                         </td>
                                         <td className="py-3 text-sm text-gray-400 dark:text-slate-400 transition-colors">
-                                            {r.time}
+                                            {formatRelativeTime(r.time_spent_ms)}
                                         </td>
                                         <td className="py-3 text-sm text-gray-300 dark:text-slate-500 transition-colors">
-                                            {r.date}
+                                            {formatDate(r.created_at)}
                                         </td>
                                     </tr>
                                 ))}
                                 </tbody>
                             </table>
                         </div>
+                        )}
                     </div>
 
                     {/* Прогресс по разделам */}
@@ -226,29 +220,35 @@ const Dashboard = () => {
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 transition-colors">
                             Прогресс по разделам
                         </h2>
+                        {dashboard && dashboard.topics_progress.length === 0 ? (
+                            <p className="text-sm text-gray-400 dark:text-slate-500 transition-colors">
+                                Пока нет данных — пройдите диагностику или пару заданий по теме.
+                            </p>
+                        ) : (
                         <div className="space-y-4">
-                            {TOPICS_PROGRESS.map((t) => (
-                                <div key={t.name}>
+                            {dashboard?.topics_progress.map((t) => (
+                                <div key={t.skill_id}>
                                     <div className="flex items-center justify-between mb-1.5">
                                         <span className="text-sm text-gray-600 dark:text-slate-300 transition-colors">
-                                            {t.name}
+                                            {t.skill_name}
                                         </span>
                                         <span className="text-sm text-indigo-600 dark:text-indigo-400 font-medium transition-colors">
-                                            {t.val}%
+                                            {LEVEL_LABEL[t.level] ?? t.level}
                                         </span>
                                     </div>
                                     <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden transition-colors">
                                         <div
                                             className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
-                                            style={{ width: `${t.val}%` }}
+                                            style={{ width: `${t.progress_pct}%` }}
                                         />
                                     </div>
                                     <div className="text-xs text-gray-400 dark:text-slate-500 mt-1 transition-colors">
-                                        {t.done} заданий выполнено
+                                        {t.done} {t.done === 1 ? "задание выполнено" : "заданий выполнено"}
                                     </div>
                                 </div>
                             ))}
                         </div>
+                        )}
                     </div>
                 </div>
 
