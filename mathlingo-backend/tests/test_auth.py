@@ -68,6 +68,34 @@ def test_current_user_returns_authenticated_user(client, user):
     }
 
 
+# Раньше деактивация (PUT /admin/users/{id}/status) меняла только флаг в
+# БД — уже выданный токен продолжал работать до истечения (до 30 дней с
+# remember_me), пользователь ничего не замечал. get_current_user/
+# get_admin_current_user теперь перепроверяют is_active на каждый запрос.
+def test_deactivated_user_with_valid_token_is_rejected(client, user, db):
+    token = create_access_token({"sub": user.email})
+
+    user.is_active = False
+    db.commit()
+
+    response = client.get("/api/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Аккаунт деактивирован"
+
+
+def test_deactivated_admin_with_valid_token_is_rejected(client, admin, db):
+    token = create_access_token({"sub": admin.email, "role": "admin", "admin_role": admin.role})
+
+    admin.is_active = False
+    db.commit()
+
+    response = client.get("/admin/admins", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Аккаунт деактивирован"
+
+
 def test_expired_token_is_rejected(client, user):
     token = create_access_token({"sub": user.email}, expires_delta=timedelta(seconds=-1))
     response = client.get("/api/me", headers={"Authorization": f"Bearer {token}"})

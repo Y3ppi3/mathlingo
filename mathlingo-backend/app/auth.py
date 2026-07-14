@@ -90,6 +90,11 @@ def get_admin_current_user(request: Request, db: Session = Depends(get_db)):
         if user_role == "admin":
             admin = db.query(Admin).filter(Admin.email == user_email).first()
             if admin:
+                if not admin.is_active:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Аккаунт деактивирован",
+                    )
                 return admin
 
         # Если роль не админ или админ не найден, проверяем обычного пользователя
@@ -183,6 +188,16 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Пользователь не найден"
+        )
+
+    if not user.is_active:
+        # Токен ещё валиден (не истёк), но аккаунт деактивирован админом
+        # ПОСЛЕ его выдачи — раньше это никак не проверялось: деактивация
+        # в /admin/users/{id}/status меняла только флаг в БД, а токен
+        # продолжал работать до истечения (до 30 дней с "запомнить меня").
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Аккаунт деактивирован",
         )
 
     return user

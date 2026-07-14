@@ -1,6 +1,8 @@
 // Updated adminApi.ts with improved error handling
 import axios from "axios";
 
+const ACCOUNT_DEACTIVATED_DETAIL = "Аккаунт деактивирован";
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 // Create axios instance with base settings
@@ -33,6 +35,20 @@ adminApi.interceptors.response.use(
         if (error.message === 'Network Error') {
             console.error('CORS or network error:', error);
             return Promise.reject(new Error('Проблема с сетевым подключением. Возможно, CORS не настроен на сервере.'));
+        }
+
+        // Аккаунт деактивирован уже ПОСЛЕ выдачи токена (см. app/auth.py
+        // get_admin_current_user) — проверяем раньше общего "резолвим любую
+        // ошибку с телом" ниже, иначе confirmation-flow код принял бы это
+        // за обычный ответ вместо явного выхода.
+        if (
+            error.response?.status === 403 &&
+            error.response.data?.detail === ACCOUNT_DEACTIVATED_DETAIL &&
+            window.location.pathname !== '/account-deactivated'
+        ) {
+            localStorage.removeItem('adminToken');
+            window.location.href = '/account-deactivated';
+            return Promise.reject(error);
         }
 
         // Return the error response data if it exists (for confirmation flow)
