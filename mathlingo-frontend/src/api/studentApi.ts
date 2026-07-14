@@ -523,13 +523,42 @@ export const submitGameAttempt = async (
     return response.data;
 };
 
-// API для прогресса пользователя
-export const fetchUserProgress = async () => {
-    try {
-        const response = await api.get('/gamification/progress');
-        return response.data;
-    } catch (error) {
-        console.error('Ошибка при получении прогресса пользователя:', error);
-        throw error;
-    }
+// Сводка для Dashboard.tsx (R4) — реальная активность/очки/прогресс по
+// темам вместо захардкоженных STATS/RECENT/TOPICS_PROGRESS. Раньше здесь
+// был fetchUserProgress(), дёргавший несуществующий /gamification/progress
+// (мёртвый код — ни разу не вызывался, эндпоинта не было вовсе).
+export interface StudentActivityStats {
+    total_attempts: number;
+    accuracy_pct: number;
+    streak_days: number;
+    total_time_hours: number;
+    total_points: number;
+}
+
+export interface StudentActivityItem {
+    id: number;
+    title: string;
+    topic: string;
+    is_correct: boolean;
+    time_spent_ms: number | null;
+    created_at: string;
+}
+
+export interface StudentTopicProgress {
+    skill_id: number;
+    skill_name: string;
+    level: 'basic' | 'standard' | 'advanced';
+    progress_pct: number;
+    done: number;
+}
+
+export interface StudentDashboard {
+    activity: StudentActivityStats;
+    recent_activity: StudentActivityItem[];
+    topics_progress: StudentTopicProgress[];
+}
+
+export const fetchStudentDashboard = async (): Promise<StudentDashboard> => {
+    const response = await api.get('/gamification/dashboard');
+    return response.data;
 };

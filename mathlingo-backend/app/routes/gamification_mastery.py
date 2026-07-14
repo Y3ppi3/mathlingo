@@ -10,14 +10,31 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import MasteryState, User
 from app.auth import get_current_user
-from app.services import mastery
+from app.services import mastery, student_dashboard
 from app.schemas import (
     MasteryStateResponse,
     SkillLevelResponse,
     LevelOverrideRequest,
+    StudentDashboardResponse,
 )
 
 router = APIRouter(prefix="/gamification", tags=["gamification"])
+
+
+@router.get("/dashboard", response_model=StudentDashboardResponse)
+def get_student_dashboard(
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    """
+    Сводка для Dashboard.tsx: реальная активность/очки/прогресс по темам
+    вместо захардкоженных STATS/RECENT/TOPICS_PROGRESS на фронтенде (R4).
+    """
+    return StudentDashboardResponse(
+        activity=student_dashboard.activity_stats(db, current_user.id),
+        recent_activity=student_dashboard.recent_activity(db, current_user.id),
+        topics_progress=student_dashboard.topics_progress(db, current_user.id),
+    )
 
 
 @router.get("/skills/{skill_id}/mastery", response_model=MasteryStateResponse)

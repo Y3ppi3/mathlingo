@@ -12,13 +12,19 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.models import Attempt, GameScenario
+from app.models import Attempt, GameScenario, UserProgress
 from app.services import mastery
 
 # Порог "сессия засчитана как успешная" — начальный, как и пороги в
 # mastery.py (см. комментарий там же про то, почему они собраны в одном
 # месте). 50%: заработать хотя бы половину максимума за сессию.
 GAME_SESSION_PASS_THRESHOLD = 0.5
+
+# R4: раньше игровые попытки не начисляли очки вообще (только submit_answer
+# для обычных заданий, см. app/routes/gamification_tasks.py) — очки за игры
+# нигде не суммировались. База сопоставима по порядку с reward_points
+# заданий (обычно 5-10), но игровая сессия длиннее одного задания.
+GAME_SESSION_REWARD_POINTS = 20
 
 
 def record_attempt(
@@ -50,6 +56,23 @@ def record_attempt(
         source="game",
     )
     db.add(attempt)
+
+    if is_correct:
+        points_earned = round(GAME_SESSION_REWARD_POINTS * (score / max_score)) if max_score else 0
+        # Та же ленивая инициализация, что в submit_answer — UserProgress
+        # мог не существовать, если ученик ни разу не открывал карту.
+        progress = db.query(UserProgress).filter(UserProgress.user_id == user_id).first()
+        if not progress:
+            progress = UserProgress(
+                user_id=user_id,
+                current_level=1,
+                total_points=0,
+                completed_locations="[]",
+                unlocked_achievements="[]",
+            )
+            db.add(progress)
+        progress.total_points += points_earned
+
     db.commit()
     db.refresh(attempt)
 

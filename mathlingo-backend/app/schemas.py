@@ -240,6 +240,38 @@ class MasteryStateResponse(BaseModel):
         from_attributes = True
 
 
+# Сводка ученика на Dashboard.tsx (R4) — см. app/services/student_dashboard.py
+class StudentActivityStats(BaseModel):
+    total_attempts: int
+    accuracy_pct: int
+    streak_days: int
+    total_time_hours: float
+    total_points: int
+
+
+class StudentActivityItem(BaseModel):
+    id: int
+    title: str
+    topic: str
+    is_correct: bool
+    time_spent_ms: Optional[int] = None
+    created_at: datetime
+
+
+class StudentTopicProgress(BaseModel):
+    skill_id: int
+    skill_name: str
+    level: TaskLevel
+    progress_pct: int
+    done: int
+
+
+class StudentDashboardResponse(BaseModel):
+    activity: StudentActivityStats
+    recent_activity: List[StudentActivityItem]
+    topics_progress: List[StudentTopicProgress]
+
+
 # R2 task 4: рекомендация уровня с "причиной" + временный выбор соседнего
 class LevelOverrideResponse(BaseModel):
     chosen_level: TaskLevel
