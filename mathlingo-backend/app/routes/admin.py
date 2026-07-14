@@ -15,6 +15,8 @@ from app.schemas import (
     UserBulkStatusUpdate, UserResponse, SubjectCreate, SubjectUpdate, SubjectResponse, AdminLogin)
 from app.auth import get_admin_current_user, get_admin_current_user_optional, create_access_token, hash_password, verify_password, require_role
 from app.routes._admin_rbac import CAN_MANAGE_CONTENT
+from app.routes.subjects import SUBJECTS_LIST_CACHE_PREFIX
+from app.services import cache
 from typing import Optional
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -153,6 +155,7 @@ def create_subject(
     db.add(db_subject)
     db.commit()
     db.refresh(db_subject)
+    cache.delete_prefix(f"{SUBJECTS_LIST_CACHE_PREFIX}:")
     return db_subject
 
 
@@ -190,30 +193,51 @@ def update_subject(
 
     db.commit()
     db.refresh(db_subject)
+    cache.delete_prefix(f"{SUBJECTS_LIST_CACHE_PREFIX}:")
     return db_subject
 
 
 @router.delete("/subjects/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_subject(
         subject_id: int,
+        force: bool = False,
         db: Session = Depends(get_db),
         current_admin: Admin = Depends(require_role("superadmin"))
 ):
-    """Удаление раздела"""
+    """
+    Удаление раздела. Если с разделом связаны задания и force не передан —
+    отказывает с confirmation_required, чтобы фронтенд мог переспросить
+    подтверждение и повторить запрос с force=true (см. SubjectsPanel.tsx).
+    С force=true отвязывает задания и карты приключений перед удалением.
+    """
     db_subject = db.query(Subject).filter(Subject.id == subject_id).first()
     if not db_subject:
         raise HTTPException(status_code=404, detail="Раздел не найден")
 
     # Проверяем, есть ли задания, связанные с этим разделом
     tasks_count = db.query(Task).filter(Task.subject_id == subject_id).count()
-    if tasks_count > 0:
-        raise HTTPException(
+    if tasks_count > 0 and not force:
+        return JSONResponse(
             status_code=400,
-            detail=f"Нельзя удалить раздел, так как с ним связано {tasks_count} заданий"
+            content={
+                "detail": f"Нельзя удалить раздел, так как с ним связано {tasks_count} заданий",
+                "status": "confirmation_required",
+                "related_data": {"tasks_count": tasks_count},
+            },
         )
+
+    if tasks_count > 0:
+        db.query(Task).filter(Task.subject_id == subject_id).update(
+            {"subject_id": None}, synchronize_session=False
+        )
+
+    adventure_maps = db.query(AdventureMap).filter(AdventureMap.subject_id == subject_id).all()
+    for adventure_map in adventure_maps:
+        adventure_map.subject_id = None
 
     db.delete(db_subject)
     db.commit()
+    cache.delete_prefix(f"{SUBJECTS_LIST_CACHE_PREFIX}:")
     return None
 
 
@@ -270,62 +294,6 @@ def delete_user(
     db.delete(user)
     db.commit()
     return {"message": "User deleted successfully"}
-
-
-@router.delete("/subjects/{subject_id}")
-def admin_delete_subject(
-        subject_id: int,
-        force: bool = False,
-        db: Session = Depends(get_db),
-        current_admin: Admin = Depends(require_role("superadmin"))
-):
-    """Удаление раздела с поддержкой параметра force для каскадного удаления"""
-    # Проверяем существование раздела
-    db_subject = db.query(Subject).filter(Subject.id == subject_id).first()
-    if not db_subject:
-        raise HTTPException(status_code=404, detail="Раздел не найден")
-
-    # Проверяем наличие связанных заданий
-    tasks_count = db.query(Task).filter(Task.subject_id == subject_id).count()
-
-    # Если есть связанные задания и параметр force не установлен, возвращаем ошибку
-    if tasks_count > 0 and not force:
-        return JSONResponse(
-            status_code=400,
-            content={"detail": f"Нельзя удалить раздел, так как с ним связано {tasks_count} заданий",
-                     "status": "confirmation_required",
-                     "related_data": {"tasks_count": tasks_count}}
-        )
-
-    try:
-        # Если force=True или нет связанных заданий, выполняем удаление
-
-        # 1. Отвязываем все связанные задания
-        if tasks_count > 0:
-            db.query(Task).filter(Task.subject_id == subject_id).update(
-                {"subject_id": None}, synchronize_session=False
-            )
-            db.commit()
-
-        # 2. Отвязываем все связанные карты приключений (необходимо добавить импорт AdventureMap)
-        adventure_maps = db.query(AdventureMap).filter(AdventureMap.subject_id == subject_id).all()
-        for adventure_map in adventure_maps:
-            adventure_map.subject_id = None
-        if adventure_maps:
-            db.commit()
-
-        # 3. Удаляем раздел
-        db.delete(db_subject)
-        db.commit()
-
-        return {"status": "success", "detail": "Раздел успешно удален"}
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка при удалении раздела: {str(e)}"
-        )
 
 
 # Список staff-аккаунтов для зоны "Пользователи и роли" — управление ролями

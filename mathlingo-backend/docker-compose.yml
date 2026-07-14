@@ -12,15 +12,27 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
+
+  redis:
+    image: redis:7-alpine
+    container_name: mathlingo-redis
+    restart: always
+    # Только внутренняя docker-сеть — в отличие от db, порт наружу не
+    # пробрасываем: кеш и CSRF-токены не нужны снаружи контейнеров, а
+    # публикация порта без пароля была бы лишней поверхностью атаки.
+    volumes:
+      - redis_data:/data
 
   backend:
     build: .
     container_name: mathlingo-backend
     depends_on:
       - db
+      - redis
     environment:
       DATABASE_URL: postgresql://mathlingo_user:test123@db/mathlingo
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     volumes:
@@ -29,3 +41,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

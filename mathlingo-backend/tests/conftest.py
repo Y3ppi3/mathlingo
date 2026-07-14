@@ -3,6 +3,7 @@ import os
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["SECRET_KEY"] = "test-secret-key-with-at-least-thirty-two-characters"
 
+import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -11,7 +12,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.models import Admin, Subject, User
-from main import app, csrf_tokens
+from app.services import cache
+from main import app
 
 
 engine = create_engine(
@@ -33,7 +35,9 @@ def override_get_db():
 @pytest.fixture
 def client():
     Base.metadata.create_all(bind=engine)
-    csrf_tokens.clear()
+    # Тесты не поднимают реальный Redis — fakeredis подменяет клиент
+    # cache.get_client() так же, как override_get_db подменяет БД.
+    cache._client = fakeredis.FakeRedis(decode_responses=True)
     app.dependency_overrides[get_db] = override_get_db
 
     with TestClient(app) as test_client:
@@ -41,6 +45,7 @@ def client():
 
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
+    cache._client = None
 
 
 @pytest.fixture
