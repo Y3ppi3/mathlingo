@@ -16,7 +16,7 @@ interface NotificationSettings {
 }
 
 const ProfileSettingsPage = () => {
-    const { user, loading, error, refreshUserData } = useUser();
+    const { user, loading, error, refreshUserData, updateUserProfile } = useUser();
     const navigate = useNavigate();
     const isMounted = useRef(true);
 
@@ -76,25 +76,15 @@ const ProfileSettingsPage = () => {
             if (formData.username !== originalData.username) updateData.username = formData.username;
             if (formData.avatarId !== originalData.avatarId) updateData.avatarId = formData.avatarId ?? null;
 
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            // Через useUser().updateUserProfile (общий axios-инстанс api), а не
+            // отдельный raw fetch — тот брал X-CSRF-Token из
+            // meta[name="csrf-token"], которого в приложении никогда не
+            // существовало (токен живёт только в JS-модуле studentApi.ts),
+            // так что обновление профиля тут всегда падало с 403.
+            const result = await updateUserProfile(updateData) as { success: boolean; canceled?: boolean };
+            if (result.canceled) return;
 
-            const response = await fetch(`${API_URL}/api/me/update`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-                body: JSON.stringify(updateData),
-                credentials: 'include',
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || 'Не удалось обновить профиль');
-            }
-
-            const responseData = await response.json();
-            setSuccessMessage(responseData.message || 'Профиль успешно обновлён!');
+            setSuccessMessage('Профиль успешно обновлён!');
 
             const freshUser = await refreshUserData();
             if (freshUser && isMounted.current) {

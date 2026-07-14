@@ -4,7 +4,7 @@ import {
     BookOpen, Map, Sparkles, CheckCircle, Percent,
     Flame, Clock, Sigma, TrendingUp, Star
 } from "lucide-react";
-import { fetchStudentDashboard, StudentDashboard } from "../api/studentApi";
+import { fetchStudentDashboard, getCurrentUser, StudentDashboard } from "../api/studentApi";
 
 interface UserData {
     id: number;
@@ -46,19 +46,16 @@ const Dashboard = () => {
 
     useEffect(() => {
         const fetchUserData = async () => {
+            // Через общий axios-инстанс (не raw fetch) — его перехватчик в
+            // api/studentApi.ts читает X-CSRF-Token из ответа GET /api/me.
+            // Backend перевыпускает этот токен на КАЖДЫЙ такой запрос —
+            // raw fetch отсюда молча "протухал" токен, уже закешированный
+            // где-то ещё в приложении (например, перед отправкой результата
+            // игры).
             try {
-                const response = await fetch(`${API_URL}/api/me`, {
-                    method: "GET",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                });
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.detail || "Ошибка авторизации. Войдите заново.");
-                }
-                setUserData(await response.json());
+                setUserData(await getCurrentUser());
             } catch (err: unknown) {
-                setError(err instanceof Error ? err.message : "Неизвестная ошибка");
+                setError(err instanceof Error ? err.message : "Ошибка авторизации. Войдите заново.");
             } finally {
                 setIsLoading(false);
             }
