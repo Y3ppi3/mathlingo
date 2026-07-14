@@ -453,7 +453,7 @@ export interface IntegralBuilderGameConfig {
 
 export interface MathLabTaskConfig {
     id: string;
-    type: 'analyze' | 'find' | 'calculate' | 'limit' | 'series';
+    type: 'analyze' | 'find' | 'calculate' | 'limit' | 'series' | 'slope';
     question: string;
     function_expression: string;
     correct_answer: string;
@@ -462,10 +462,12 @@ export interface MathLabTaskConfig {
     hints: string[];
     // Точка приближения (R4, mode="limits") — "2", "infinity", "-infinity".
     approach_x?: string | null;
+    // Точка старта траектории [x0, y0] (R4, mode="slopefield").
+    start_point?: [number, number] | null;
 }
 
 export interface MathLabGameConfig {
-    mode: 'derivatives' | 'integrals' | 'limits' | 'series';
+    mode: 'derivatives' | 'integrals' | 'limits' | 'series' | 'slopefield';
     difficulty: number;
     tasks: MathLabTaskConfig[];
 }
@@ -558,6 +560,33 @@ export const mapSeriesTasks = (tasks: MathLabTaskConfig[]): SeriesTaskProp[] =>
         id: t.id,
         question: t.question,
         termExpression: t.function_expression,
+        correctAnswer: t.correct_answer,
+        options: t.options as string[],
+        difficulty: t.difficulty,
+        hints: t.hints,
+    }));
+
+// mode="slopefield" (R4, игра "Наклон") — function_expression здесь хранит
+// правую часть ОДУ f(x,y) в dy/dx = f(x,y) (переменные x И y), см.
+// game_config.py. options — явные формулы y(x) кандидатных кривых, они же
+// строки для отображения (тот же паттерн, что у limits/series).
+export interface SlopeFieldTaskProp {
+    id: string;
+    question: string;
+    fieldExpression: string;
+    startPoint: [number, number];
+    correctAnswer: string;
+    options: string[];
+    difficulty: number;
+    hints: string[];
+}
+
+export const mapSlopeFieldTasks = (tasks: MathLabTaskConfig[]): SlopeFieldTaskProp[] =>
+    tasks.map(t => ({
+        id: t.id,
+        question: t.question,
+        fieldExpression: t.function_expression,
+        startPoint: t.start_point as [number, number],
         correctAnswer: t.correct_answer,
         options: t.options as string[],
         difficulty: t.difficulty,

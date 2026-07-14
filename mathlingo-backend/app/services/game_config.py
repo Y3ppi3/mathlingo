@@ -58,12 +58,14 @@ class IntegralBuilderConfig(BaseModel):
 
 class MathLabTaskConfig(BaseModel):
     id: str
-    type: Literal["analyze", "find", "calculate", "limit", "series"]
+    type: Literal["analyze", "find", "calculate", "limit", "series", "slope"]
     question: str
     # Для mode="series" — это формула общего члена ряда a(n), например
-    # "1/2^n" (переменная n, не x) — переиспользуем то же поле, а не
-    # заводим отдельное: смысл тот же ("выражение, вокруг которого
-    # построено задание"), только имя переменной определяется режимом.
+    # "1/2^n" (переменная n, не x). Для mode="slopefield" — правая часть
+    # ОДУ f(x,y) в dy/dx = f(x,y) (переменные x И y) — переиспользуем то же
+    # поле, а не заводим отдельное: смысл тот же ("выражение, вокруг
+    # которого построено задание"), только набор переменных определяется
+    # режимом.
     function_expression: str
     correct_answer: str
     options: Optional[List[str]] = None
@@ -71,25 +73,30 @@ class MathLabTaskConfig(BaseModel):
     hints: List[str] = Field(default_factory=list)
     # Точка приближения (R4, mode="limits") — "2", "infinity", "-infinity".
     # Не число, т.к. должна кодировать и предел на бесконечности; None для
-    # derivatives/integrals/series, где этого понятия нет.
+    # derivatives/integrals/series/slopefield, где этого понятия нет.
     approach_x: Optional[str] = None
+    # Точка старта траектории [x0, y0] (R4, mode="slopefield") — откуда
+    # ученик "идёт" по полю направлений, чтобы сравнить с кандидатными
+    # кривыми в options. None вне mode="slopefield".
+    start_point: Optional[List[float]] = None
 
 
 class MathLabConfig(BaseModel):
     template_key: Literal["mathlab"] = "mathlab"
-    mode: Literal["derivatives", "integrals", "limits", "series"]
+    mode: Literal["derivatives", "integrals", "limits", "series", "slopefield"]
     difficulty: int = Field(ge=1, le=5, default=3)
     tasks: List[MathLabTaskConfig] = Field(min_length=1)
 
     @model_validator(mode="after")
     def _limits_and_series_tasks_are_multiple_choice(self):
-        # mode="limits" ("Приближение") и mode="series" ("Наполнение") —
-        # оба геймплея всегда MC (выбор ответа, не ввод формулы) — та же
-        # причина, по которой печать выражения как ответ была признана
-        # неудачной задумкой у старого MathLab (см. решение по R4).
-        # Проверка correct_answer-in-options ограничена этими режимами —
-        # у derivatives/integrals options исторически не всегда буквально
-        # содержат correct_answer (см. backfill, test_game_content_snapshot).
+        # mode="limits" ("Приближение"), mode="series" ("Наполнение") и
+        # mode="slopefield" ("Наклон") — все три геймплея всегда MC (выбор
+        # ответа, не ввод формулы) — та же причина, по которой печать
+        # выражения как ответ была признана неудачной задумкой у старого
+        # MathLab (см. решение по R4). Проверка correct_answer-in-options
+        # ограничена этими режимами — у derivatives/integrals options
+        # исторически не всегда буквально содержат correct_answer (см.
+        # backfill, test_game_content_snapshot).
         if self.mode == "limits":
             for t in self.tasks:
                 if t.type != "limit":
@@ -106,6 +113,16 @@ class MathLabConfig(BaseModel):
                     raise ValueError(f"task '{t.id}': type должен быть 'series' для mode=series")
                 if not t.options:
                     raise ValueError(f"task '{t.id}': options обязательны для mode=series (ответ — выбор, не ввод)")
+                if t.correct_answer not in t.options:
+                    raise ValueError(f"task '{t.id}': correct_answer must be one of options")
+        elif self.mode == "slopefield":
+            for t in self.tasks:
+                if t.type != "slope":
+                    raise ValueError(f"task '{t.id}': type должен быть 'slope' для mode=slopefield")
+                if t.start_point is None or len(t.start_point) != 2:
+                    raise ValueError(f"task '{t.id}': start_point обязателен для mode=slopefield и должен содержать 2 числа [x0, y0]")
+                if not t.options:
+                    raise ValueError(f"task '{t.id}': options обязательны для mode=slopefield (ответ — выбор, не ввод)")
                 if t.correct_answer not in t.options:
                     raise ValueError(f"task '{t.id}': correct_answer must be one of options")
         return self

@@ -241,3 +241,66 @@ def test_series_correct_answer_not_in_options_rejected():
 def test_series_does_not_require_approach_x():
     result = game_config.validate_config("mathlab", _valid_series_config())
     assert result["tasks"][0]["approach_x"] is None
+
+
+# --- mathlab mode="slopefield" ("Наклон", R4) ---
+
+def _valid_slopefield_config():
+    return {
+        "mode": "slopefield",
+        "difficulty": 3,
+        "tasks": [
+            {
+                "id": "sf1", "type": "slope", "question": "Какая кривая — решение через отмеченную точку?",
+                "function_expression": "x - y", "start_point": [0, 2],
+                "correct_answer": "2*exp(-x) + x - 1", "options": ["2*exp(-x) + x - 1", "x^2/2 + 2", "2 - x"],
+                "difficulty": 3, "hints": [],
+            },
+        ],
+    }
+
+
+def test_slopefield_valid_config_passes():
+    result = game_config.validate_config("mathlab", _valid_slopefield_config())
+    assert result["mode"] == "slopefield"
+    assert result["tasks"][0]["start_point"] == [0, 2]
+
+
+def test_slopefield_requires_start_point():
+    config = _valid_slopefield_config()
+    config["tasks"][0]["start_point"] = None
+    with pytest.raises(ValueError, match="start_point обязателен"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_slopefield_start_point_must_have_two_numbers():
+    config = _valid_slopefield_config()
+    config["tasks"][0]["start_point"] = [0]
+    with pytest.raises(ValueError, match="start_point обязателен"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_slopefield_requires_type_slope():
+    config = _valid_slopefield_config()
+    config["tasks"][0]["type"] = "limit"
+    with pytest.raises(ValueError, match="type должен быть 'slope'"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_slopefield_requires_options():
+    config = _valid_slopefield_config()
+    config["tasks"][0]["options"] = None
+    with pytest.raises(ValueError, match="options обязательны"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_slopefield_correct_answer_not_in_options_rejected():
+    config = _valid_slopefield_config()
+    config["tasks"][0]["correct_answer"] = "not-an-option"
+    with pytest.raises(ValueError, match="correct_answer must be one of options"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_slopefield_does_not_require_approach_x():
+    result = game_config.validate_config("mathlab", _valid_slopefield_config())
+    assert result["tasks"][0]["approach_x"] is None

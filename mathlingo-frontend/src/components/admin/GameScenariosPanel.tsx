@@ -12,7 +12,7 @@ import {
     DerivFallGameConfig, DerivFallProblemConfig,
     IntegralBuilderGameConfig, IntegralBuilderProblemConfig,
     MathLabGameConfig, MathLabTaskConfig,
-    mapIntegralBuilderProblems, mapMathLabTasks, mapLimitsTasks, mapSeriesTasks,
+    mapIntegralBuilderProblems, mapMathLabTasks, mapLimitsTasks, mapSeriesTasks, mapSlopeFieldTasks,
 } from '../../api/studentApi';
 import { adminHasRole } from '../../utils/auth';
 import DerivFall from '../games/DerivFall';
@@ -20,6 +20,7 @@ import IntegralBuilder from '../games/IntegralBuilder';
 import MathLab from '../games/MathLab';
 import LimitsApproach from '../games/LimitsApproach';
 import SeriesFilling from '../games/SeriesFilling';
+import SlopeField from '../games/SlopeField';
 
 // R3 task 5: конструктор игровых сценариев без кода — форма конфигурации
 // поверх контракта GameConfigSchema (см. mathlingo-backend/app/services/
@@ -40,11 +41,12 @@ const TEMPLATE_LABEL: Record<GameScenarioTemplateKey, string> = {
     mathlab: 'MathLab (лаборатория)',
 };
 
-const MATHLAB_MODE_LABEL: Record<'derivatives' | 'integrals' | 'limits' | 'series', string> = {
+const MATHLAB_MODE_LABEL: Record<'derivatives' | 'integrals' | 'limits' | 'series' | 'slopefield', string> = {
     derivatives: 'Производные',
     integrals: 'Интегралы',
     limits: 'Приближение (пределы)',
     series: 'Наполнение (ряды)',
+    slopefield: 'Наклон (диф. уравнения)',
 };
 
 const STATUS_LABEL: Record<GameScenarioStatus, string> = {
@@ -114,7 +116,7 @@ const StringListEditor = ({ label, values, onChange, placeholder }: {
 type FormConfig =
     | { template_key: 'derivfall'; difficulty: number; time_limit: number; problems: DerivFallProblemConfig[] }
     | { template_key: 'integralbuilder'; initial_difficulty: number; time_limit: number; problems: IntegralBuilderProblemConfig[] }
-    | { template_key: 'mathlab'; mode: 'derivatives' | 'integrals' | 'limits' | 'series'; difficulty: number; tasks: MathLabTaskConfig[] };
+    | { template_key: 'mathlab'; mode: 'derivatives' | 'integrals' | 'limits' | 'series' | 'slopefield'; difficulty: number; tasks: MathLabTaskConfig[] };
 
 const emptyConfig = (key: GameScenarioTemplateKey): FormConfig => {
     if (key === 'derivfall') return { template_key: 'derivfall', difficulty: 3, time_limit: 60, problems: [] };
@@ -123,12 +125,14 @@ const emptyConfig = (key: GameScenarioTemplateKey): FormConfig => {
 };
 
 // Задачи derivatives/integrals (свободный ввод, options необязательны) и
-// limits/series (обязательный выбор из options + строгий type, см.
-// game_config.py _limits_and_series_tasks_are_multiple_choice) структурно
-// разные — новая задача заполняется под тот режим, что выбран сейчас.
-const emptyMathLabTask = (mode: 'derivatives' | 'integrals' | 'limits' | 'series'): MathLabTaskConfig => {
+// limits/series/slopefield (обязательный выбор из options + строгий type,
+// см. game_config.py _limits_and_series_tasks_are_multiple_choice)
+// структурно разные — новая задача заполняется под тот режим, что выбран
+// сейчас.
+const emptyMathLabTask = (mode: 'derivatives' | 'integrals' | 'limits' | 'series' | 'slopefield'): MathLabTaskConfig => {
     if (mode === 'limits') return { id: genRowId('t'), type: 'limit', question: '', function_expression: '', correct_answer: '', options: ['', ''], difficulty: 3, hints: [], approach_x: '' };
     if (mode === 'series') return { id: genRowId('t'), type: 'series', question: '', function_expression: '', correct_answer: '', options: ['', ''], difficulty: 3, hints: [] };
+    if (mode === 'slopefield') return { id: genRowId('t'), type: 'slope', question: '', function_expression: '', correct_answer: '', options: ['', ''], difficulty: 3, hints: [], start_point: [0, 0] };
     return { id: genRowId('t'), type: 'calculate', question: '', function_expression: '', correct_answer: '', options: [], difficulty: 3, hints: [] };
 };
 
@@ -209,7 +213,7 @@ const IntegralBuilderForm = ({ config, onChange }: { config: Extract<FormConfig,
 );
 
 const MathLabForm = ({ config, onChange }: { config: Extract<FormConfig, { template_key: 'mathlab' }>; onChange: (c: FormConfig) => void }) => {
-    const isChoiceMode = config.mode === 'limits' || config.mode === 'series';
+    const isChoiceMode = config.mode === 'limits' || config.mode === 'series' || config.mode === 'slopefield';
 
     const handleModeChange = (mode: typeof config.mode) => {
         // derivatives/integrals (свободный ввод) и limits/series (строгий
@@ -233,6 +237,7 @@ const MathLabForm = ({ config, onChange }: { config: Extract<FormConfig, { templ
             <p className="text-xs text-gray-400 dark:text-gray-500">
                 {config.mode === 'limits' && 'Ответ всегда выбор из вариантов — укажите точку приближения и варианты, один из которых совпадает с правильным ответом.'}
                 {config.mode === 'series' && 'Ответ всегда выбор из вариантов — укажите формулу общего члена ряда a(n) (переменная n, не x).'}
+                {config.mode === 'slopefield' && 'Ответ всегда выбор из вариантов — укажите правую часть уравнения f(x,y), точку старта и явные формулы y(x) кандидатных кривых, одна из которых совпадает с правильным ответом.'}
                 {!isChoiceMode && 'Вкладка «Графики» (живой калькулятор) конструктору не подчиняется — только вкладка «Задачи».'}
             </p>
             <div className="space-y-3">
@@ -264,25 +269,36 @@ const MathLabForm = ({ config, onChange }: { config: Extract<FormConfig, { templ
                             <input
                                 className={inputCls}
                                 value={t.question}
-                                placeholder={config.mode === 'series' ? 'Сходится ли ряд с общим членом a(n)?' : config.mode === 'limits' ? 'Найдите предел функции при x → 2' : "Найдите производную: y'(x) = x³"}
+                                placeholder={config.mode === 'series' ? 'Сходится ли ряд с общим членом a(n)?' : config.mode === 'limits' ? 'Найдите предел функции при x → 2' : config.mode === 'slopefield' ? 'Какая кривая — решение через отмеченную точку?' : "Найдите производную: y'(x) = x³"}
                                 onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, question: e.target.value } : x) })}
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className={labelCls}>{config.mode === 'series' ? 'Формула общего члена a(n)' : 'Выражение функции'}</label>
-                                <input className={inputCls} value={t.function_expression} placeholder={config.mode === 'series' ? '1/2^n' : 'x^3'} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, function_expression: e.target.value } : x) })} />
+                                <label className={labelCls}>{config.mode === 'series' ? 'Формула общего члена a(n)' : config.mode === 'slopefield' ? 'Правая часть f(x,y) в dy/dx = f(x,y)' : 'Выражение функции'}</label>
+                                <input className={inputCls} value={t.function_expression} placeholder={config.mode === 'series' ? '1/2^n' : config.mode === 'slopefield' ? 'x - y' : 'x^3'} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, function_expression: e.target.value } : x) })} />
                             </div>
                             {config.mode === 'limits' ? (
                                 <div>
                                     <label className={labelCls}>Точка приближения</label>
                                     <input className={inputCls} value={t.approach_x ?? ''} placeholder="2 / infinity / -infinity" onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, approach_x: e.target.value } : x) })} />
                                 </div>
+                            ) : config.mode === 'slopefield' ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className={labelCls}>Старт x₀</label>
+                                        <input type="number" className={inputCls} value={t.start_point?.[0] ?? 0} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, start_point: [parseFloat(e.target.value) || 0, x.start_point?.[1] ?? 0] } : x) })} />
+                                    </div>
+                                    <div>
+                                        <label className={labelCls}>Старт y₀</label>
+                                        <input type="number" className={inputCls} value={t.start_point?.[1] ?? 0} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, start_point: [x.start_point?.[0] ?? 0, parseFloat(e.target.value) || 0] } : x) })} />
+                                    </div>
+                                </div>
                             ) : !isChoiceMode ? (
                                 <div><label className={labelCls}>Правильный ответ</label><input className={inputCls} value={t.correct_answer} placeholder="3x^2" onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, correct_answer: e.target.value } : x) })} /></div>
                             ) : null}
                         </div>
-                        <StringListEditor label={isChoiceMode ? 'Варианты ответа' : 'Варианты ответа (необязательно)'} values={t.options ?? []} onChange={v => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, options: v } : x) })} />
+                        <StringListEditor label={isChoiceMode ? (config.mode === 'slopefield' ? 'Варианты ответа — формулы y(x) кандидатных кривых' : 'Варианты ответа') : 'Варианты ответа (необязательно)'} values={t.options ?? []} placeholder={config.mode === 'slopefield' ? '2*exp(-x) + x - 1' : undefined} onChange={v => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, options: v } : x) })} />
                         {isChoiceMode && (
                             <div>
                                 <label className={labelCls}>Правильный ответ</label>
@@ -437,6 +453,9 @@ const ScenarioPreview = ({ scenario, onClose }: { scenario: GameScenario; onClos
                 }
                 if (config.mode === 'series') {
                     return <SeriesFilling difficulty={config.difficulty} tasksSource={mapSeriesTasks(config.tasks)} onComplete={() => {}} />;
+                }
+                if (config.mode === 'slopefield') {
+                    return <SlopeField difficulty={config.difficulty} tasksSource={mapSlopeFieldTasks(config.tasks)} onComplete={() => {}} />;
                 }
                 return (
                     <MathLab

@@ -30,5 +30,11 @@ export const mockGameData = {
         description: 'Смотрите, как растёт сумма ряда, и угадывайте, сходится ли она!',
         difficulty: 3,
         rewardPoints: 120
+    },
+    'slope-field': {
+        title: 'Наклон',
+        description: 'Смотрите на поле направлений и угадывайте, какая кривая — решение уравнения!',
+        difficulty: 3,
+        rewardPoints: 120
     }
 };
