@@ -25,5 +25,11 @@ export const mockGameData = {
         description: 'Изучайте функции и их интегралы!',
         difficulty: 4,
         rewardPoints: 150
+    },
+    'limits-approach': {
+        title: 'Приближение',
+        description: 'Смотрите, к чему стремится функция, и угадывайте предел!',
+        difficulty: 3,
+        rewardPoints: 120
     }
 };

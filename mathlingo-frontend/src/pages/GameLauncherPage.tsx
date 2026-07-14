@@ -10,8 +10,8 @@ interface GameInfo {
     title: string;
     description: string;
     icon: string;
-    mechanicType: 'падение' | 'сборка' | 'лаборатория';
-    subject: 'derivatives' | 'integrals';
+    mechanicType: 'падение' | 'сборка' | 'лаборатория' | 'приближение';
+    subject: 'derivatives' | 'integrals' | 'limits';
     difficulty: number;
     estimatedTime: number;
 }
@@ -56,9 +56,11 @@ const GameLauncherPage = () => {
                 setSubjectName(subjectResponse.data.name);
 
                 const subjectNameLower = subjectResponse.data.name.toLowerCase();
-                let subjectTheme: 'derivatives' | 'integrals';
+                let subjectTheme: 'derivatives' | 'integrals' | 'limits';
 
-                if (subjectNameLower.includes('производн') || subjectNameLower.includes('дифференц') || subjectId === '1') {
+                if (subjectNameLower.includes('предел')) {
+                    subjectTheme = 'limits';
+                } else if (subjectNameLower.includes('производн') || subjectNameLower.includes('дифференц') || subjectId === '1') {
                     subjectTheme = 'derivatives';
                 } else {
                     subjectTheme = 'integrals';
@@ -105,6 +107,16 @@ const GameLauncherPage = () => {
                         difficulty: difficulty ?? 4,
                         estimatedTime: 15,
                     },
+                    {
+                        id: 'limits-approach',
+                        title: 'Приближение',
+                        description: 'Смотрите, к чему стремится график функции, и угадывайте предел!',
+                        icon: '🔎',
+                        mechanicType: 'приближение',
+                        subject: 'limits',
+                        difficulty: difficulty ?? 3,
+                        estimatedTime: 8,
+                    },
                 ];
 
                 let filteredGames = availableGames.filter(g => g.subject === subjectTheme);
@@ -124,7 +136,8 @@ const GameLauncherPage = () => {
                     title: type === 'падение' ? 'Игры на быструю реакцию'
                         : type === 'сборка'  ? 'Игры на конструирование'
                             : type === 'лаборатория' ? 'Исследовательские игры'
-                                : 'Другие игры',
+                                : type === 'приближение' ? 'Игры на визуальную интуицию'
+                                    : 'Другие игры',
                     type,
                     games: filteredGames.filter(g => g.mechanicType === type),
                 }));

@@ -435,17 +435,19 @@ export interface IntegralBuilderGameConfig {
 
 export interface MathLabTaskConfig {
     id: string;
-    type: 'analyze' | 'find' | 'calculate';
+    type: 'analyze' | 'find' | 'calculate' | 'limit';
     question: string;
     function_expression: string;
     correct_answer: string;
     options?: string[];
     difficulty: number;
     hints: string[];
+    // Точка приближения (R4, mode="limits") — "2", "infinity", "-infinity".
+    approach_x?: string | null;
 }
 
 export interface MathLabGameConfig {
-    mode: 'derivatives' | 'integrals';
+    mode: 'derivatives' | 'integrals' | 'limits';
     difficulty: number;
     tasks: MathLabTaskConfig[];
 }
@@ -472,13 +474,14 @@ export const mapIntegralBuilderProblems = (problems: IntegralBuilderProblemConfi
 
 export interface MathLabTaskProp {
     id: string;
-    type: 'analyze' | 'find' | 'calculate';
+    type: 'analyze' | 'find' | 'calculate' | 'limit';
     question: string;
     functionExpression: string;
     correctAnswer: string;
     options?: string[];
     difficulty: number;
     hints: string[];
+    approachX?: string | null;
 }
 
 export const mapMathLabTasks = (tasks: MathLabTaskConfig[]): MathLabTaskProp[] =>
@@ -489,6 +492,33 @@ export const mapMathLabTasks = (tasks: MathLabTaskConfig[]): MathLabTaskProp[] =
         functionExpression: t.function_expression,
         correctAnswer: t.correct_answer,
         options: t.options,
+        difficulty: t.difficulty,
+        hints: t.hints,
+        approachX: t.approach_x,
+    }));
+
+// mode="limits" (R4, игра "Приближение") гарантирует approach_x/options на
+// бэкенде (см. game_config.py) — здесь просто сужаем тип под это
+// гарантированное подмножество, без доп. проверок в компоненте игры.
+export interface LimitsTaskProp {
+    id: string;
+    question: string;
+    functionExpression: string;
+    approachX: string;
+    correctAnswer: string;
+    options: string[];
+    difficulty: number;
+    hints: string[];
+}
+
+export const mapLimitsTasks = (tasks: MathLabTaskConfig[]): LimitsTaskProp[] =>
+    tasks.map(t => ({
+        id: t.id,
+        question: t.question,
+        functionExpression: t.function_expression,
+        approachX: t.approach_x as string,
+        correctAnswer: t.correct_answer,
+        options: t.options as string[],
         difficulty: t.difficulty,
         hints: t.hints,
     }));

@@ -7,7 +7,7 @@ R4: GET /gamification/dashboard — раньше "Последняя актив�
 """
 from datetime import datetime, timedelta
 
-from app.models import Attempt, MasteryState, Skill, Task, UserProgress
+from app.models import Attempt, GameScenario, MasteryState, Skill, Task, UserProgress
 from app.services import student_dashboard
 
 
@@ -63,6 +63,26 @@ def test_dashboard_reflects_real_attempts_and_points(client, db, user, subject):
     assert len(body["recent_activity"]) == 2
     assert body["recent_activity"][0]["title"] == "Найти производную"
     assert body["recent_activity"][0]["topic"] == "Производные"
+
+
+# R4: MathLab — один template_key на несколько режимов (derivatives/
+# integrals/limits) — без учёта mode вся игровая активность выглядела бы
+# одинаково "Игра: MathLab" независимо от того, в каком режиме играли.
+def test_dashboard_distinguishes_mathlab_modes_in_activity_titles(client, db, user):
+    scenario = GameScenario(
+        template_key="mathlab", status="published",
+        config={"template_key": "mathlab", "mode": "limits", "difficulty": 3, "tasks": []},
+    )
+    db.add(scenario)
+    db.commit()
+    db.refresh(scenario)
+
+    db.add(Attempt(user_id=user.id, content_type="game", content_id=scenario.id, is_correct=True, source="game"))
+    db.commit()
+
+    response = client.get("/gamification/dashboard", headers=_student_header(user))
+    assert response.status_code == 200
+    assert response.json()["recent_activity"][0]["title"] == "Игра: Приближение (пределы)"
 
 
 def test_dashboard_topics_progress_reflects_mastery_level(client, db, user, subject):
