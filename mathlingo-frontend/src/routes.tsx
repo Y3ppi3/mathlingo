@@ -12,6 +12,10 @@ import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+// Низкочастотные экраны (R4) — тоже не нужны в основном бандле.
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+
 // R4: весь admin-поддерево и игровые компоненты (katex/mathjs/recharts/
 // dnd-kit/framer-motion) грузились уже на экране логина — эти маршруты
 // не нужны студенту/гостю. React.lazy выносит их в отдельные чанки,
@@ -67,6 +71,8 @@ function AppRoutes() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route
                 path="/dashboard"
                 element={
