@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clearLocalUserData, saveLocalUserData } from "../utils/LocalUserStorage";
+import { api } from "../api/studentApi";
 
 // Интерфейс для данных пользователя
 interface UserData {
@@ -58,36 +59,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const refreshAuth = async (): Promise<boolean> => {
         try {
-            // Проверяем авторизацию только через API
-            const response = await fetch(`${API_URL}/api/me`, {
-                method: "GET",
-                credentials: "include", // Отправляем куки с токеном
-                headers: { "Content-Type": "application/json" },
-            });
+            // Через общий axios-инстанс (не raw fetch) — его перехватчик в
+            // api/studentApi.ts читает заголовок X-CSRF-Token из ответа и
+            // сохраняет его для последующих мутирующих запросов (submit-
+            // answer, submit-attempt и т.д.). Raw fetch() этот заголовок
+            // просто отбрасывал: токен на сервере выпускался на каждый
+            // /api/me, но фронтенд его никогда не читал — из-за этого
+            // ПЕРВЫЙ мутирующий запрос в сессии (например, первая же
+            // сыгранная игра) молча падал с 403 "CSRF-токен отсутствует",
+            // проглоченным в .catch(console.error) вызывающих компонентов.
+            const response = await api.get("/api/me");
+            const userData = response.data;
 
-            if (response.ok) {
-                // Получаем данные пользователя
-                const userData = await response.json();
-
-                // Никаких токенов в localStorage!
-                // localStorage.removeItem(AUTH_TOKEN_KEY);
-
-                // Устанавливаем состояние авторизации
-                setIsAuthenticated(true);
-
-                // Отправляем событие для обновления данных пользователя
-                window.dispatchEvent(new CustomEvent('userDataUpdated', {
-                    detail: userData
-                }));
-
-                return true;
-            } else {
-                // Если запрос не успешен, считаем пользователя не авторизованным
-                setIsAuthenticated(false);
-                return false;
-            }
-        } catch (error) {
-            console.error("Ошибка проверки авторизации:", error);
+            setIsAuthenticated(true);
+            window.dispatchEvent(new CustomEvent('userDataUpdated', {
+                detail: userData
+            }));
+            return true;
+        } catch {
+            // 401 (не авторизован) и сетевые ошибки — тот же исход, что и
+            // раньше при response.ok === false: считаем пользователя не
+            // авторизованным.
             setIsAuthenticated(false);
             return false;
         }
