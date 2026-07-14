@@ -617,25 +617,24 @@ export const returnTaskToReview = async (taskId: number): Promise<Task> => {
     return response.data;
 };
 
-// Игровые сценарии (R3 task 2 backend, task 5 конструктор) — конфиг
-// типизирован per-template в самой панели через DerivFallGameConfig /
-// IntegralBuilderGameConfig / MathLabGameConfig из utils/api.ts (тот же
-// контракт, что использует студенческий эндпоинт активного сценария).
-//
-// Ниже функции сами проверяют response.status и бросают Error с detail —
-// перехватчик adminApi выше нарочно РЕЗОЛВИТ (не реджектит) любой ответ с
+// Перехватчик adminApi выше нарочно РЕЗОЛВИТ (не реджектит) любой ответ с
 // телом ошибки (используется для confirmation-flow при удалении), из-за
 // этого try/catch вокруг обычного adminApi.post/put в остальном файле не
-// ловит 4xx для этих ручек. Трогать общий перехватчик рискованно — на нём
-// завязан confirmation-flow в deleteSubject/deleteAdventureMap; вместо
-// этого разворачиваем ответ здесь же, точечно.
-const unwrapGameScenarioResponse = <T,>(response: { status: number; data: unknown }): T => {
+// ловит 4xx. Трогать общий перехватчик рискованно — на нём завязан
+// confirmation-flow в deleteSubject/deleteAdventureMap; вместо этого
+// разворачиваем ответ точечно там, где try/catch реально нужен (game
+// scenarios, dashboard).
+const unwrapAdminResponse = <T,>(response: { status: number; data: unknown }): T => {
     if (response.status >= 400) {
         throw new Error((response.data as { detail?: string } | undefined)?.detail || 'Запрос не выполнен');
     }
     return response.data as T;
 };
 
+// Игровые сценарии (R3 task 2 backend, task 5 конструктор) — конфиг
+// типизирован per-template в самой панели через DerivFallGameConfig /
+// IntegralBuilderGameConfig / MathLabGameConfig из utils/api.ts (тот же
+// контракт, что использует студенческий эндпоинт активного сценария).
 export type GameScenarioTemplateKey = 'derivfall' | 'integralbuilder' | 'mathlab';
 export type GameScenarioStatus = 'draft' | 'published' | 'archived';
 
@@ -667,12 +666,12 @@ export interface GameScenarioChecklistItem {
 
 export const fetchGameScenarios = async (filters?: { status_filter?: GameScenarioStatus; template_key?: GameScenarioTemplateKey }): Promise<GameScenario[]> => {
     const response = await adminApi.get('/admin/game-scenarios/', { params: filters });
-    return unwrapGameScenarioResponse<GameScenario[]>(response);
+    return unwrapAdminResponse<GameScenario[]>(response);
 };
 
 export const fetchGameScenario = async (id: number): Promise<GameScenario> => {
     const response = await adminApi.get(`/admin/game-scenarios/${id}`);
-    return unwrapGameScenarioResponse<GameScenario>(response);
+    return unwrapAdminResponse<GameScenario>(response);
 };
 
 export const createGameScenario = async (data: {
@@ -684,7 +683,7 @@ export const createGameScenario = async (data: {
     availability_to?: string | null;
 }): Promise<GameScenario> => {
     const response = await adminApi.post('/admin/game-scenarios/', data);
-    return unwrapGameScenarioResponse<GameScenario>(response);
+    return unwrapAdminResponse<GameScenario>(response);
 };
 
 export const updateGameScenario = async (id: number, data: {
@@ -695,30 +694,91 @@ export const updateGameScenario = async (id: number, data: {
     availability_to?: string | null;
 }): Promise<GameScenario> => {
     const response = await adminApi.put(`/admin/game-scenarios/${id}`, data);
-    return unwrapGameScenarioResponse<GameScenario>(response);
+    return unwrapAdminResponse<GameScenario>(response);
 };
 
 export const fetchGameScenarioChecklist = async (id: number): Promise<GameScenarioChecklistItem[]> => {
     const response = await adminApi.get(`/admin/game-scenarios/${id}/checklist`);
-    return unwrapGameScenarioResponse<GameScenarioChecklistItem[]>(response);
+    return unwrapAdminResponse<GameScenarioChecklistItem[]>(response);
 };
 
 export const checkGameScenarioChecklistItem = async (id: number, itemKey: ChecklistItemKey): Promise<GameScenarioChecklistItem> => {
     const response = await adminApi.post(`/admin/game-scenarios/${id}/checklist/${itemKey}`);
-    return unwrapGameScenarioResponse<GameScenarioChecklistItem>(response);
+    return unwrapAdminResponse<GameScenarioChecklistItem>(response);
 };
 
 export const previewGameScenario = async (id: number): Promise<GameScenario> => {
     const response = await adminApi.post(`/admin/game-scenarios/${id}/preview`);
-    return unwrapGameScenarioResponse<GameScenario>(response);
+    return unwrapAdminResponse<GameScenario>(response);
 };
 
 export const publishGameScenario = async (id: number): Promise<GameScenario> => {
     const response = await adminApi.post(`/admin/game-scenarios/${id}/publish`);
-    return unwrapGameScenarioResponse<GameScenario>(response);
+    return unwrapAdminResponse<GameScenario>(response);
 };
 
 export const archiveGameScenario = async (id: number): Promise<GameScenario> => {
     const response = await adminApi.post(`/admin/game-scenarios/${id}/archive`);
-    return unwrapGameScenarioResponse<GameScenario>(response);
+    return unwrapAdminResponse<GameScenario>(response);
+};
+
+// Финальный dashboard (R3 task 7) — см. mathlingo-backend/app/services/dashboard.py.
+export interface DashboardActivitySummary {
+    window_days: number;
+    total_attempts: number;
+    active_users: number;
+    by_content_type: Record<string, { attempts: number; active_users: number }>;
+}
+
+export interface DashboardSkillProgress {
+    skill_id: number;
+    skill_name: string;
+    student_count: number;
+    levels: Record<string, number>;
+    avg_confidence: number;
+}
+
+export interface DashboardGameCompletion {
+    template_key: GameScenarioTemplateKey;
+    sessions: number;
+    pass_rate: number | null;
+    avg_time_spent_ms: number | null;
+}
+
+export interface DashboardAiQuality {
+    published_ai_tasks: number;
+    open_anomaly_flags: number;
+    open_complaint_flags: number;
+}
+
+export interface DashboardReviewQueue {
+    tasks_in_review: number;
+    ai_items_pending: number;
+}
+
+export interface DashboardAdminAction {
+    id: number;
+    actor_username: string | null;
+    actor_role: string | null;
+    method: string;
+    path: string;
+    action: string | null;
+    status_code: number;
+    created_at: string;
+}
+
+export interface DashboardOverview {
+    activity: DashboardActivitySummary;
+    skill_progress: DashboardSkillProgress[];
+    game_completion: DashboardGameCompletion[];
+    ai_quality: DashboardAiQuality;
+    review_queue: DashboardReviewQueue;
+    publish_errors: Record<string, number>;
+    // null для teacher — см. R3 §5, "частично, без раздела действий администраторов".
+    admin_actions: DashboardAdminAction[] | null;
+}
+
+export const fetchDashboardOverview = async (): Promise<DashboardOverview> => {
+    const response = await adminApi.get('/admin/dashboard/overview');
+    return unwrapAdminResponse<DashboardOverview>(response);
 };

@@ -471,6 +471,63 @@ class GameAttemptSubmissionResponse(BaseModel):
     is_correct: bool
 
 
+# Финальный dashboard (R3 task 7) — см. app/services/dashboard.py.
+class DashboardActivitySummary(BaseModel):
+    window_days: int
+    total_attempts: int
+    active_users: int
+    by_content_type: Dict[str, Dict[str, int]]
+
+
+class DashboardSkillProgress(BaseModel):
+    skill_id: int
+    skill_name: str
+    student_count: int
+    levels: Dict[str, int]
+    avg_confidence: float
+
+
+class DashboardGameCompletion(BaseModel):
+    template_key: str
+    sessions: int
+    pass_rate: Optional[float] = None
+    avg_time_spent_ms: Optional[int] = None
+
+
+class DashboardAiQuality(BaseModel):
+    published_ai_tasks: int
+    open_anomaly_flags: int
+    open_complaint_flags: int
+
+
+class DashboardReviewQueue(BaseModel):
+    tasks_in_review: int
+    ai_items_pending: int
+
+
+class DashboardAdminAction(BaseModel):
+    id: int
+    actor_username: Optional[str] = None
+    actor_role: Optional[str] = None
+    method: str
+    path: str
+    action: Optional[str] = None
+    status_code: int
+    created_at: datetime
+
+
+class DashboardOverviewResponse(BaseModel):
+    activity: DashboardActivitySummary
+    skill_progress: List[DashboardSkillProgress]
+    game_completion: List[DashboardGameCompletion]
+    ai_quality: DashboardAiQuality
+    review_queue: DashboardReviewQueue
+    publish_errors: Dict[str, int]
+    # None (а не []) для teacher — см. R3 §5: "частично, без раздела
+    # действий администраторов".
+    admin_actions: Optional[List[DashboardAdminAction]] = None
+
+
 # Student-facing: то же самое, что задание в task-groups/data — без
 # correct_answer.
 class DiagnosticTaskView(BaseModel):
