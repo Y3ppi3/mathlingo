@@ -30,6 +30,23 @@ GAME_TEMPLATE_LABELS = {
     "mathlab": "Игра: MathLab",
 }
 
+# MathLab — один template_key на несколько режимов (derivatives/integrals/
+# limits, см. app/services/game_config.py) — без этого все игровые сессии
+# MathLab выглядели бы в ленте активности одинаково "Игра: MathLab",
+# независимо от того, в каком режиме ученик реально играл.
+MATHLAB_MODE_LABELS = {
+    "derivatives": "Игра: MathLab (производные)",
+    "integrals": "Игра: MathLab (интегралы)",
+    "limits": "Игра: Приближение (пределы)",
+}
+
+
+def _game_scenario_title(scenario: GameScenario) -> str:
+    if scenario.template_key == "mathlab":
+        mode = (scenario.config or {}).get("mode")
+        return MATHLAB_MODE_LABELS.get(mode, GAME_TEMPLATE_LABELS["mathlab"])
+    return GAME_TEMPLATE_LABELS.get(scenario.template_key, scenario.template_key)
+
 
 def get_points(db: Session, user_id: int) -> int:
     progress = db.query(UserProgress).filter(UserProgress.user_id == user_id).first()
@@ -99,7 +116,7 @@ def _resolve_titles(db: Session, attempts: list) -> dict:
 
     if game_ids:
         for g in db.query(GameScenario).filter(GameScenario.id.in_(game_ids)).all():
-            titles[("game", g.id)] = GAME_TEMPLATE_LABELS.get(g.template_key, g.template_key)
+            titles[("game", g.id)] = _game_scenario_title(g)
 
     if diagnostic_ids:
         for d in db.query(Diagnostic).filter(Diagnostic.id.in_(diagnostic_ids)).all():

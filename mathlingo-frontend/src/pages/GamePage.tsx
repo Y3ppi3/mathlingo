@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import DerivFall from '../components/games/DerivFall';
 import IntegralBuilder from '../components/games/IntegralBuilder';
 import MathLab from '../components/games/MathLab';
+import LimitsApproach from '../components/games/LimitsApproach';
 import RewardPopup from '../components/adventure/RewardPopup';
 import { mockGameData } from '../utils/gameMockData';
 import {
@@ -18,6 +19,7 @@ import {
     MathLabGameConfig,
     mapIntegralBuilderProblems,
     mapMathLabTasks,
+    mapLimitsTasks,
 } from '../api/studentApi';
 
 // Navbar = p-4 (16px) + h-16 (64px) + p-4 (16px) = 96px
@@ -42,6 +44,7 @@ const GamePage = () => {
     const [derivFallConfig, setDerivFallConfig] = useState<DerivFallGameConfig | null>(null);
     const [integralBuilderConfig, setIntegralBuilderConfig] = useState<IntegralBuilderGameConfig | null>(null);
     const [mathLabConfig, setMathLabConfig] = useState<MathLabGameConfig | null>(null);
+    const [limitsConfig, setLimitsConfig] = useState<MathLabGameConfig | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
 
     // R3 task 6: сценарий, за который отчитываемся попыткой по завершении
@@ -82,6 +85,10 @@ const GamePage = () => {
                 } else if (gameId === 'math-lab-integrals') {
                     const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'integrals');
                     setMathLabConfig(scenario.config);
+                    activeScenarioIdRef.current = scenario.id;
+                } else if (gameId === 'limits-approach') {
+                    const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'limits');
+                    setLimitsConfig(scenario.config);
                     activeScenarioIdRef.current = scenario.id;
                 }
                 sessionStartRef.current = Date.now();
@@ -142,12 +149,21 @@ const GamePage = () => {
                 );
             case 'math-lab-derivatives':
             case 'math-lab-integrals':
-                if (!mathLabConfig) return null;
+                if (!mathLabConfig || mathLabConfig.mode === 'limits') return null;
                 return (
                     <MathLab
                         mode={mathLabConfig.mode}
                         difficulty={customDifficulty !== undefined ? customDifficulty : mathLabConfig.difficulty}
                         tasksSource={mapMathLabTasks(mathLabConfig.tasks)}
+                        onComplete={handleGameComplete}
+                    />
+                );
+            case 'limits-approach':
+                if (!limitsConfig) return null;
+                return (
+                    <LimitsApproach
+                        difficulty={customDifficulty !== undefined ? customDifficulty : limitsConfig.difficulty}
+                        tasksSource={mapLimitsTasks(limitsConfig.tasks)}
                         onComplete={handleGameComplete}
                     />
                 );
