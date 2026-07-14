@@ -10,7 +10,12 @@ import IntegralBuilder from '../components/games/IntegralBuilder';
 import MathLab from '../components/games/MathLab';
 import RewardPopup from '../components/adventure/RewardPopup';
 import { mockGameData } from '../utils/gameMockData';
-import { fetchActiveGameScenario, DerivFallGameConfig } from '../utils/api';
+import {
+    fetchActiveGameScenario,
+    DerivFallGameConfig,
+    IntegralBuilderGameConfig,
+    MathLabGameConfig,
+} from '../utils/api';
 
 // Navbar = p-4 (16px) + h-16 (64px) + p-4 (16px) = 96px
 const NAVBAR_HEIGHT = 96;
@@ -32,6 +37,8 @@ const GamePage = () => {
         title: string; description: string; difficulty: number; rewardPoints: number;
     } | null>(null);
     const [derivFallConfig, setDerivFallConfig] = useState<DerivFallGameConfig | null>(null);
+    const [integralBuilderConfig, setIntegralBuilderConfig] = useState<IntegralBuilderGameConfig | null>(null);
+    const [mathLabConfig, setMathLabConfig] = useState<MathLabGameConfig | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
 
     useEffect(() => {
@@ -53,6 +60,15 @@ const GamePage = () => {
                 if (gameId === 'deriv-fall') {
                     const scenario = await fetchActiveGameScenario<DerivFallGameConfig>('derivfall');
                     setDerivFallConfig(scenario.config);
+                } else if (gameId === 'integral-builder') {
+                    const scenario = await fetchActiveGameScenario<IntegralBuilderGameConfig>('integralbuilder');
+                    setIntegralBuilderConfig(scenario.config);
+                } else if (gameId === 'math-lab-derivatives') {
+                    const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'derivatives');
+                    setMathLabConfig(scenario.config);
+                } else if (gameId === 'math-lab-integrals') {
+                    const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'integrals');
+                    setMathLabConfig(scenario.config);
                 }
             } catch (err) {
                 if (axios.isAxiosError(err) && err.response?.status === 404) {
@@ -92,11 +108,41 @@ const GamePage = () => {
                     />
                 );
             case 'integral-builder':
-                return <IntegralBuilder initialDifficulty={gameInfo?.difficulty || 4} timeLimit={300} onComplete={handleGameComplete} />;
+                if (!integralBuilderConfig) return null;
+                return (
+                    <IntegralBuilder
+                        initialDifficulty={customDifficulty !== undefined ? customDifficulty : integralBuilderConfig.initial_difficulty}
+                        timeLimit={integralBuilderConfig.time_limit}
+                        problemsSource={integralBuilderConfig.problems.map(p => ({
+                            id: p.id,
+                            question: p.question,
+                            solutionPieces: p.solution_pieces,
+                            distractors: p.distractors,
+                            difficulty: p.difficulty,
+                        }))}
+                        onComplete={handleGameComplete}
+                    />
+                );
             case 'math-lab-derivatives':
-                return <MathLab mode="derivatives" difficulty={gameInfo?.difficulty || 3} onComplete={handleGameComplete} />;
             case 'math-lab-integrals':
-                return <MathLab mode="integrals" difficulty={gameInfo?.difficulty || 4} onComplete={handleGameComplete} />;
+                if (!mathLabConfig) return null;
+                return (
+                    <MathLab
+                        mode={mathLabConfig.mode}
+                        difficulty={customDifficulty !== undefined ? customDifficulty : mathLabConfig.difficulty}
+                        tasksSource={mathLabConfig.tasks.map(t => ({
+                            id: t.id,
+                            type: t.type,
+                            question: t.question,
+                            functionExpression: t.function_expression,
+                            correctAnswer: t.correct_answer,
+                            options: t.options,
+                            difficulty: t.difficulty,
+                            hints: t.hints,
+                        }))}
+                        onComplete={handleGameComplete}
+                    />
+                );
             default:
                 return (
                     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-8 rounded-xl text-center transition-colors">

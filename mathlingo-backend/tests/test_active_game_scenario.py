@@ -1,7 +1,10 @@
 """
 Student-facing эндпоинт GET /gamification/game-scenarios/active/{template_key}
-(R3 task 3) — источник конфига, из которого DerivFall теперь берёт задания
-вместо DEFAULT_PROBLEMS (см. app/routes/gamification.py get_active_game_scenario).
+(R3 task 3/4) — источник конфига, из которого DerivFall/IntegralBuilder/
+MathLab теперь берут задания вместо своих хардкодов (см.
+app/routes/gamification.py get_active_game_scenario). Фильтр ?mode= (R3
+task 4) нужен только mathlab — derivatives/integrals делят один
+template_key, но это разные опубликованные сценарии.
 """
 from datetime import datetime, timedelta
 
@@ -12,6 +15,13 @@ VALID_CONFIG = {
     "time_limit": 60,
     "problems": [
         {"id": "d1", "problem": "(x^2)'", "options": ["2x", "x", "2", "x^2"], "answer": "2x", "difficulty": "easy"},
+    ],
+}
+
+MATHLAB_CONFIG = {
+    "difficulty": 3,
+    "tasks": [
+        {"id": "t1", "type": "calculate", "question": "Найдите производную x^2", "function_expression": "x^2", "correct_answer": "2x", "difficulty": 3, "hints": []},
     ],
 }
 
@@ -109,3 +119,32 @@ def test_other_template_key_not_matched(client, db, user):
     })
     response = client.get("/gamification/game-scenarios/active/derivfall", headers=_student_header(user))
     assert response.status_code == 404
+
+
+# --- ?mode= фильтр (R3 task 4, только mathlab) ---
+
+def test_mode_filter_selects_matching_scenario(client, db, user):
+    derivatives_config = dict(MATHLAB_CONFIG, mode="derivatives")
+    integrals_config = dict(MATHLAB_CONFIG, mode="integrals")
+    deriv_scenario = _make_scenario(db, template_key="mathlab", config=derivatives_config)
+    _make_scenario(db, template_key="mathlab", config=integrals_config)
+
+    response = client.get("/gamification/game-scenarios/active/mathlab?mode=derivatives", headers=_student_header(user))
+    assert response.status_code == 200
+    assert response.json()["id"] == deriv_scenario.id
+    assert response.json()["config"]["mode"] == "derivatives"
+
+
+def test_mode_filter_404_when_no_scenario_for_that_mode(client, db, user):
+    _make_scenario(db, template_key="mathlab", config=dict(MATHLAB_CONFIG, mode="derivatives"))
+    response = client.get("/gamification/game-scenarios/active/mathlab?mode=integrals", headers=_student_header(user))
+    assert response.status_code == 404
+
+
+def test_without_mode_filter_returns_most_recent_regardless_of_mode(client, db, user):
+    _make_scenario(db, template_key="mathlab", config=dict(MATHLAB_CONFIG, mode="derivatives"), published_at=datetime.utcnow() - timedelta(days=1))
+    newer = _make_scenario(db, template_key="mathlab", config=dict(MATHLAB_CONFIG, mode="integrals"), published_at=datetime.utcnow())
+
+    response = client.get("/gamification/game-scenarios/active/mathlab", headers=_student_header(user))
+    assert response.status_code == 200
+    assert response.json()["id"] == newer.id

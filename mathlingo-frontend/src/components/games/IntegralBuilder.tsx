@@ -21,7 +21,7 @@ interface SolutionPiece {
 interface IntegralBuilderProps {
   initialDifficulty?: number;
   timeLimit?: number;
-  problemsSource?: IntegralProblem[];
+  problemsSource: IntegralProblem[];
   onComplete?: (score: number, maxScore: number) => void;
 }
 
@@ -47,69 +47,7 @@ const IntegralBuilder: React.FC<IntegralBuilderProps> = ({
 
   // Загрузка проблем из источника
   useEffect(() => {
-    if (problemsSource && problemsSource.length > 0) {
-      setProblemBank(problemsSource);
-    } else {
-      // Моковые данные, если источник не предоставлен
-      setProblemBank([
-        {
-          id: "i1",
-          question: "∫ x² dx",
-          solutionPieces: ["x³/3", "+C"],
-          distractors: ["x²/2", "3x²", "x³", "2x"],
-          difficulty: "easy"
-        },
-        {
-          id: "i2",
-          question: "∫ 3x² dx",
-          solutionPieces: ["x³", "+C"],
-          distractors: ["3x³/3", "3x²/2", "3x", "6x"],
-          difficulty: "easy"
-        },
-        {
-          id: "i3",
-          question: "∫ sin 2x dx",
-          solutionPieces: ["-", "cos 2x/2", "+C"],
-          distractors: ["sin 2x/2", "2 sin x", "cos x", "sin x²"],
-          difficulty: "medium"
-        },
-        {
-          id: "i4",
-          question: "∫ 1/x² dx",
-          solutionPieces: ["-", "1/x", "+C"],
-          distractors: ["ln|x|", "x⁻¹", "1/2x²", "-x⁻²"],
-          difficulty: "medium"
-        },
-        {
-          id: "i5",
-          question: "∫ e^x dx",
-          solutionPieces: ["e^x", "+C"],
-          distractors: ["xe^x", "e^x/x", "ln(e^x)"],
-          difficulty: "easy"
-        },
-        {
-          id: "i6",
-          question: "∫ 1/x dx",
-          solutionPieces: ["ln|x|", "+C"],
-          distractors: ["1/x²", "x⁻¹", "1/2x²"],
-          difficulty: "medium"
-        },
-        {
-          id: "i7",
-          question: "∫ cos x dx",
-          solutionPieces: ["sin x", "+C"],
-          distractors: ["-cos x", "tan x", "sec x"],
-          difficulty: "easy"
-        },
-        {
-          id: "i8",
-          question: "∫ (3x² - 4x + 5) dx",
-          solutionPieces: ["x³", "-2x²", "+5x", "+C"],
-          distractors: ["3x³", "4x²", "-5x", "x²"],
-          difficulty: "hard"
-        }
-      ]);
-    }
+    setProblemBank(problemsSource);
   }, [problemsSource]);
 
   // Настройка уровня сложности в зависимости от переданного значения
