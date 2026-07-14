@@ -31,13 +31,14 @@ GAME_TEMPLATE_LABELS = {
 }
 
 # MathLab — один template_key на несколько режимов (derivatives/integrals/
-# limits, см. app/services/game_config.py) — без этого все игровые сессии
-# MathLab выглядели бы в ленте активности одинаково "Игра: MathLab",
+# limits/series, см. app/services/game_config.py) — без этого все игровые
+# сессии MathLab выглядели бы в ленте активности одинаково "Игра: MathLab",
 # независимо от того, в каком режиме ученик реально играл.
 MATHLAB_MODE_LABELS = {
     "derivatives": "Игра: MathLab (производные)",
     "integrals": "Игра: MathLab (интегралы)",
     "limits": "Игра: Приближение (пределы)",
+    "series": "Игра: Наполнение (ряды)",
 }
 
 

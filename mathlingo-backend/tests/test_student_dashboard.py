@@ -7,6 +7,8 @@ R4: GET /gamification/dashboard — раньше "Последняя актив�
 """
 from datetime import datetime, timedelta
 
+import pytest
+
 from app.models import Attempt, GameScenario, MasteryState, Skill, Task, UserProgress
 from app.services import student_dashboard
 
@@ -83,6 +85,33 @@ def test_dashboard_distinguishes_mathlab_modes_in_activity_titles(client, db, us
     response = client.get("/gamification/dashboard", headers=_student_header(user))
     assert response.status_code == 200
     assert response.json()["recent_activity"][0]["title"] == "Игра: Приближение (пределы)"
+
+
+# Параметризовано по ВСЕМ известным mode — раньше "series" отсутствовал в
+# MATHLAB_MODE_LABELS (нашлось только живым E2E, не тестами: старый тест
+# проверял только mode=limits) и молча падал обратно на "Игра: MathLab".
+# Список здесь обязан обновляться при добавлении нового режима.
+@pytest.mark.parametrize("mode,expected_title", [
+    ("derivatives", "Игра: MathLab (производные)"),
+    ("integrals", "Игра: MathLab (интегралы)"),
+    ("limits", "Игра: Приближение (пределы)"),
+    ("series", "Игра: Наполнение (ряды)"),
+])
+def test_dashboard_every_known_mathlab_mode_has_a_title(client, db, user, mode, expected_title):
+    scenario = GameScenario(
+        template_key="mathlab", status="published",
+        config={"template_key": "mathlab", "mode": mode, "difficulty": 3, "tasks": []},
+    )
+    db.add(scenario)
+    db.commit()
+    db.refresh(scenario)
+
+    db.add(Attempt(user_id=user.id, content_type="game", content_id=scenario.id, is_correct=True, source="game"))
+    db.commit()
+
+    response = client.get("/gamification/dashboard", headers=_student_header(user))
+    assert response.status_code == 200
+    assert response.json()["recent_activity"][0]["title"] == expected_title
 
 
 def test_dashboard_topics_progress_reflects_mastery_level(client, db, user, subject):

@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import DerivFall from '../components/games/DerivFall';
 import IntegralBuilder from '../components/games/IntegralBuilder';
 import LimitsApproach from '../components/games/LimitsApproach';
+import SeriesFilling from '../components/games/SeriesFilling';
 import RewardPopup from '../components/adventure/RewardPopup';
 import { mockGameData } from '../utils/gameMockData';
 import {
@@ -18,6 +19,7 @@ import {
     MathLabGameConfig,
     mapIntegralBuilderProblems,
     mapLimitsTasks,
+    mapSeriesTasks,
 } from '../api/studentApi';
 
 // Navbar = p-4 (16px) + h-16 (64px) + p-4 (16px) = 96px
@@ -42,6 +44,7 @@ const GamePage = () => {
     const [derivFallConfig, setDerivFallConfig] = useState<DerivFallGameConfig | null>(null);
     const [integralBuilderConfig, setIntegralBuilderConfig] = useState<IntegralBuilderGameConfig | null>(null);
     const [limitsConfig, setLimitsConfig] = useState<MathLabGameConfig | null>(null);
+    const [seriesConfig, setSeriesConfig] = useState<MathLabGameConfig | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
 
     // R3 task 6: сценарий, за который отчитываемся попыткой по завершении
@@ -78,6 +81,10 @@ const GamePage = () => {
                 } else if (gameId === 'limits-approach') {
                     const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'limits');
                     setLimitsConfig(scenario.config);
+                    activeScenarioIdRef.current = scenario.id;
+                } else if (gameId === 'series-filling') {
+                    const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'series');
+                    setSeriesConfig(scenario.config);
                     activeScenarioIdRef.current = scenario.id;
                 }
                 sessionStartRef.current = Date.now();
@@ -142,6 +149,15 @@ const GamePage = () => {
                     <LimitsApproach
                         difficulty={customDifficulty !== undefined ? customDifficulty : limitsConfig.difficulty}
                         tasksSource={mapLimitsTasks(limitsConfig.tasks)}
+                        onComplete={handleGameComplete}
+                    />
+                );
+            case 'series-filling':
+                if (!seriesConfig) return null;
+                return (
+                    <SeriesFilling
+                        difficulty={customDifficulty !== undefined ? customDifficulty : seriesConfig.difficulty}
+                        tasksSource={mapSeriesTasks(seriesConfig.tasks)}
                         onComplete={handleGameComplete}
                     />
                 );
