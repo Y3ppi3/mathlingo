@@ -1,6 +1,8 @@
 // src/hooks/useUser.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../api/studentApi';
 // Импортируем функции из исправленного LocalUserStorage
 import {
     getLocalUserData,
@@ -15,25 +17,21 @@ interface User {
     avatarId?: number;
 }
 
-// Вспомогательная функция для повторных попыток запроса
-const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3): Promise<Response> => {
-    let lastError: Error | unknown;
+// Вспомогательная функция для повторных попыток запроса — обёртка над
+// общим axios-инстансом api/studentApi.ts (а не raw fetch), т.к. только у
+// него есть перехватчик, читающий X-CSRF-Token из ответа GET /api/me.
+// Backend перевыпускает этот токен на КАЖДЫЙ такой запрос — raw fetch
+// отсюда молча "протухал" токен, закешированный где-то ещё в приложении
+// (submitGameAttempt получал 403 "Недействительный CSRF-токен" именно
+// из-за этого — see commit history).
+const requestWithRetry = async <T,>(fn: () => Promise<T>, maxRetries = 3): Promise<T> => {
+    let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 секунд таймаут
-
-            const fetchOptions = {
-                ...options,
-                signal: controller.signal
-            };
-
-            const response = await fetch(url, fetchOptions);
-            clearTimeout(timeoutId);
-
-            return response;
+            return await fn();
         } catch (err) {
+            if (axios.isCancel(err) || (err instanceof Error && err.name === 'AbortError')) throw err;
             console.warn(`Попытка ${attempt}/${maxRetries} не удалась:`, err);
             lastError = err;
 
@@ -75,7 +73,6 @@ export function useUser() {
 
         try {
             setLoading(true);
-            const API_URL = import.meta.env.VITE_API_URL;
 
             // Сначала проверяем localStorage
             const localUserData = getLocalUserData();
@@ -92,54 +89,24 @@ export function useUser() {
             activeRequestRef.current = controller;
 
             try {
-                // Используем функцию fetchWithRetry для надежности
-                const response = await fetchWithRetry(`${API_URL}/api/me`, {
-                    method: "GET",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                    signal: controller.signal
-                });
+                // Через общий axios-инстанс api (не raw fetch) — см. комментарий
+                // к requestWithRetry выше.
+                const response = await requestWithRetry(() => api.get('/api/me', { signal: controller.signal }));
 
                 // Проверяем, что компонент все еще смонтирован
                 if (!isMountedRef.current) return null;
 
-                if (response.ok) {
-                    const userData = await response.json();
-                    console.log('✅ Получены данные пользователя от сервера:', userData);
+                const userData = response.data;
+                console.log('✅ Получены данные пользователя от сервера:', userData);
 
-                    if (!isMountedRef.current) return null;
-
-                    // Сохраняем полученные данные через updateLocalUserData
-                    updateLocalUserData(userData);
-                    setUser(userData);
-                    setError(null);
-                    return userData;
-                } else {
-                    // Проверка режима разработки...
-                    if (process.env.NODE_ENV === 'development') {
-                        console.log('⚠️ Сервер недоступен, используем тестовые данные');
-                        const testUser = {
-                            id: 1,
-                            username: "Тестовый пользователь",
-                            email: "test@example.com",
-                            avatarId: 1
-                        };
-
-                        if (!isMountedRef.current) return null;
-
-                        updateLocalUserData(testUser);
-                        setUser(testUser);
-                        setError(null);
-                        return testUser;
-                    } else {
-                        setUser(null);
-                        setError('Не удалось загрузить данные пользователя');
-                        return null;
-                    }
-                }
+                // Сохраняем полученные данные через updateLocalUserData
+                updateLocalUserData(userData);
+                setUser(userData);
+                setError(null);
+                return userData;
             } catch (err: any) {
                 // Если запрос был отменен, не обрабатываем ошибку
-                if (err.name === 'AbortError') {
+                if (err.name === 'AbortError' || axios.isCancel(err)) {
                     console.log('Запрос был отменен');
                     return null;
                 }
@@ -161,7 +128,8 @@ export function useUser() {
                     setError(null);
                     return testUser;
                 } else {
-                    setError('Произошла ошибка при загрузке данных пользователя');
+                    setUser(null);
+                    setError('Не удалось загрузить данные пользователя');
                     return null;
                 }
             }
@@ -200,34 +168,20 @@ export function useUser() {
 
                 try {
                     console.log("📝 Отправка обновления профиля:", data);
-                    const API_URL = import.meta.env.VITE_API_URL;
 
-                    const response = await fetchWithRetry(`${API_URL}/api/me/update`, {
-                        method: "PUT",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(data),
-                        signal: controller.signal
-                    });
+                    // Через общий axios-инстанс api (не raw fetch) — это PUT,
+                    // ему нужен X-CSRF-Token, который raw fetch никогда не
+                    // проставлял (см. requestWithRetry выше).
+                    const response = await requestWithRetry(() => api.put('/api/me/update', data, { signal: controller.signal }));
 
                     if (!isMountedRef.current) {
                         resolve({ success: false, canceled: true });
                         return;
-                    }
-
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(errorData.detail || "Не удалось обновить профиль");
                     }
 
                     // Получаем обновленные данные из ответа
-                    const updatedUserData = await response.json();
+                    const updatedUserData = response.data;
                     console.log('✅ Получены обновленные данные:', updatedUserData);
-
-                    if (!isMountedRef.current) {
-                        resolve({ success: false, canceled: true });
-                        return;
-                    }
 
                     // Обновляем данные через updateLocalUserData
                     updateLocalUserData(updatedUserData);
@@ -240,14 +194,15 @@ export function useUser() {
 
                     resolve({ success: true, data: updatedUserData });
                 } catch (err: any) {
-                    if (err.name === 'AbortError') {
+                    if (err.name === 'AbortError' || axios.isCancel(err)) {
                         console.log('Запрос был отменен');
                         resolve({ success: false, canceled: true });
                         return;
                     }
 
                     console.error("❌ Ошибка при обновлении профиля:", err);
-                    reject(err);
+                    const message = err.response?.data?.detail || err.message || "Не удалось обновить профиль";
+                    reject(new Error(message));
                 } finally {
                     activeRequestRef.current = null;
                     updateDebounceTimer.current = null;
