@@ -87,6 +87,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Функция входа пользователя
     const login = async (userData?: UserData): Promise<void> => {
+        // Login.tsx логинится через raw fetch (не через общий axios-инстанс
+        // api), а /api/login/ в любом случае не выдаёт CSRF-токен — это
+        // делает только GET /api/me. Без этого вызова токен подхватывался
+        // бы только на первом мутирующем запросе (submit-attempt) через
+        // retry в studentApi.ts — рабочий, но лишний лишний круг с 403 в
+        // логах сразу после входа.
+        api.get('/api/me').catch(() => {});
+
         return new Promise<void>((resolve) => {
             setIsAuthenticated(true);
 
