@@ -4,7 +4,7 @@ import { AxiosError } from 'axios';
 import {
     fetchSubjects, fetchSkills, fetchTasks, fetchDiagnostics, createDiagnostic, updateDiagnostic,
     Subject, Skill, Task, Diagnostic,
-} from '../../utils/adminApi';
+} from '../../api/adminApi';
 import { adminHasRole } from '../../utils/auth';
 
 const inputCls = "px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors";

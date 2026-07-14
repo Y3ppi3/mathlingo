@@ -1,6 +1,6 @@
 // src/components/admin/TaskForm.tsx
 import { useState, useEffect } from 'react';
-import { createTask, updateTask, fetchSkills, Task, TaskLevel, TaskAnswerType, User, fetchUsers, Skill, fetchSubjects, Subject } from '../../utils/adminApi';
+import { createTask, updateTask, fetchSkills, Task, TaskLevel, TaskAnswerType, User, fetchUsers, Skill, fetchSubjects, Subject } from '../../api/adminApi';
 
 interface TaskFormProps {
     task: Task | null;

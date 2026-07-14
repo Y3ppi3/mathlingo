@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import * as math from 'mathjs';
-import Button from '../Button';
+import Button from '../ui/Button';
 
 interface MathLabProps {
   mode?: 'derivatives' | 'integrals';

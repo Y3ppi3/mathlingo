@@ -1,6 +1,6 @@
 // src/components/admin/UsersPanel.tsx
 import { useEffect, useState } from 'react';
-import { fetchUsers, User, deleteUser, updateUserStatus, bulkUpdateUserStatus } from '../../utils/adminApi';
+import { fetchUsers, User, deleteUser, updateUserStatus, bulkUpdateUserStatus } from '../../api/adminApi';
 import { adminHasRole } from '../../utils/auth';
 
 const UsersPanel = () => {

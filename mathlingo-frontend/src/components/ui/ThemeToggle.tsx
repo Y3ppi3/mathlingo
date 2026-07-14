@@ -1,4 +1,4 @@
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "../../context/ThemeContext";
 
 interface ThemeToggleProps {
     isCompact?: boolean; // Компактный вид для меню

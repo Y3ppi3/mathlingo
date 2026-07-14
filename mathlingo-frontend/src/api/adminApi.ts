@@ -633,7 +633,7 @@ const unwrapAdminResponse = <T,>(response: { status: number; data: unknown }): T
 
 // Игровые сценарии (R3 task 2 backend, task 5 конструктор) — конфиг
 // типизирован per-template в самой панели через DerivFallGameConfig /
-// IntegralBuilderGameConfig / MathLabGameConfig из utils/api.ts (тот же
+// IntegralBuilderGameConfig / MathLabGameConfig из api/studentApi.ts (тот же
 // контракт, что использует студенческий эндпоинт активного сценария).
 export type GameScenarioTemplateKey = 'derivfall' | 'integralbuilder' | 'mathlab';
 export type GameScenarioStatus = 'draft' | 'published' | 'archived';

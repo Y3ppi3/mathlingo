@@ -1,10 +1,10 @@
 // src/pages/AdventureMapPage.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import Navbar from '../components/layout/Navbar';
 import AdventureMap from '../components/adventure/AdventureMap';
-import { api } from '../utils/api';
-import '../styles/adventure-map.css'; // Импортируем новые стили
+import { api } from '../api/studentApi';
+import '../styles/adventure-map.css';
 
 interface Subject {
     id: number;
@@ -14,7 +14,7 @@ interface Subject {
     icon: string;
 }
 
-const AdventureMapPage: React.FC = () => {
+const AdventureMapPage = () => {
     const { subjectId } = useParams<{ subjectId: string }>();
     const navigate = useNavigate();
 
@@ -25,41 +25,42 @@ const AdventureMapPage: React.FC = () => {
     useEffect(() => {
         const fetchSubject = async () => {
             if (!subjectId) return;
-
             try {
                 setLoading(true);
                 const response = await api.get(`/api/subjects/${subjectId}`);
                 setSubject(response.data);
             } catch (err) {
-                console.error('Ошибка при загрузке предмета:', err);
                 setError('Не удалось загрузить данные о предмете. Попробуйте позже.');
             } finally {
                 setLoading(false);
             }
         };
-
         fetchSubject();
     }, [subjectId]);
 
     if (loading) return (
-        <div className="min-h-screen bg-gray-900 dark:bg-white">
+        <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
             <Navbar />
-            <div className="container mx-auto px-4 py-8 mt-16">
-                <div className="flex justify-center items-center h-96">
-                    <div className="text-lg text-gray-500">Загрузка...</div>
+            <div className="container mx-auto px-4 py-8 mt-16 flex justify-center items-center h-96">
+                <div className="flex items-center gap-3 text-gray-400 dark:text-gray-500 transition-colors">
+                    <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    Загрузка...
                 </div>
             </div>
         </div>
     );
 
     if (error || !subject) return (
-        <div className="min-h-screen bg-gray-900 dark:bg-white">
+        <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
             <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
-                <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg p-6 text-center">
-                    <h2 className="text-xl text-red-500 mb-4">{error || 'Предмет не найден'}</h2>
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 text-center transition-colors">
+                    <p className="text-red-500 dark:text-red-400 text-lg mb-4 transition-colors">
+                        {error || 'Предмет не найден'}
+                    </p>
                     <button
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        style={{ padding: '0.625rem 1.5rem' }}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors"
                         onClick={() => navigate('/dashboard')}
                     >
                         Вернуться на главную
@@ -70,45 +71,55 @@ const AdventureMapPage: React.FC = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gray-900 dark:bg-white">
+        <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
             <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
-                <div className="bg-gray-800 dark:bg-white rounded-lg shadow-lg p-6">
-                    {/* Шапка страницы */}
-                    <div className="flex items-center mb-6">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-6 transition-colors">
+
+                    {/* Шапка */}
+                    <div className="flex items-center gap-4 mb-6">
                         {subject.icon && (
                             <img
                                 src={subject.icon}
                                 alt={subject.name}
-                                className="w-16 h-16 mr-4 object-contain"
+                                className="w-14 h-14 object-contain flex-shrink-0"
                             />
                         )}
                         <div>
-                            <h1 className="text-2xl font-bold text-white dark:text-gray-900">{subject.name}</h1>
-                            <p className="text-gray-400 dark:text-gray-500">{subject.description}</p>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors">
+                                {subject.name}
+                            </h1>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm transition-colors">
+                                {subject.description}
+                            </p>
                         </div>
                     </div>
 
-                    <div className="mb-8">
-                        <h2 className="text-xl font-semibold mb-4 text-white dark:text-gray-900">Ваше приключение</h2>
-                        <p className="text-gray-300 dark:text-gray-600 mb-4">
-                            Пройдите через различные локации, выполняя увлекательные задания по математике.
+                    {/* Карта */}
+                    <div className="mb-6">
+                        <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white transition-colors">
+                            Ваше приключение
+                        </h2>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-4 transition-colors">
+                            Пройдите через различные локации, выполняя задания по математике.
                             Накапливайте очки и открывайте новые части карты!
                         </p>
 
-                        {/* Карта приключений с исправленными стилями */}
                         <div className="adventure-map-wrapper">
                             <AdventureMap subjectId={parseInt(subjectId!)} />
                         </div>
                     </div>
 
-                    <div className="mt-8 p-4 bg-blue-900/80 dark:bg-blue-50 rounded-lg">
-                        <h3 className="text-lg font-semibold mb-2 text-white dark:text-gray-900">Как играть?</h3>
-                        <ol className="list-decimal list-inside space-y-2 text-gray-300 dark:text-gray-700">
+                    {/* Инструкция */}
+                    <div className="p-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 rounded-xl transition-colors">
+                        <h3 className="text-base font-semibold mb-2 text-indigo-700 dark:text-indigo-300 transition-colors">
+                            Как играть?
+                        </h3>
+                        <ol className="list-decimal list-inside space-y-1.5 text-sm text-gray-600 dark:text-gray-400 transition-colors">
                             <li>Нажмите на доступную локацию на карте (яркие иконки)</li>
                             <li>Выберите группу заданий, которую хотите пройти</li>
                             <li>Решайте задания одно за другим, зарабатывая очки</li>
-                            <li>Завершив группу заданий, вы разблокируете новые локации на карте</li>
+                            <li>Завершив группу заданий, вы разблокируете новые локации</li>
                         </ol>
                     </div>
                 </div>

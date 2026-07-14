@@ -3,8 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { LogOut, AlertTriangle } from 'lucide-react';
-import Navbar from '../components/Navbar';
-import Button from '../components/Button';
+import Navbar from '../components/layout/Navbar';
+import Button from '../components/ui/Button';
 import DerivFall from '../components/games/DerivFall';
 import IntegralBuilder from '../components/games/IntegralBuilder';
 import MathLab from '../components/games/MathLab';
@@ -18,7 +18,7 @@ import {
     MathLabGameConfig,
     mapIntegralBuilderProblems,
     mapMathLabTasks,
-} from '../utils/api';
+} from '../api/studentApi';
 
 // Navbar = p-4 (16px) + h-16 (64px) + p-4 (16px) = 96px
 const NAVBAR_HEIGHT = 96;

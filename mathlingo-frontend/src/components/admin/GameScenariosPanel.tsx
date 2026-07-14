@@ -7,13 +7,13 @@ import {
     fetchSkills,
     GameScenario, GameScenarioTemplateKey, GameScenarioStatus,
     GameScenarioChecklistItem, CHECKLIST_ITEM_KEYS, Skill,
-} from '../../utils/adminApi';
+} from '../../api/adminApi';
 import {
     DerivFallGameConfig, DerivFallProblemConfig,
     IntegralBuilderGameConfig, IntegralBuilderProblemConfig,
     MathLabGameConfig, MathLabTaskConfig,
     mapIntegralBuilderProblems, mapMathLabTasks,
-} from '../../utils/api';
+} from '../../api/studentApi';
 import { adminHasRole } from '../../utils/auth';
 import DerivFall from '../games/DerivFall';
 import IntegralBuilder from '../games/IntegralBuilder';

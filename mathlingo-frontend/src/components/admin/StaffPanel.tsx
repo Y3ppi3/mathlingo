@@ -1,7 +1,7 @@
 // src/components/admin/StaffPanel.tsx
 import { useEffect, useState } from 'react';
 import { AxiosError } from 'axios';
-import { fetchAdmins, createAdmin, AdminAccount } from '../../utils/adminApi';
+import { fetchAdmins, createAdmin, AdminAccount } from '../../api/adminApi';
 
 const ROLE_LABELS: Record<AdminAccount['role'], string> = {
     superadmin: 'Superadmin',

@@ -1,90 +1,89 @@
-// src/components/adventure/RewardPopup.tsx
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import Button from '../ui/Button';
 
 interface RewardPopupProps {
-    points: number;
-    totalPoints: number;
-    taskGroupName: string;
+    score: number;
+    maxScore: number;
+    rewardPoints: number;
     onClose: () => void;
 }
 
-const RewardPopup: React.FC<RewardPopupProps> = ({ points, totalPoints, taskGroupName, onClose }) => {
+const RewardPopup = ({ score, maxScore, rewardPoints, onClose }: RewardPopupProps) => {
     const [animateStars, setAnimateStars] = useState(false);
 
-    // Вычисляем процент набранных очков
-    const percentage = Math.round((points / totalPoints) * 100);
+    // FIX: гарантируем корректные значения — score не может быть > maxScore для отображения
+    const safeMax    = Math.max(maxScore, score, 1);  // maxScore никогда не меньше score
+    const percentage = Math.min(Math.round((score / safeMax) * 100), 100); // cap 100%
+    const starCount  = Math.min(Math.ceil((percentage / 100) * 3), 3);     // cap 3 звезды
 
-    // Определяем сообщение в зависимости от результата
-    const getMessage = () => {
-        if (percentage >= 90) return 'Потрясающе! Вы настоящий гений!';
-        if (percentage >= 70) return 'Отличный результат! Вы многому научились!';
-        if (percentage >= 50) return 'Хороший результат! Есть куда расти!';
-        return 'Неплохое начало! Продолжайте изучать этот материал!';
-    };
-
-    // Количество звезд в зависимости от процента
-    const getStars = () => {
-        if (percentage >= 90) return 3;
-        if (percentage >= 70) return 2;
-        if (percentage >= 40) return 1;
-        return 0;
-    };
+    const message =
+        percentage >= 80 ? 'Отлично! Вы прекрасно справились!'
+            : percentage >= 50 ? 'Хорошая работа! Продолжайте практиковаться.'
+                :                    'Неплохое начало! Продолжайте изучать материал.';
 
     useEffect(() => {
-        // Запускаем анимацию через небольшую задержку
-        const timer = setTimeout(() => {
-            setAnimateStars(true);
-        }, 300);
-
-        return () => clearTimeout(timer);
+        const t = setTimeout(() => setAnimateStars(true), 300);
+        return () => clearTimeout(t);
     }, []);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 dark:bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4 text-center">
-                <h2 className="text-2xl font-bold mb-4">Задание завершено!</h2>
-                <p className="text-gray-300 dark:text-gray-600 mb-6">{taskGroupName}</p>
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/60">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors">
 
-                <div className="flex justify-center space-x-4 mb-6">
-                    {[...Array(3)].map((_, i) => (
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 transition-colors">
+                    Задание завершено!
+                </h2>
+
+                {/* Звёзды */}
+                <div className="flex justify-center gap-4 my-6">
+                    {[0, 1, 2].map(i => (
                         <div
                             key={i}
-                            className={`transition-all duration-500 ${
-                                i < getStars()
-                                    ? 'text-yellow-500 transform scale-100' + (animateStars ? ' animate-pulse' : '')
-                                    : 'text-gray-300 transform scale-90'
-                            }`}
+                            className="text-4xl transition-all duration-500"
+                            style={{
+                                transitionDelay: `${i * 200}ms`,
+                                transform: animateStars ? 'scale(1)' : 'scale(0)',
+                                color: i < starCount ? '#eab308' : '#d1d5db',
+                                filter: i < starCount && animateStars ? 'drop-shadow(0 0 6px #eab308)' : 'none',
+                            }}
                         >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                className="w-16 h-16"
-                            >
-                                <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
-                            </svg>
+                            ★
                         </div>
                     ))}
                 </div>
 
-                <div className="mb-6">
-                    <div className="text-lg font-semibold">{getMessage()}</div>
-                    <div className="mt-2 text-2xl font-bold text-blue-600 dark:text-blue-400">
-                        {points} / {totalPoints} очков
+                <p className="text-gray-600 dark:text-gray-400 mb-5 text-sm transition-colors">
+                    {message}
+                </p>
+
+                {/* Счёт */}
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 mb-4 transition-colors">
+                    <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1 transition-colors">
+                        {score} <span className="text-base font-medium text-gray-400 dark:text-gray-500">/ {safeMax} очков</span>
                     </div>
-                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+
+                    {/* Прогресс-бар */}
+                    <div className="h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden mt-2 transition-colors">
+                        <div
+                            className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-1000"
+                            style={{ width: `${percentage}%` }}
+                        />
+                    </div>
+                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 transition-colors">
                         {percentage}% выполнено
                     </div>
                 </div>
 
-                <div className="mt-6">
-                    <button
-                        onClick={onClose}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"
-                    >
-                        Вернуться к карте
-                    </button>
+                {/* Очки опыта */}
+                <div className="bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 rounded-xl p-3 mb-6 transition-colors">
+                    <div className="text-sm text-green-700 dark:text-green-400 font-medium transition-colors">
+                        🏆 Вы получили <span className="font-bold">{rewardPoints}</span> очков опыта!
+                    </div>
                 </div>
+
+                <Button onClick={onClose} className="w-full">
+                    Вернуться к карте
+                </Button>
             </div>
         </div>
     );
