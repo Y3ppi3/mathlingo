@@ -4,6 +4,7 @@ import secrets
 
 from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.database import get_db
@@ -196,6 +197,10 @@ origins = [
     "http://localhost:8080"
     # Добавьте здесь ваши production домены, когда перейдете в production
 ]
+
+# R4: сжимает тела ответов от 1KB — в первую очередь dashboard/overview и
+# списки (subjects/skills/tasks), самые крупные JSON-ответы в проекте.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
