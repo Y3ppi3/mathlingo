@@ -121,16 +121,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             clearLocalUserData();
             localStorage.removeItem(AUTH_TOKEN_KEY);
 
-            // Отправляем запрос на сервер (если не в режиме разработки)
-            if (process.env.NODE_ENV !== 'development') {
-                await fetch(`${API_URL}/api/logout/`, {
-                    method: "POST",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                });
-            } else {
-                console.log('Выход из системы в режиме разработки (без API-запроса)');
-            }
+            // Запрос на сервер обязателен в любом окружении — httpOnly
+            // cookie "token" может удалить только бэкенд (JS её не видит).
+            // Раньше в dev-режиме этот вызов пропускался, из-за чего
+            // реальная сессия на сервере не завершалась: после "выхода"
+            // куки оставались валидными, и следующая полная перезагрузка
+            // страницы снова аутентифицировала пользователя (найдено как
+            // баг — https://.../404 после logout вело в /profile).
+            await fetch(`${API_URL}/api/logout/`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+            });
 
             setIsAuthenticated(false);
             navigate("/login");
