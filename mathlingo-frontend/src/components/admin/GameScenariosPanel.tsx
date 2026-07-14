@@ -12,12 +12,14 @@ import {
     DerivFallGameConfig, DerivFallProblemConfig,
     IntegralBuilderGameConfig, IntegralBuilderProblemConfig,
     MathLabGameConfig, MathLabTaskConfig,
-    mapIntegralBuilderProblems, mapMathLabTasks,
+    mapIntegralBuilderProblems, mapMathLabTasks, mapLimitsTasks, mapSeriesTasks,
 } from '../../api/studentApi';
 import { adminHasRole } from '../../utils/auth';
 import DerivFall from '../games/DerivFall';
 import IntegralBuilder from '../games/IntegralBuilder';
 import MathLab from '../games/MathLab';
+import LimitsApproach from '../games/LimitsApproach';
+import SeriesFilling from '../games/SeriesFilling';
 
 // R3 task 5: конструктор игровых сценариев без кода — форма конфигурации
 // поверх контракта GameConfigSchema (см. mathlingo-backend/app/services/
@@ -36,6 +38,13 @@ const TEMPLATE_LABEL: Record<GameScenarioTemplateKey, string> = {
     derivfall: 'DerivFall (падение)',
     integralbuilder: 'IntegralBuilder (сборка)',
     mathlab: 'MathLab (лаборатория)',
+};
+
+const MATHLAB_MODE_LABEL: Record<'derivatives' | 'integrals' | 'limits' | 'series', string> = {
+    derivatives: 'Производные',
+    integrals: 'Интегралы',
+    limits: 'Приближение (пределы)',
+    series: 'Наполнение (ряды)',
 };
 
 const STATUS_LABEL: Record<GameScenarioStatus, string> = {
@@ -105,12 +114,22 @@ const StringListEditor = ({ label, values, onChange, placeholder }: {
 type FormConfig =
     | { template_key: 'derivfall'; difficulty: number; time_limit: number; problems: DerivFallProblemConfig[] }
     | { template_key: 'integralbuilder'; initial_difficulty: number; time_limit: number; problems: IntegralBuilderProblemConfig[] }
-    | { template_key: 'mathlab'; mode: 'derivatives' | 'integrals'; difficulty: number; tasks: MathLabTaskConfig[] };
+    | { template_key: 'mathlab'; mode: 'derivatives' | 'integrals' | 'limits' | 'series'; difficulty: number; tasks: MathLabTaskConfig[] };
 
 const emptyConfig = (key: GameScenarioTemplateKey): FormConfig => {
     if (key === 'derivfall') return { template_key: 'derivfall', difficulty: 3, time_limit: 60, problems: [] };
     if (key === 'integralbuilder') return { template_key: 'integralbuilder', initial_difficulty: 3, time_limit: 300, problems: [] };
     return { template_key: 'mathlab', mode: 'derivatives', difficulty: 3, tasks: [] };
+};
+
+// Задачи derivatives/integrals (свободный ввод, options необязательны) и
+// limits/series (обязательный выбор из options + строгий type, см.
+// game_config.py _limits_and_series_tasks_are_multiple_choice) структурно
+// разные — новая задача заполняется под тот режим, что выбран сейчас.
+const emptyMathLabTask = (mode: 'derivatives' | 'integrals' | 'limits' | 'series'): MathLabTaskConfig => {
+    if (mode === 'limits') return { id: genRowId('t'), type: 'limit', question: '', function_expression: '', correct_answer: '', options: ['', ''], difficulty: 3, hints: [], approach_x: '' };
+    if (mode === 'series') return { id: genRowId('t'), type: 'series', question: '', function_expression: '', correct_answer: '', options: ['', ''], difficulty: 3, hints: [] };
+    return { id: genRowId('t'), type: 'calculate', question: '', function_expression: '', correct_answer: '', options: [], difficulty: 3, hints: [] };
 };
 
 const DerivFallForm = ({ config, onChange }: { config: Extract<FormConfig, { template_key: 'derivfall' }>; onChange: (c: FormConfig) => void }) => (
@@ -189,52 +208,97 @@ const IntegralBuilderForm = ({ config, onChange }: { config: Extract<FormConfig,
     </div>
 );
 
-const MathLabForm = ({ config, onChange }: { config: Extract<FormConfig, { template_key: 'mathlab' }>; onChange: (c: FormConfig) => void }) => (
-    <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-            <div>
-                <label className={labelCls}>Режим</label>
-                <select className={inputCls} value={config.mode} onChange={e => onChange({ ...config, mode: e.target.value as 'derivatives' | 'integrals' })}>
-                    <option value="derivatives">Производные</option><option value="integrals">Интегралы</option>
-                </select>
-            </div>
-            <div><label className={labelCls}>Сложность (1–5)</label><input type="number" min={1} max={5} className={inputCls} value={config.difficulty} onChange={e => onChange({ ...config, difficulty: parseInt(e.target.value) || 1 })} /></div>
-        </div>
-        <p className="text-xs text-gray-400 dark:text-gray-500">Вкладка «Графики» (живой калькулятор) конструктору не подчиняется — только вкладка «Задачи».</p>
-        <div className="space-y-3">
-            <div className="flex items-center justify-between">
-                <label className={labelCls}>Задачи ({config.tasks.length})</label>
-                <button type="button" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-                    onClick={() => onChange({ ...config, tasks: [...config.tasks, { id: genRowId('t'), type: 'calculate', question: '', function_expression: '', correct_answer: '', options: [], difficulty: 3, hints: [] }] })}
-                >+ Добавить задачу</button>
-            </div>
-            {config.tasks.map((t, i) => (
-                <div key={t.id} className="p-3 border border-gray-200 dark:border-gray-600 rounded-xl space-y-2.5">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-400 dark:text-gray-500">#{i + 1}</span>
-                        <button type="button" onClick={() => onChange({ ...config, tasks: config.tasks.filter((_, j) => j !== i) })} className="text-xs text-red-500 hover:underline">Удалить</button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className={labelCls}>Тип</label>
-                            <select className={inputCls} value={t.type} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, type: e.target.value as MathLabTaskConfig['type'] } : x) })}>
-                                <option value="calculate">calculate</option><option value="find">find</option><option value="analyze">analyze</option>
-                            </select>
-                        </div>
-                        <div><label className={labelCls}>Сложность задачи (1–5)</label><input type="number" min={1} max={5} className={inputCls} value={t.difficulty} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, difficulty: parseInt(e.target.value) || 1 } : x) })} /></div>
-                    </div>
-                    <div><label className={labelCls}>Вопрос</label><input className={inputCls} value={t.question} placeholder="Найдите производную: y'(x) = x³" onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, question: e.target.value } : x) })} /></div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div><label className={labelCls}>Выражение функции</label><input className={inputCls} value={t.function_expression} placeholder="x^3" onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, function_expression: e.target.value } : x) })} /></div>
-                        <div><label className={labelCls}>Правильный ответ</label><input className={inputCls} value={t.correct_answer} placeholder="3x^2" onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, correct_answer: e.target.value } : x) })} /></div>
-                    </div>
-                    <StringListEditor label="Варианты ответа (необязательно)" values={t.options ?? []} onChange={v => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, options: v } : x) })} />
-                    <StringListEditor label="Подсказки" values={t.hints} onChange={v => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, hints: v } : x) })} />
+const MathLabForm = ({ config, onChange }: { config: Extract<FormConfig, { template_key: 'mathlab' }>; onChange: (c: FormConfig) => void }) => {
+    const isChoiceMode = config.mode === 'limits' || config.mode === 'series';
+
+    const handleModeChange = (mode: typeof config.mode) => {
+        // derivatives/integrals (свободный ввод) и limits/series (строгий
+        // MC-формат) несовместимы по форме задачи — при смене режима
+        // безопаснее начать список задач с нуля, чем тащить старые записи,
+        // которые не пройдут валидацию бэкенда (game_config.py).
+        onChange({ ...config, mode, tasks: [] });
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <label className={labelCls}>Режим</label>
+                    <select className={inputCls} value={config.mode} onChange={e => handleModeChange(e.target.value as typeof config.mode)}>
+                        {(Object.keys(MATHLAB_MODE_LABEL) as (typeof config.mode)[]).map(m => <option key={m} value={m}>{MATHLAB_MODE_LABEL[m]}</option>)}
+                    </select>
                 </div>
-            ))}
+                <div><label className={labelCls}>Сложность (1–5)</label><input type="number" min={1} max={5} className={inputCls} value={config.difficulty} onChange={e => onChange({ ...config, difficulty: parseInt(e.target.value) || 1 })} /></div>
+            </div>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+                {config.mode === 'limits' && 'Ответ всегда выбор из вариантов — укажите точку приближения и варианты, один из которых совпадает с правильным ответом.'}
+                {config.mode === 'series' && 'Ответ всегда выбор из вариантов — укажите формулу общего члена ряда a(n) (переменная n, не x).'}
+                {!isChoiceMode && 'Вкладка «Графики» (живой калькулятор) конструктору не подчиняется — только вкладка «Задачи».'}
+            </p>
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <label className={labelCls}>Задачи ({config.tasks.length})</label>
+                    <button type="button" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                        onClick={() => onChange({ ...config, tasks: [...config.tasks, emptyMathLabTask(config.mode)] })}
+                    >+ Добавить задачу</button>
+                </div>
+                {config.tasks.map((t, i) => (
+                    <div key={t.id} className="p-3 border border-gray-200 dark:border-gray-600 rounded-xl space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-400 dark:text-gray-500">#{i + 1}</span>
+                            <button type="button" onClick={() => onChange({ ...config, tasks: config.tasks.filter((_, j) => j !== i) })} className="text-xs text-red-500 hover:underline">Удалить</button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            {!isChoiceMode && (
+                                <div>
+                                    <label className={labelCls}>Тип</label>
+                                    <select className={inputCls} value={t.type} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, type: e.target.value as MathLabTaskConfig['type'] } : x) })}>
+                                        <option value="calculate">calculate</option><option value="find">find</option><option value="analyze">analyze</option>
+                                    </select>
+                                </div>
+                            )}
+                            <div><label className={labelCls}>Сложность задачи (1–5)</label><input type="number" min={1} max={5} className={inputCls} value={t.difficulty} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, difficulty: parseInt(e.target.value) || 1 } : x) })} /></div>
+                        </div>
+                        <div>
+                            <label className={labelCls}>Вопрос</label>
+                            <input
+                                className={inputCls}
+                                value={t.question}
+                                placeholder={config.mode === 'series' ? 'Сходится ли ряд с общим членом a(n)?' : config.mode === 'limits' ? 'Найдите предел функции при x → 2' : "Найдите производную: y'(x) = x³"}
+                                onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, question: e.target.value } : x) })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className={labelCls}>{config.mode === 'series' ? 'Формула общего члена a(n)' : 'Выражение функции'}</label>
+                                <input className={inputCls} value={t.function_expression} placeholder={config.mode === 'series' ? '1/2^n' : 'x^3'} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, function_expression: e.target.value } : x) })} />
+                            </div>
+                            {config.mode === 'limits' ? (
+                                <div>
+                                    <label className={labelCls}>Точка приближения</label>
+                                    <input className={inputCls} value={t.approach_x ?? ''} placeholder="2 / infinity / -infinity" onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, approach_x: e.target.value } : x) })} />
+                                </div>
+                            ) : !isChoiceMode ? (
+                                <div><label className={labelCls}>Правильный ответ</label><input className={inputCls} value={t.correct_answer} placeholder="3x^2" onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, correct_answer: e.target.value } : x) })} /></div>
+                            ) : null}
+                        </div>
+                        <StringListEditor label={isChoiceMode ? 'Варианты ответа' : 'Варианты ответа (необязательно)'} values={t.options ?? []} onChange={v => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, options: v } : x) })} />
+                        {isChoiceMode && (
+                            <div>
+                                <label className={labelCls}>Правильный ответ</label>
+                                <select className={inputCls} value={t.correct_answer} onChange={e => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, correct_answer: e.target.value } : x) })}>
+                                    <option value="">— выберите из вариантов —</option>
+                                    {(t.options ?? []).filter(Boolean).map((opt, k) => <option key={k} value={opt}>{opt}</option>)}
+                                </select>
+                            </div>
+                        )}
+                        <StringListEditor label="Подсказки" values={t.hints} onChange={v => onChange({ ...config, tasks: config.tasks.map((x, j) => j === i ? { ...x, hints: v } : x) })} />
+                    </div>
+                ))}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 // ── Форма создания/редактирования сценария ──────────────────────────────────────
 const ScenarioForm = ({ initial, skills, onClose, onSaved }: { initial: GameScenario | null; skills: Skill[]; onClose: () => void; onSaved: () => void }) => {
@@ -368,6 +432,12 @@ const ScenarioPreview = ({ scenario, onClose }: { scenario: GameScenario; onClos
             })()}
             {scenario.template_key === 'mathlab' && (() => {
                 const config = scenario.config as unknown as MathLabGameConfig;
+                if (config.mode === 'limits') {
+                    return <LimitsApproach difficulty={config.difficulty} tasksSource={mapLimitsTasks(config.tasks)} onComplete={() => {}} />;
+                }
+                if (config.mode === 'series') {
+                    return <SeriesFilling difficulty={config.difficulty} tasksSource={mapSeriesTasks(config.tasks)} onComplete={() => {}} />;
+                }
                 return (
                     <MathLab
                         mode={config.mode}
