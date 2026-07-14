@@ -424,6 +424,49 @@ export interface MathLabGameConfig {
     tasks: MathLabTaskConfig[];
 }
 
+// Мапперы snake_case (API) -> camelCase (пропсы компонентов) — общие для
+// GamePage.tsx (студенческий рендер) и admin GameScenariosPanel.tsx
+// (live-предпросмотр "от лица ученика" при конструировании сценария).
+export interface IntegralBuilderProblemProp {
+    id: string;
+    question: string;
+    solutionPieces: string[];
+    distractors: string[];
+    difficulty: 'easy' | 'medium' | 'hard';
+}
+
+export const mapIntegralBuilderProblems = (problems: IntegralBuilderProblemConfig[]): IntegralBuilderProblemProp[] =>
+    problems.map(p => ({
+        id: p.id,
+        question: p.question,
+        solutionPieces: p.solution_pieces,
+        distractors: p.distractors,
+        difficulty: p.difficulty,
+    }));
+
+export interface MathLabTaskProp {
+    id: string;
+    type: 'analyze' | 'find' | 'calculate';
+    question: string;
+    functionExpression: string;
+    correctAnswer: string;
+    options?: string[];
+    difficulty: number;
+    hints: string[];
+}
+
+export const mapMathLabTasks = (tasks: MathLabTaskConfig[]): MathLabTaskProp[] =>
+    tasks.map(t => ({
+        id: t.id,
+        type: t.type,
+        question: t.question,
+        functionExpression: t.function_expression,
+        correctAnswer: t.correct_answer,
+        options: t.options,
+        difficulty: t.difficulty,
+        hints: t.hints,
+    }));
+
 export interface ActiveGameScenario<TConfig> {
     id: number;
     template_key: string;

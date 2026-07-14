@@ -52,6 +52,18 @@ const ZONES: Zone[] = [
         ),
     },
     {
+        path: 'game-scenarios',
+        label: 'Игровые сценарии',
+        // teacher: может отмечать чек-лист/предпросматривать, но не публиковать
+        // (см. docs/roadmap/product-technical-plan.md R3 §5) — гейтится внутри панели.
+        roles: null,
+        icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+        ),
+    },
+    {
         path: 'students',
         label: 'Учащиеся',
         roles: null,
