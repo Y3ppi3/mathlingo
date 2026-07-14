@@ -23,10 +23,26 @@ from app.schemas import (
     GameScenarioChecklistItemResponse, GameScenarioCreate, GameScenarioResponse, GameScenarioUpdate,
 )
 from app.auth import get_admin_current_user, get_current_user, require_role
-from app.services import game_attempts, game_config
+from app.services import cache, game_attempts, game_config
 
 router = APIRouter(prefix="/admin/game-scenarios", tags=["game_scenarios"])
 student_router = APIRouter(prefix="/gamification/game-scenarios", tags=["game_scenarios"])
+
+# R4: GET /gamification/game-scenarios/active/{template_key} дёргается на
+# каждый старт каждой игры каждым учеником — самый горячий student-facing
+# эндпоинт, при этом меняется редко (только publish/archive/update того же
+# template_key). TTL — подстраховка на случай пропущенной инвалидации, не
+# основной механизм актуальности.
+ACTIVE_SCENARIO_CACHE_PREFIX = "game_scenario_active"
+ACTIVE_SCENARIO_CACHE_TTL = 300
+
+
+def _active_scenario_cache_key(template_key: str, mode: Optional[str]) -> str:
+    return f"{ACTIVE_SCENARIO_CACHE_PREFIX}:{template_key}:{mode or '_'}"
+
+
+def _invalidate_active_scenario_cache(template_key: str) -> None:
+    cache.delete_prefix(f"{ACTIVE_SCENARIO_CACHE_PREFIX}:{template_key}:")
 
 # Создание/редактирование/публикация/архивация сценария — superadmin и
 # content_manager (симметрично CAN_MANAGE_CONTENT в admin.py). Просмотр,
@@ -265,6 +281,7 @@ def publish_scenario(
     scenario.published_at = datetime.utcnow()
     db.commit()
     db.refresh(scenario)
+    _invalidate_active_scenario_cache(scenario.template_key)
     return scenario
 
 
@@ -281,6 +298,7 @@ def archive_scenario(
     scenario.status = "archived"
     db.commit()
     db.refresh(scenario)
+    _invalidate_active_scenario_cache(scenario.template_key)
     return scenario
 
 
@@ -312,6 +330,11 @@ def get_active_game_scenario(
     if template_key not in GameScenario.TEMPLATE_KEYS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Неизвестный template_key: {template_key}")
 
+    cache_key = _active_scenario_cache_key(template_key, mode)
+    cached = cache.get_json(cache_key)
+    if cached is not None:
+        return cached
+
     now = datetime.utcnow()
     scenarios = (
         db.query(GameScenario)
@@ -330,7 +353,10 @@ def get_active_game_scenario(
     if not scenarios:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Для этого шаблона нет доступного опубликованного сценария")
 
-    return scenarios[0]
+    result = ActiveGameScenarioResponse.model_validate(scenarios[0], from_attributes=True)
+    result_dict = result.model_dump(mode="json")
+    cache.set_json(cache_key, result_dict, ttl=ACTIVE_SCENARIO_CACHE_TTL)
+    return result_dict
 
 
 def _is_scenario_active(scenario: GameScenario, now: datetime) -> bool:

@@ -1,6 +1,5 @@
 
 import os
-import time
 import secrets
 
 from fastapi import FastAPI, Response, Request
@@ -10,6 +9,7 @@ from fastapi.responses import JSONResponse
 from app.database import get_db
 from app.models import AuditLog
 from app.auth import get_admin_current_user_optional
+from app.services import cache
 from app.routes import (
     users, tasks, admin, admin_tasks, admin_ai, admin_content_quality,
     gamification_maps, gamification_tasks, gamification_mastery,
@@ -19,9 +19,11 @@ from app.routes.admin_gamification import router as admin_gamification_router
 
 app = FastAPI(title="MathLingo API")
 
-csrf_tokens = {}
-
 CSRF_TOKEN_EXPIRY = 3600
+
+
+def _csrf_key(auth_token: str) -> str:
+    return f"csrf:{auth_token}"
 
 
 @app.middleware("http")
@@ -43,7 +45,11 @@ async def csrf_protection(request: Request, call_next):
             auth_token = request.cookies.get("token")
             if auth_token:
                 csrf_token = secrets.token_hex(16)
-                csrf_tokens[auth_token] = (csrf_token, time.time())
+                # SETEX сам обрабатывает истечение — раньше это был dict в
+                # памяти процесса uvicorn: токен, выданный одним worker'ом,
+                # не проходил проверку в другом, а рестарт ронял все сессии
+                # разом. Redis убирает оба случая (R4).
+                cache.get_client().setex(_csrf_key(auth_token), CSRF_TOKEN_EXPIRY, csrf_token)
                 response.headers["X-CSRF-Token"] = csrf_token
 
         return response
@@ -66,20 +72,12 @@ async def csrf_protection(request: Request, call_next):
                 status_code=403
             )
 
-        # Проверяем валидность CSRF-токена
-        stored_data = csrf_tokens.get(auth_token)
-        if not stored_data or stored_data[0] != csrf_token:
+        # Проверяем валидность CSRF-токена (отсутствие в Redis = не найден
+        # или уже истёк — TTL уже отработал, отдельная проверка не нужна).
+        stored_token = cache.get_client().get(_csrf_key(auth_token))
+        if not stored_token or stored_token != csrf_token:
             return JSONResponse(
                 content={"detail": "Недействительный CSRF-токен"},
-                status_code=403
-            )
-
-        # Проверяем, не истек ли срок действия токена
-        timestamp = stored_data[1]
-        if time.time() - timestamp > CSRF_TOKEN_EXPIRY:
-            csrf_tokens.pop(auth_token, None)
-            return JSONResponse(
-                content={"detail": "Срок действия CSRF-токена истек"},
                 status_code=403
             )
     return await call_next(request)

@@ -12,3 +12,4 @@ pydantic[email]
 python-jose[cryptography]
 python-multipart
 bleach
+redis

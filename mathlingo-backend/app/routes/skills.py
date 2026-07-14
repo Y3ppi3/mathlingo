@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import Admin, Skill, Subject
 from app.schemas import SkillCreate, SkillResponse, SkillUpdate
 from app.auth import get_admin_current_user, require_role
+from app.services import cache
 
 router = APIRouter(prefix="/admin/skills", tags=["skills"])
 
@@ -14,6 +15,9 @@ router = APIRouter(prefix="/admin/skills", tags=["skills"])
 # создании контента). Мутации — только superadmin/content_manager, см.
 # docs/roadmap/product-technical-plan.md (R1, §5).
 CAN_MANAGE = require_role("superadmin", "content_manager")
+
+SKILLS_LIST_CACHE_PREFIX = "skills_list"
+SKILLS_LIST_CACHE_TTL = 120
 
 
 @router.get("/", response_model=List[SkillResponse])
@@ -24,10 +28,18 @@ def get_skills(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_admin_current_user),
 ):
+    cache_key = f"{SKILLS_LIST_CACHE_PREFIX}:{subject_id}:{skip}:{limit}"
+    cached = cache.get_json(cache_key)
+    if cached is not None:
+        return cached
+
     query = db.query(Skill)
     if subject_id is not None:
         query = query.filter(Skill.subject_id == subject_id)
-    return query.order_by(Skill.order, Skill.id).offset(skip).limit(limit).all()
+    skills = query.order_by(Skill.order, Skill.id).offset(skip).limit(limit).all()
+    result = [SkillResponse.model_validate(s, from_attributes=True).model_dump(mode="json") for s in skills]
+    cache.set_json(cache_key, result, ttl=SKILLS_LIST_CACHE_TTL)
+    return result
 
 
 @router.get("/{skill_id}", response_model=SkillResponse)
@@ -65,6 +77,7 @@ def create_skill(
     db.add(db_skill)
     db.commit()
     db.refresh(db_skill)
+    cache.delete_prefix(f"{SKILLS_LIST_CACHE_PREFIX}:")
     return db_skill
 
 
@@ -96,4 +109,5 @@ def update_skill(
 
     db.commit()
     db.refresh(db_skill)
+    cache.delete_prefix(f"{SKILLS_LIST_CACHE_PREFIX}:")
     return db_skill

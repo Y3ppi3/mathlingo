@@ -43,6 +43,55 @@ def test_superadmin_can_hard_delete_subject(client, admin, subject):
     assert response.status_code == 204
 
 
+# Ранее в admin.py существовало два конкурирующих @router.delete("/subjects/{subject_id}")
+# — второй (с поддержкой force) был мёртвым кодом: FastAPI матчит первый
+# зарегистрированный роут, поэтому force=true никогда не выполнял каскадное
+# удаление, хотя фронтенд (adminApi.ts deleteSubject) на это рассчитывал.
+# Слиты в один эндпоинт (R4) — эти тесты закрывают оба ветвления.
+def test_delete_subject_with_tasks_requires_force(client, admin, content_manager_admin, subject):
+    create = client.post(
+        "/admin/tasks",
+        headers=authorization_header(content_manager_admin),
+        json={"title": "Find the derivative", "subject": subject.code},
+    )
+    assert create.status_code == 200, create.text
+
+    response = client.delete(
+        f"/admin/subjects/{subject.id}",
+        headers=authorization_header(admin),
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert body["status"] == "confirmation_required"
+    assert body["related_data"]["tasks_count"] == 1
+
+
+def test_delete_subject_with_force_unlinks_tasks_and_deletes(client, admin, content_manager_admin, subject, db):
+    from app.models import Subject as SubjectModel, Task as TaskModel
+
+    create = client.post(
+        "/admin/tasks",
+        headers=authorization_header(content_manager_admin),
+        json={"title": "Find the derivative", "subject": subject.code},
+    )
+    assert create.status_code == 200, create.text
+    task_id = create.json()["id"]
+
+    response = client.delete(
+        f"/admin/subjects/{subject.id}?force=true",
+        headers=authorization_header(admin),
+    )
+    assert response.status_code == 204
+
+    # Задание не удаляется вместе с разделом — только отвязывается
+    # (subject_id=None).
+    db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
+    assert db_task is not None
+    assert db_task.subject_id is None
+
+    assert db.query(SubjectModel).filter(SubjectModel.id == subject.id).first() is None
+
+
 def test_teacher_cannot_update_subject(client, teacher_admin, subject):
     response = client.put(
         f"/admin/subjects/{subject.id}",
