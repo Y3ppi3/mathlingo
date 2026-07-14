@@ -7,7 +7,6 @@ import Navbar from '../components/layout/Navbar';
 import Button from '../components/ui/Button';
 import DerivFall from '../components/games/DerivFall';
 import IntegralBuilder from '../components/games/IntegralBuilder';
-import MathLab from '../components/games/MathLab';
 import LimitsApproach from '../components/games/LimitsApproach';
 import RewardPopup from '../components/adventure/RewardPopup';
 import { mockGameData } from '../utils/gameMockData';
@@ -18,7 +17,6 @@ import {
     IntegralBuilderGameConfig,
     MathLabGameConfig,
     mapIntegralBuilderProblems,
-    mapMathLabTasks,
     mapLimitsTasks,
 } from '../api/studentApi';
 
@@ -43,7 +41,6 @@ const GamePage = () => {
     } | null>(null);
     const [derivFallConfig, setDerivFallConfig] = useState<DerivFallGameConfig | null>(null);
     const [integralBuilderConfig, setIntegralBuilderConfig] = useState<IntegralBuilderGameConfig | null>(null);
-    const [mathLabConfig, setMathLabConfig] = useState<MathLabGameConfig | null>(null);
     const [limitsConfig, setLimitsConfig] = useState<MathLabGameConfig | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
 
@@ -77,14 +74,6 @@ const GamePage = () => {
                 } else if (gameId === 'integral-builder') {
                     const scenario = await fetchActiveGameScenario<IntegralBuilderGameConfig>('integralbuilder');
                     setIntegralBuilderConfig(scenario.config);
-                    activeScenarioIdRef.current = scenario.id;
-                } else if (gameId === 'math-lab-derivatives') {
-                    const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'derivatives');
-                    setMathLabConfig(scenario.config);
-                    activeScenarioIdRef.current = scenario.id;
-                } else if (gameId === 'math-lab-integrals') {
-                    const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'integrals');
-                    setMathLabConfig(scenario.config);
                     activeScenarioIdRef.current = scenario.id;
                 } else if (gameId === 'limits-approach') {
                     const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'limits');
@@ -144,17 +133,6 @@ const GamePage = () => {
                         initialDifficulty={customDifficulty !== undefined ? customDifficulty : integralBuilderConfig.initial_difficulty}
                         timeLimit={integralBuilderConfig.time_limit}
                         problemsSource={mapIntegralBuilderProblems(integralBuilderConfig.problems)}
-                        onComplete={handleGameComplete}
-                    />
-                );
-            case 'math-lab-derivatives':
-            case 'math-lab-integrals':
-                if (!mathLabConfig || mathLabConfig.mode === 'limits') return null;
-                return (
-                    <MathLab
-                        mode={mathLabConfig.mode}
-                        difficulty={customDifficulty !== undefined ? customDifficulty : mathLabConfig.difficulty}
-                        tasksSource={mapMathLabTasks(mathLabConfig.tasks)}
                         onComplete={handleGameComplete}
                     />
                 );

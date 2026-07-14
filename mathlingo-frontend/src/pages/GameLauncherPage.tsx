@@ -87,26 +87,9 @@ const GameLauncherPage = () => {
                         difficulty: difficulty ?? 4,
                         estimatedTime: 10,
                     },
-                    {
-                        id: 'math-lab-derivatives',
-                        title: 'MathLab: Производные',
-                        description: 'Изучайте функции, их производные и решайте задачи!',
-                        icon: '🔬',
-                        mechanicType: 'лаборатория',
-                        subject: 'derivatives',
-                        difficulty: difficulty ?? 3,
-                        estimatedTime: 15,
-                    },
-                    {
-                        id: 'math-lab-integrals',
-                        title: 'MathLab: Интегралы',
-                        description: 'Изучайте функции, их интегралы и решайте задачи!',
-                        icon: '🧪',
-                        mechanicType: 'лаборатория',
-                        subject: 'integrals',
-                        difficulty: difficulty ?? 4,
-                        estimatedTime: 15,
-                    },
+                    // MathLab: Производные/Интегралы архивированы (R4) — см.
+                    // gameMockData.ts. DerivFall/IntegralBuilder уже покрывают
+                    // эти темы своими механиками.
                     {
                         id: 'limits-approach',
                         title: 'Приближение',
