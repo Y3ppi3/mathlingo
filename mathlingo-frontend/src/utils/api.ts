@@ -342,6 +342,68 @@ export const fetchSkillMastery = async (skillId: number): Promise<MasteryResult>
     return response.data;
 };
 
+// Уровень с "причиной" + временный выбор соседнего (R2 task 4)
+export type SkillLevelValue = 'basic' | 'standard' | 'advanced';
+
+export interface LevelOverrideInfo {
+    chosen_level: SkillLevelValue;
+    reason: string;
+    expires_at: string;
+}
+
+export interface SkillLevel {
+    skill_id: number;
+    computed_level: SkillLevelValue | null;
+    confidence: number;
+    sample_size: number;
+    factors: { accuracy: number; avg_time_ratio: number | null; hints_rate: number } | null;
+    override: LevelOverrideInfo | null;
+    effective_level: SkillLevelValue | null;
+}
+
+export const fetchSkillLevel = async (skillId: number): Promise<SkillLevel> => {
+    const response = await api.get(`/gamification/skills/${skillId}/level`);
+    return response.data;
+};
+
+export const setSkillLevelOverride = async (skillId: number, chosenLevel: SkillLevelValue): Promise<SkillLevel> => {
+    const response = await api.post(`/gamification/skills/${skillId}/level-override`, { chosen_level: chosenLevel });
+    return response.data;
+};
+
+export const clearSkillLevelOverride = async (skillId: number): Promise<SkillLevel> => {
+    const response = await api.delete(`/gamification/skills/${skillId}/level-override`);
+    return response.data;
+};
+
+// Конфиг игрового сценария (R3 task 3) — DerivFall больше не хранит задания
+// в коде, а запрашивает текущий опубликованный сценарий шаблона здесь.
+export interface DerivFallProblemConfig {
+    id: string;
+    problem: string;
+    options: string[];
+    answer: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+}
+
+export interface DerivFallGameConfig {
+    difficulty: number;
+    time_limit: number;
+    problems: DerivFallProblemConfig[];
+}
+
+export interface ActiveGameScenario<TConfig> {
+    id: number;
+    template_key: string;
+    config: TConfig;
+    level_range: number[] | null;
+}
+
+export const fetchActiveGameScenario = async <TConfig,>(templateKey: string): Promise<ActiveGameScenario<TConfig>> => {
+    const response = await api.get(`/gamification/game-scenarios/active/${templateKey}`);
+    return response.data;
+};
+
 // API для прогресса пользователя
 export const fetchUserProgress = async () => {
     try {

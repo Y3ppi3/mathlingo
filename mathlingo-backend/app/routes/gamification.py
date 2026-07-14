@@ -9,9 +9,9 @@ import os
 from dotenv import load_dotenv
 
 from app.database import get_db
-from app.models import Admin, Attempt, Diagnostic, MasteryState, User, Task, TaskGroup, MapLocation, AdventureMap, UserProgress, Achievement
+from app.models import Admin, Attempt, Diagnostic, GameScenario, MasteryState, User, Task, TaskGroup, MapLocation, AdventureMap, UserProgress, Achievement
 from app.auth import get_admin_current_user, get_current_user, get_token_from_request, require_role
-from app.services import mastery
+from app.services import content_quality, mastery
 from app.schemas import (
     AdminCreate,
     AdminResponse,
@@ -34,6 +34,7 @@ from app.schemas import (
     SkillLevelResponse,
     LevelOverrideRequest,
     LevelOverrideResponse,
+    ActiveGameScenarioResponse,
 )
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -495,6 +496,10 @@ def submit_answer(
     if task.skill_id is not None:
         mastery.recompute(db, current_user.id, task.skill_id)
 
+    # Пост-публикационный мониторинг (R2 task 7): только для опубликованных
+    # AI-заданий, no-op для ручного контента и черновиков.
+    content_quality.check_for_anomaly(db, task)
+
     return TaskSubmissionResponse(
         isCorrect=is_correct,
         points=points,
@@ -683,3 +688,39 @@ def clear_skill_level_override(
 ):
     mastery.clear_override(db, current_user.id, skill_id)
     return get_skill_level(skill_id, db, current_user)
+
+
+@router.get("/game-scenarios/active/{template_key}", response_model=ActiveGameScenarioResponse)
+def get_active_game_scenario(
+        template_key: str,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    """
+    R3 task 3: единственная точка, откуда игровые компоненты берут конфиг —
+    DerivFall (и, после задачи 4, IntegralBuilder/MathLab) больше не
+    хранят задания в коде, а запрашивают текущий опубликованный сценарий
+    шаблона здесь. Если опубликованных сценариев несколько (после задачи 5,
+    когда появится конструктор) — берём самый свежий по published_at; выбор
+    "какой именно сценарий подходит ученику" (level_range/группы) — вне
+    scope этой задачи, минимально жизнеспособная выборка.
+    """
+    if template_key not in GameScenario.TEMPLATE_KEYS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Неизвестный template_key: {template_key}")
+
+    now = datetime.utcnow()
+    scenario = (
+        db.query(GameScenario)
+        .filter(
+            GameScenario.template_key == template_key,
+            GameScenario.status == "published",
+            (GameScenario.availability_from == None) | (GameScenario.availability_from <= now),
+            (GameScenario.availability_to == None) | (GameScenario.availability_to >= now),
+        )
+        .order_by(GameScenario.published_at.desc())
+        .first()
+    )
+    if not scenario:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Для этого шаблона нет доступного опубликованного сценария")
+
+    return scenario
