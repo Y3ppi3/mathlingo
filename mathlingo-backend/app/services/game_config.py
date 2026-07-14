@@ -58,20 +58,44 @@ class IntegralBuilderConfig(BaseModel):
 
 class MathLabTaskConfig(BaseModel):
     id: str
-    type: Literal["analyze", "find", "calculate"]
+    type: Literal["analyze", "find", "calculate", "limit"]
     question: str
     function_expression: str
     correct_answer: str
     options: Optional[List[str]] = None
     difficulty: int = Field(ge=1, le=5)
     hints: List[str] = Field(default_factory=list)
+    # Точка приближения (R4, mode="limits") — "2", "infinity", "-infinity".
+    # Не число, т.к. должна кодировать и предел на бесконечности; None для
+    # derivatives/integrals, где этого понятия нет.
+    approach_x: Optional[str] = None
 
 
 class MathLabConfig(BaseModel):
     template_key: Literal["mathlab"] = "mathlab"
-    mode: Literal["derivatives", "integrals"]
+    mode: Literal["derivatives", "integrals", "limits"]
     difficulty: int = Field(ge=1, le=5, default=3)
     tasks: List[MathLabTaskConfig] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _limits_tasks_require_approach_x_and_options(self):
+        # mode="limits" — геймплей "Приближение" (R4): всегда MC (выбор
+        # значения предела, не печать выражения) и всегда нужна точка
+        # приближения для анимации графика на фронтенде. Проверка
+        # correct_answer-in-options тоже только здесь (не для всех
+        # MathLabTaskConfig) — у derivatives/integrals options историчес-
+        # ки не всегда буквально содержат correct_answer (см. backfill).
+        if self.mode == "limits":
+            for t in self.tasks:
+                if t.type != "limit":
+                    raise ValueError(f"task '{t.id}': type должен быть 'limit' для mode=limits")
+                if t.approach_x is None:
+                    raise ValueError(f"task '{t.id}': approach_x обязателен для mode=limits")
+                if not t.options:
+                    raise ValueError(f"task '{t.id}': options обязательны для mode=limits (ответ — выбор, не ввод)")
+                if t.correct_answer not in t.options:
+                    raise ValueError(f"task '{t.id}': correct_answer must be one of options")
+        return self
 
 
 GameConfig = Union[DerivFallConfig, IntegralBuilderConfig, MathLabConfig]

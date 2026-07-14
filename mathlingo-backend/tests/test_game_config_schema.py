@@ -134,3 +134,61 @@ def test_mathlab_hints_default_to_empty_list():
     del config["tasks"][0]["hints"]
     result = game_config.validate_config("mathlab", config)
     assert result["tasks"][0]["hints"] == []
+
+
+# --- mathlab mode="limits" ("Приближение", R4) ---
+
+def _valid_limits_config():
+    return {
+        "mode": "limits",
+        "difficulty": 3,
+        "tasks": [
+            {
+                "id": "l1", "type": "limit", "question": "Чему равен предел?",
+                "function_expression": "(x^2-4)/(x-2)", "approach_x": "2",
+                "correct_answer": "4", "options": ["2", "4", "не существует", "∞"],
+                "difficulty": 3, "hints": [],
+            },
+        ],
+    }
+
+
+def test_limits_valid_config_passes():
+    result = game_config.validate_config("mathlab", _valid_limits_config())
+    assert result["mode"] == "limits"
+    assert result["tasks"][0]["approach_x"] == "2"
+
+
+def test_limits_requires_approach_x():
+    config = _valid_limits_config()
+    config["tasks"][0]["approach_x"] = None
+    with pytest.raises(ValueError, match="approach_x обязателен"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_limits_requires_options():
+    config = _valid_limits_config()
+    config["tasks"][0]["options"] = None
+    with pytest.raises(ValueError, match="options обязательны"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_limits_requires_type_limit():
+    config = _valid_limits_config()
+    config["tasks"][0]["type"] = "calculate"
+    with pytest.raises(ValueError, match="type должен быть 'limit'"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_limits_correct_answer_not_in_options_rejected():
+    config = _valid_limits_config()
+    config["tasks"][0]["correct_answer"] = "not-an-option"
+    with pytest.raises(ValueError, match="correct_answer must be one of options"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_derivatives_mode_does_not_require_approach_x():
+    # derivatives/integrals не должны внезапно требовать approach_x —
+    # проверка ограничена mode="limits" (см. game_config.py).
+    result = game_config.validate_config("mathlab", _valid_mathlab_config())
+    assert result["tasks"][0]["approach_x"] is None
