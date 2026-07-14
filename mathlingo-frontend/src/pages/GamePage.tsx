@@ -9,6 +9,7 @@ import DerivFall from '../components/games/DerivFall';
 import IntegralBuilder from '../components/games/IntegralBuilder';
 import LimitsApproach from '../components/games/LimitsApproach';
 import SeriesFilling from '../components/games/SeriesFilling';
+import SlopeField from '../components/games/SlopeField';
 import RewardPopup from '../components/adventure/RewardPopup';
 import { mockGameData } from '../utils/gameMockData';
 import {
@@ -20,6 +21,7 @@ import {
     mapIntegralBuilderProblems,
     mapLimitsTasks,
     mapSeriesTasks,
+    mapSlopeFieldTasks,
 } from '../api/studentApi';
 
 // Navbar = p-4 (16px) + h-16 (64px) + p-4 (16px) = 96px
@@ -45,6 +47,7 @@ const GamePage = () => {
     const [integralBuilderConfig, setIntegralBuilderConfig] = useState<IntegralBuilderGameConfig | null>(null);
     const [limitsConfig, setLimitsConfig] = useState<MathLabGameConfig | null>(null);
     const [seriesConfig, setSeriesConfig] = useState<MathLabGameConfig | null>(null);
+    const [slopeFieldConfig, setSlopeFieldConfig] = useState<MathLabGameConfig | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
 
     // R3 task 6: сценарий, за который отчитываемся попыткой по завершении
@@ -85,6 +88,10 @@ const GamePage = () => {
                 } else if (gameId === 'series-filling') {
                     const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'series');
                     setSeriesConfig(scenario.config);
+                    activeScenarioIdRef.current = scenario.id;
+                } else if (gameId === 'slope-field') {
+                    const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'slopefield');
+                    setSlopeFieldConfig(scenario.config);
                     activeScenarioIdRef.current = scenario.id;
                 }
                 sessionStartRef.current = Date.now();
@@ -158,6 +165,15 @@ const GamePage = () => {
                     <SeriesFilling
                         difficulty={customDifficulty !== undefined ? customDifficulty : seriesConfig.difficulty}
                         tasksSource={mapSeriesTasks(seriesConfig.tasks)}
+                        onComplete={handleGameComplete}
+                    />
+                );
+            case 'slope-field':
+                if (!slopeFieldConfig) return null;
+                return (
+                    <SlopeField
+                        difficulty={customDifficulty !== undefined ? customDifficulty : slopeFieldConfig.difficulty}
+                        tasksSource={mapSlopeFieldTasks(slopeFieldConfig.tasks)}
                         onComplete={handleGameComplete}
                     />
                 );

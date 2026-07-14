@@ -10,8 +10,8 @@ interface GameInfo {
     title: string;
     description: string;
     icon: string;
-    mechanicType: 'падение' | 'сборка' | 'лаборатория' | 'приближение' | 'наполнение';
-    subject: 'derivatives' | 'integrals' | 'limits' | 'series';
+    mechanicType: 'падение' | 'сборка' | 'лаборатория' | 'приближение' | 'наполнение' | 'наклон';
+    subject: 'derivatives' | 'integrals' | 'limits' | 'series' | 'slopefield';
     difficulty: number;
     estimatedTime: number;
 }
@@ -112,17 +112,29 @@ const GameLauncherPage = () => {
                         difficulty: difficulty ?? 3,
                         estimatedTime: 8,
                     },
+                    {
+                        id: 'slope-field',
+                        title: 'Наклон',
+                        description: 'Смотрите на поле направлений и угадывайте, какая кривая — решение уравнения!',
+                        icon: '🧭',
+                        mechanicType: 'наклон',
+                        subject: 'slopefield',
+                        difficulty: difficulty ?? 3,
+                        estimatedTime: 8,
+                    },
                 ];
 
-                // "Приближение"/"Наполнение" (limits/series) не привязаны ни
-                // к какому Subject в модели данных (skill_id = null у их
-                // GameScenario — играются "без темы", см. GameScenariosPanel.tsx)
-                // — в БД вообще нет предмета с именем "Пределы"/"Ряды", поэтому
-                // subjectTheme для них никогда не совпадёт ни на одном реальном
-                // предмете. Показываем их всегда, независимо от темы — иначе
-                // эти игры физически недостижимы через выбор игры по предмету.
+                // "Приближение"/"Наполнение"/"Наклон" (limits/series/slopefield)
+                // не привязаны ни к какому Subject в модели данных (skill_id =
+                // null у их GameScenario — играются "без темы", см.
+                // GameScenariosPanel.tsx) — в БД вообще нет предмета с именем
+                // "Пределы"/"Ряды"/"Диф. уравнения", поэтому subjectTheme для
+                // них никогда не совпадёт ни на одном реальном предмете.
+                // Показываем их всегда, независимо от темы — иначе эти игры
+                // физически недостижимы через выбор игры по предмету.
+                const STANDALONE_SUBJECTS: GameInfo['subject'][] = ['limits', 'series', 'slopefield'];
                 let filteredGames = availableGames.filter(g =>
-                    g.subject === subjectTheme || g.subject === 'limits' || g.subject === 'series'
+                    g.subject === subjectTheme || STANDALONE_SUBJECTS.includes(g.subject)
                 );
 
                 if (mechanicType) {
@@ -140,7 +152,7 @@ const GameLauncherPage = () => {
                     title: type === 'падение' ? 'Игры на быструю реакцию'
                         : type === 'сборка'  ? 'Игры на конструирование'
                             : type === 'лаборатория' ? 'Исследовательские игры'
-                                : (type === 'приближение' || type === 'наполнение') ? 'Игры на визуальную интуицию'
+                                : (type === 'приближение' || type === 'наполнение' || type === 'наклон') ? 'Игры на визуальную интуицию'
                                     : 'Другие игры',
                     type,
                     games: filteredGames.filter(g => g.mechanicType === type),

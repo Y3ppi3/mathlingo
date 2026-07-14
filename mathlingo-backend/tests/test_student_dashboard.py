@@ -96,6 +96,7 @@ def test_dashboard_distinguishes_mathlab_modes_in_activity_titles(client, db, us
     ("integrals", "Игра: MathLab (интегралы)"),
     ("limits", "Игра: Приближение (пределы)"),
     ("series", "Игра: Наполнение (ряды)"),
+    ("slopefield", "Игра: Наклон (диф. уравнения)"),
 ])
 def test_dashboard_every_known_mathlab_mode_has_a_title(client, db, user, mode, expected_title):
     scenario = GameScenario(
