@@ -1,5 +1,6 @@
 // src/api/studentApi.ts
 import axios from "axios";
+import { clearLocalUserData } from "../utils/LocalUserStorage";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -60,6 +61,20 @@ api.interceptors.response.use(
             // Можно попробовать получить новый токен
             api.get('/api/me').catch(() => {});
         }
+
+        // Аккаунт деактивирован администратором уже ПОСЛЕ выдачи токена
+        // (см. app/auth.py get_current_user) — токен ещё формально валиден,
+        // но доступ закрыт. Раньше пользователь просто видел обрыв
+        // очередного запроса без объяснений; теперь — выходим и объясняем.
+        if (
+            error.response && error.response.status === 403 &&
+            error.response.data?.detail === 'Аккаунт деактивирован' &&
+            window.location.pathname !== '/account-deactivated'
+        ) {
+            clearLocalUserData();
+            window.location.href = '/account-deactivated';
+        }
+
         return Promise.reject(error);
     }
 );

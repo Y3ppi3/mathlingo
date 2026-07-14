@@ -15,6 +15,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 // Низкочастотные экраны (R4) — тоже не нужны в основном бандле.
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const AccountDeactivatedPage = lazy(() => import("./pages/AccountDeactivatedPage"));
 
 // R4: весь admin-поддерево и игровые компоненты (katex/mathjs/recharts/
 // dnd-kit/framer-motion) грузились уже на экране логина — эти маршруты
@@ -73,6 +74,7 @@ function AppRoutes() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/account-deactivated" element={<AccountDeactivatedPage />} />
             <Route
                 path="/dashboard"
                 element={
