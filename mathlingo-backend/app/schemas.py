@@ -71,6 +71,9 @@ class UserBase(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+    # "Запомнить меня" (R4) — влияет на срок жизни cookie/JWT, см.
+    # app/routes/users.py login_user.
+    remember_me: bool = False
 
 
 class UserLoginResponse(BaseModel):

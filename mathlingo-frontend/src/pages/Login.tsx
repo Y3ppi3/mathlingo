@@ -8,6 +8,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [rememberMe, setRememberMe] = useState(false);
     const [showPass, setShowPass] = useState(false);
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -23,7 +24,7 @@ const Login = () => {
             const response = await fetch(`${API_URL}/api/login/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, password, remember_me: rememberMe }),
                 credentials: "include",
             });
 
@@ -138,6 +139,8 @@ const Login = () => {
                                 className="flex items-center gap-2 text-gray-500 dark:text-slate-400 cursor-pointer transition-colors">
                                 <input
                                     type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
                                     className="rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-indigo-500 focus:ring-indigo-500"
                                 />
                                 Запомнить меня
@@ -155,11 +158,11 @@ const Login = () => {
                             id="login-submit"
                             disabled={isLoading}
                             style={{padding: '0.75rem'}}
-                            className={`w-full flex items-center justify-center font-semibold rounded-xl transition-all shadow-lg ${
+                            className={`w-full flex items-center justify-center font-semibold rounded-xl shadow-lg text-white ${
                                 isLoading
-                                    ? "bg-indigo-400 cursor-not-allowed shadow-none"
-                                    : "bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 shadow-indigo-500/25"
-                            } text-white`}
+                                    ? "bg-indigo-400 cursor-not-allowed shadow-none transition-all"
+                                    : "brand-gradient brand-gradient-hover shadow-indigo-500/25"
+                            }`}
                         >
                             {isLoading ? "Вход..." : "Войти"}
                         </button>

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response, Body
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -11,13 +11,25 @@ from app.auth import verify_password, hash_password, create_access_token, get_cu
 
 router = APIRouter()
 
+# Обычная сессия — 1 день (как было раньше). "Запомнить меня" продлевает
+# и cookie, и сам JWT до 30 дней — если продлить только cookie, запросы
+# всё равно начали бы падать через 7 дней (ACCESS_TOKEN_EXPIRE_MINUTES в
+# app/auth.py), а пользователь не понимал бы, почему его разлогинило.
+DEFAULT_SESSION_SECONDS = 86400
+REMEMBER_ME_SECONDS = 60 * 60 * 24 * 30
+
+
 @router.post("/login/")
 def login_user(user: UserLogin, response: Response, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
     if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=400, detail="Неверный email или пароль")
 
-    access_token = create_access_token({"sub": db_user.email})
+    max_age = REMEMBER_ME_SECONDS if user.remember_me else DEFAULT_SESSION_SECONDS
+    access_token = create_access_token(
+        {"sub": db_user.email},
+        expires_delta=timedelta(seconds=max_age) if user.remember_me else None,
+    )
 
     # Устанавливаем куку на переданном объекте response
     response.set_cookie(
@@ -26,7 +38,7 @@ def login_user(user: UserLogin, response: Response, db: Session = Depends(get_db
         httponly=True,
         secure=True,
         samesite="strict",
-        max_age=86400,
+        max_age=max_age,
         path="/"
     )
 
