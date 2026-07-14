@@ -86,9 +86,19 @@ const DerivFall = ({
   const lastProblemTimeRef   = useRef(0);
   const activeProblemsRef    = useRef(0);
   const livesRef             = useRef(3);
+  const problemsRef          = useRef<FallingProblem[]>([]);
+  // Защита от двойного завершения игры: endGame() дёргается из двух
+  // независимых асинхронных путей (истечение таймера и потеря последней
+  // жизни при пропуске задачи) — при их совпадении (или под React
+  // StrictMode, который в dev дважды вызывает updater-функции setState)
+  // onComplete/submitGameAttempt мог вызваться дважды за один и тот же
+  // прогон игры (см. отчёт: очки списывались, но одна из двух попыток
+  // приходила на бэкенд как "Неверно" из-за гонки currentScoreRef).
+  const gameEndedRef         = useRef(false);
 
   useEffect(() => { livesRef.current = lives; }, [lives]);
   useEffect(() => { problemsCompletedRef.current = problemsCompleted; }, [problemsCompleted]);
+  useEffect(() => { problemsRef.current = problems; }, [problems]);
 
   const setFeedback = useCallback((msg: string, type: 'success' | 'error') => {
     setFeedbackMessage(msg);
@@ -106,6 +116,9 @@ const DerivFall = ({
   }, []);
 
   const endGame = useCallback(() => {
+    if (gameEndedRef.current) return;
+    gameEndedRef.current = true;
+
     setGameOver(true);
     setGameStarted(false);
     setGamePaused(false);
@@ -153,21 +166,25 @@ const DerivFall = ({
     problemTimeoutsRef.current[instanceId] = setTimeout(() => {
       if (isPausedRef.current || isForcePausedRef.current) return;
 
-      setProblems(prev => {
-        const exists = prev.find(p => p.instanceId === instanceId && !p.answered);
-        if (exists) {
-          activeProblemsRef.current = Math.max(0, activeProblemsRef.current - 1);
-          const newLives = livesRef.current - 1;
-          setLives(newLives);
-          if (newLives <= 0) endGame();
-          currentScoreRef.current = Math.max(0, currentScoreRef.current - 5);
-          setScore(currentScoreRef.current);
-          setPointsLost(pl => pl + 5);
-          setFeedback('Пропущена задача! −5 очков', 'error');
-        }
-        return prev.filter(p => p.instanceId !== instanceId);
-      });
+      // Существование задачи проверяем через ref (актуален синхронно), а не
+      // внутри updater'а setProblems — вызывать setLives/endGame прямо из
+      // updater'а другого setState — антипаттерн React (see: "Cannot update
+      // a component while rendering a different component"), который под
+      // StrictMode приводит к двойному вызову endGame()/onComplete().
+      const exists = problemsRef.current.some(p => p.instanceId === instanceId && !p.answered);
+      setProblems(prev => prev.filter(p => p.instanceId !== instanceId));
       delete problemTimeoutsRef.current[instanceId];
+
+      if (exists) {
+        activeProblemsRef.current = Math.max(0, activeProblemsRef.current - 1);
+        const newLives = livesRef.current - 1;
+        setLives(newLives);
+        currentScoreRef.current = Math.max(0, currentScoreRef.current - 5);
+        setScore(currentScoreRef.current);
+        setPointsLost(pl => pl + 5);
+        setFeedback('Пропущена задача! −5 очков', 'error');
+        if (newLives <= 0) endGame();
+      }
     }, speed + 1200);
   }, [difficultyLevel, problemBank, endGame, setFeedback, speed]);
 
@@ -183,13 +200,17 @@ const DerivFall = ({
     stopTimer();
     timerRef.current = setInterval(() => {
       if (!isPausedRef.current && !isForcePausedRef.current) {
-        setTimeRemaining(prev => {
-          if (prev <= 1) { endGame(); return 0; }
-          return prev - 1;
-        });
+        // Только чистое вычисление следующего состояния — endGame() не
+        // вызывается отсюда (см. gameEndedRef выше), а из эффекта ниже,
+        // который реагирует на timeRemaining === 0.
+        setTimeRemaining(prev => Math.max(0, prev - 1));
       }
     }, 1000);
-  }, [stopTimer, endGame]);
+  }, [stopTimer]);
+
+  useEffect(() => {
+    if (gameStarted && !gameOver && timeRemaining <= 0) endGame();
+  }, [timeRemaining, gameStarted, gameOver, endGame]);
 
   // Внешняя принудительная пауза (диалог выхода)
   useEffect(() => {
@@ -252,6 +273,7 @@ const DerivFall = ({
     lastProblemTimeRef.current   = 0;
     activeProblemsRef.current    = 0;
     livesRef.current             = 3;
+    gameEndedRef.current         = false;
   }, [timeLimit, stopTimer, stopProblemInterval]);
 
   const startGame = useCallback(() => {
