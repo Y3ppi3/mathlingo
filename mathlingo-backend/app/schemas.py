@@ -446,6 +446,16 @@ class GameScenarioChecklistItemResponse(BaseModel):
     checked_at: Optional[datetime] = None
 
 
+# Student-facing (R3 task 3): активный сценарий шаблона — без
+# preview/чек-лист/статусных полей, ученику это не нужно и не должно быть
+# видно, что за сценарием стоит workflow модерации.
+class ActiveGameScenarioResponse(BaseModel):
+    id: int
+    template_key: GameTemplateKey
+    config: Dict[str, Any]
+    level_range: Optional[List[int]] = None
+
+
 # Student-facing: то же самое, что задание в task-groups/data — без
 # correct_answer.
 class DiagnosticTaskView(BaseModel):

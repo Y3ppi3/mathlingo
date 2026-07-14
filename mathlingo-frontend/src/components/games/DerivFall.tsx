@@ -1,816 +1,509 @@
 // src/components/games/DerivFall.tsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import Button from '../Button';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
-// Интерфейс для задачи на производную
+// ─── KaTeX рендерер ───────────────────────────────────────────────────────────
+const M = ({ tex }: { tex: string }) => (
+    <span
+        dangerouslySetInnerHTML={{
+          __html: sanitizeHtml(katex.renderToString(tex, { throwOnError: false, displayMode: false })),
+        }}
+    />
+);
+
+// ─── Интерфейсы ───────────────────────────────────────────────────────────────
 interface DerivativeProblem {
   id: string;
-  problem: string;
-  options: string[];
-  answer: string;
+  problem: string;   // LaTeX строка для условия
+  options: string[]; // LaTeX строки для вариантов
+  answer: string;    // должен совпадать с одним из options
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
-// Интерфейс для пропсов компонента
 interface DerivFallProps {
   difficulty?: number;
   timeLimit?: number;
-  problemsSource?: DerivativeProblem[];
   onComplete?: (score: number, maxScore: number) => void;
+  problemsSource: DerivativeProblem[];
+  forcePause?: boolean;
 }
 
-// Стандартные задачи для использования если источник не предоставлен
-const DEFAULT_PROBLEMS: DerivativeProblem[] = [
-  {
-    id: "d1",
-    problem: "y'(x) = x³",
-    options: ["3x²", "3x⁴", "4x³", "x²"],
-    answer: "3x²",
-    difficulty: "medium"
-  },
-  {
-    id: "d2",
-    problem: "y'(x) = x⁷",
-    options: ["7x⁶", "6x⁵", "7x⁸", "x⁶"],
-    answer: "7x⁶",
-    difficulty: "medium"
-  },
-  {
-    id: "d3",
-    problem: "y'(x) = x⁻²",
-    options: ["-2x⁻³", "2/x³", "-2/x³", "-x⁻³"],
-    answer: "-2x⁻³",
-    difficulty: "hard"
-  },
-  {
-    id: "d4",
-    problem: "y'(x) = √x",
-    options: ["1/(2√x)", "2√x", "1/2√x", "√x/2"],
-    answer: "1/(2√x)",
-    difficulty: "hard"
-  },
-  {
-    id: "d5",
-    problem: "y'(x) = (5x+2)⁻³",
-    options: ["-15(5x+2)⁻⁴", "-3(5x+2)⁻⁴", "-5(5x+2)⁻⁴", "-15(5x+2)⁻²"],
-    answer: "-15(5x+2)⁻⁴",
-    difficulty: "hard"
-  },
-  {
-    id: "d6",
-    problem: "y'(x) = sin(x)",
-    options: ["cos(x)", "-sin(x)", "tan(x)", "sec²(x)"],
-    answer: "cos(x)",
-    difficulty: "easy"
-  },
-  {
-    id: "d7",
-    problem: "y'(x) = e^x",
-    options: ["e^x", "xe^x", "e^(x-1)", "ln(x)e^x"],
-    answer: "e^x",
-    difficulty: "easy"
-  },
-  {
-    id: "d8",
-    problem: "y'(x) = ln(x)",
-    options: ["1/x", "ln(x)/x", "x^(-1)", "1/ln(x)"],
-    answer: "1/x",
-    difficulty: "medium"
-  },
-  {
-    id: "d9",
-    problem: "y'(x) = cos(x)",
-    options: ["-sin(x)", "sin(x)", "-cos(x)", "tan(x)"],
-    answer: "-sin(x)",
-    difficulty: "easy"
-  },
-  {
-    id: "d10",
-    problem: "y'(x) = tan(x)",
-    options: ["sec²(x)", "-csc²(x)", "1/cos²(x)", "sin(x)/cos²(x)"],
-    answer: "sec²(x)",
-    difficulty: "medium"
-  },
-  {
-    id: "d11",
-    problem: "y'(x) = x² + 3x",
-    options: ["2x + 3", "2x² + 3", "x + 3", "2x + 3x²"],
-    answer: "2x + 3",
-    difficulty: "easy"
-  },
-  {
-    id: "d12",
-    problem: "y'(x) = x·sin(x)",
-    options: ["sin(x) + x·cos(x)", "x·cos(x)", "sin(x) - x·cos(x)", "cos(x) + x·sin(x)"],
-    answer: "sin(x) + x·cos(x)",
-    difficulty: "medium"
-  }
-];
+// карточка шириной 260px — центры колонок подбираем с запасом от края
+const CARD_WIDTH    = 260;
+const FIXED_POSITIONS = [20, 50, 80]; // %
 
-const DerivFall: React.FC<DerivFallProps> = ({
-                                               difficulty = 3,
-                                               timeLimit = 60, // 60 секунд по умолчанию
-                                               problemsSource,
-                                               onComplete
-                                             }) => {
-  // Состояние падающих проблем
-  const [problems, setProblems] = useState<Array<DerivativeProblem & {
-    id: string;
-    left: number;
-    top: number;
-    answered: boolean;
-    correct?: boolean;
-  }>>([]);
+type FallingProblem = DerivativeProblem & {
+  instanceId: string;
+  left: number;
+  top: number;
+  answered: boolean;
+  correct?: boolean;
+};
 
-  // Игровые состояния
-  const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
-  const [gameOver, setGameOver] = useState(false);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [gamePaused, setGamePaused] = useState(false);
-  const [difficultyLevel, setDifficultyLevel] = useState<'easy' | 'medium' | 'hard'>('medium');
-  const [speed, setSpeed] = useState(3000); // миллисекунды для падения
-  const [timeRemaining, setTimeRemaining] = useState(timeLimit);
-  const [problemBank, setProblemBank] = useState<DerivativeProblem[]>(DEFAULT_PROBLEMS);
+// ─── Компонент ────────────────────────────────────────────────────────────────
+const DerivFall = ({
+                     difficulty   = 3,
+                     timeLimit    = 60,
+                     onComplete,
+                     problemsSource,
+                     forcePause   = false,
+                   }: DerivFallProps) => {
+
+  const [problems, setProblems]                   = useState<FallingProblem[]>([]);
+  const [score, setScore]                         = useState(0);
+  const [pointsEarned, setPointsEarned]           = useState(0);
+  const [pointsLost, setPointsLost]               = useState(0);
+  const [lives, setLives]                         = useState(3);
+  const [gameOver, setGameOver]                   = useState(false);
+  const [gameStarted, setGameStarted]             = useState(false);
+  const [gamePaused, setGamePaused]               = useState(false);
+  const [difficultyLevel, setDifficultyLevel]     = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [speed, setSpeed]                         = useState(6000);
+  const [timeRemaining, setTimeRemaining]         = useState(timeLimit);
+  const [problemBank, setProblemBank]             = useState<DerivativeProblem[]>(problemsSource);
   const [problemsCompleted, setProblemsCompleted] = useState(0);
-  const [countdownActive, setCountdownActive] = useState(false);
-  const [countdown, setCountdown] = useState(3);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [feedbackType, setFeedbackType] = useState<'success' | 'error'>('success');
+  const [problemsIncorrect, setProblemsIncorrect] = useState(0);
+  const [countdownActive, setCountdownActive]     = useState(false);
+  const [countdown, setCountdown]                 = useState(3);
+  const [showFeedback, setShowFeedback]           = useState(false);
+  const [feedbackMessage, setFeedbackMessage]     = useState('');
+  const [feedbackType, setFeedbackType]           = useState<'success' | 'error'>('success');
 
-  // Ссылки для доступа к DOM и таймерам
-  const gameAreaRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const gameIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const problemTimeoutsRef = useRef<{[key: string]: NodeJS.Timeout}>({});
-  const gameActiveRef = useRef(false);
+  const maxProblemsOnScreen = 2; // уменьшили т.к. карточки стали шире
 
-  // Установить сообщение обратной связи
-  const setFeedback = useCallback((message: string, type: 'success' | 'error') => {
-    setFeedbackMessage(message);
+  const timerRef             = useRef<NodeJS.Timeout | null>(null);
+  const gameIntervalRef      = useRef<NodeJS.Timeout | null>(null);
+  const problemTimeoutsRef   = useRef<Record<string, NodeJS.Timeout>>({});
+  const gameActiveRef        = useRef(false);
+  const currentScoreRef      = useRef(0);
+  const problemsCompletedRef = useRef(0);
+  const totalProblemsSeenRef = useRef(0);
+  const isPausedRef          = useRef(false);
+  const isForcePausedRef     = useRef(false);
+  const lastProblemTimeRef   = useRef(0);
+  const activeProblemsRef    = useRef(0);
+  const livesRef             = useRef(3);
+
+  useEffect(() => { livesRef.current = lives; }, [lives]);
+  useEffect(() => { problemsCompletedRef.current = problemsCompleted; }, [problemsCompleted]);
+
+  const setFeedback = useCallback((msg: string, type: 'success' | 'error') => {
+    setFeedbackMessage(msg);
     setFeedbackType(type);
     setShowFeedback(true);
-
-    // Скрываем сообщение через некоторое время
-    setTimeout(() => {
-      setShowFeedback(false);
-    }, 800);
+    setTimeout(() => setShowFeedback(false), 900);
   }, []);
 
-  // Загрузка проблем из источника или использование стандартных
-  useEffect(() => {
-    console.log("Настройка источника данных задач");
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  }, []);
 
-    if (problemsSource && problemsSource.length > 0) {
-      console.log(`Получено ${problemsSource.length} задач из источника`);
-      setProblemBank(problemsSource);
-    } else {
-      console.log(`Используем ${DEFAULT_PROBLEMS.length} стандартных задач`);
-      setProblemBank([...DEFAULT_PROBLEMS]);
-    }
+  const stopProblemInterval = useCallback(() => {
+    if (gameIntervalRef.current) { clearInterval(gameIntervalRef.current); gameIntervalRef.current = null; }
+  }, []);
 
-    return () => {
-      console.log("Очистка источника данных задач");
-    };
-  }, [problemsSource]); // DEFAULT_PROBLEMS как константа не нужна в зависимостях
-
-  // Настройка уровня сложности в зависимости от переданного значения
-  useEffect(() => {
-    console.log(`Настройка уровня сложности: ${difficulty}`);
-    if (difficulty <= 2) {
-      setDifficultyLevel('easy');
-      setSpeed(6000);
-    } else if (difficulty >= 5) {
-      setDifficultyLevel('hard');
-      setSpeed(2500);
-    } else {
-      setDifficultyLevel('medium');
-      setSpeed(4000);
-    }
-  }, [difficulty]);
-
-  // Завершить игру
   const endGame = useCallback(() => {
-    console.log("Завершение игры");
     setGameOver(true);
     setGameStarted(false);
     setGamePaused(false);
+    isPausedRef.current      = false;
+    isForcePausedRef.current = false;
+    gameActiveRef.current    = false;
 
-    // ВАЖНО: обновляем ref
-    gameActiveRef.current = false;
-
-    // Очищаем все таймеры
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (gameIntervalRef.current) {
-      clearInterval(gameIntervalRef.current);
-      gameIntervalRef.current = null;
-    }
-
-    // Очищаем таймеры для задач
+    stopTimer();
+    stopProblemInterval();
     Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
     problemTimeoutsRef.current = {};
 
-    // Вызываем обратный вызов с результатами
     if (onComplete) {
-      // Максимально возможный счет зависит от времени и частоты появления задач
-      const maxPossibleScore = Math.max(10, problemsCompleted * 10); // Минимум 10 очков
-      onComplete(score, maxPossibleScore);
+      const finalScore = currentScoreRef.current;
+      const correct    = problemsCompletedRef.current;
+      const maxScore   = Math.max(totalProblemsSeenRef.current * 10, correct * 10, 10);
+      onComplete(finalScore, maxScore);
     }
-  }, [score, problemsCompleted, onComplete]);
+  }, [onComplete, stopTimer, stopProblemInterval]);
 
-  const getDistributedPosition = useCallback(() => {
-    // Находим все текущие горизонтальные позиции задач
-    const currentPositions = problems.map(p => p.left);
-
-    // Пробуем 5 раз найти позицию, не близкую к существующим
-    for (let i = 0; i < 5; i++) {
-      const sector = Math.floor(Math.random() * 4); // 4 сектора
-      const newPos = (sector * 20) + (Math.random() * 15);
-
-      // Проверяем, нет ли рядом других задач (на расстоянии менее 20%)
-      const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 20);
-      if (!isTooClose) {
-        return newPos; // Нашли хорошую позицию
-      }
-    }
-
-    // Если не нашли хорошую позицию, возвращаем случайную
-    return Math.random() * 70;
-  }, [problems]);
-
-  // Создать новую падающую задачу
   const createProblem = useCallback(() => {
-    // Добавляем отладочный лог
-    console.log("💡 createProblem вызвана", { lives, gameOver, gameStarted, gamePaused, problemBankLength: problemBank.length });
+    if (livesRef.current <= 0 || !gameActiveRef.current || isPausedRef.current || isForcePausedRef.current) return;
+    if (activeProblemsRef.current >= maxProblemsOnScreen) return;
 
-    // Проверяем условия
-    if (lives <= 0) {
-      console.log("❌ Создание задачи отменено: нет жизней");
-      return;
-    }
+    const now = Date.now();
+    if (now - lastProblemTimeRef.current < 1200) return;
+    lastProblemTimeRef.current = now;
 
-    if (gameOver) {
-      console.log("❌ Создание задачи отменено: игра окончена");
-      return;
-    }
+    let filtered = problemBank.filter(p =>
+        difficultyLevel === 'easy'   ? p.difficulty === 'easy' :
+            difficultyLevel === 'medium' ? p.difficulty !== 'hard' : true
+    );
+    if (!filtered.length) filtered = [...problemBank];
 
-    // Вместо проверки gameStarted, используем gameActiveRef
-    if (!gameActiveRef.current) {
-      console.log("❌ Создание задачи отменено: игра не начата");
-      return;
-    }
+    const problem    = filtered[Math.floor(Math.random() * filtered.length)];
+    const instanceId = `prob-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const col        = Math.floor(Math.random() * FIXED_POSITIONS.length);
+    const left       = FIXED_POSITIONS[col];
 
-    if (gamePaused) {
-      console.log("❌ Создание задачи отменено: игра на паузе");
-      return;
-    }
+    activeProblemsRef.current    += 1;
+    totalProblemsSeenRef.current += 1;
 
-    if (problemBank.length === 0) {
-      console.error("❌ No problems available!");
-      setFeedback("Ошибка: задания не найдены", "error");
-      return;
-    }
+    setProblems(prev => [...prev, { ...problem, instanceId, left, top: 0, answered: false }]);
 
-    console.log(`🔍 Создание новой задачи. Сложность: ${difficultyLevel}, Доступно задач: ${problemBank.length}`);
-
-    // Фильтруем задачи по текущему уровню сложности
-    let filteredProblems = problemBank.filter(p => {
-      if (difficultyLevel === 'easy') return p.difficulty === 'easy';
-      if (difficultyLevel === 'medium') return p.difficulty === 'easy' || p.difficulty === 'medium';
-      return true; // Для сложного уровня берем все задачи
-    });
-
-    console.log(`🔍 После фильтрации осталось задач: ${filteredProblems.length}`);
-
-    if (filteredProblems.length === 0) {
-      console.warn(`⚠️ После фильтрации по сложности '${difficultyLevel}' задач не осталось!`);
-      console.log("ℹ️ Используем все доступные задачи без фильтрации по сложности");
-      filteredProblems = [...problemBank];
-
-      if (filteredProblems.length === 0) {
-        console.error("❌ Всё ещё нет доступных задач!");
-        setFeedback("Нет доступных заданий!", "error");
-        return;
-      }
-    }
-
-    const randomIndex = Math.floor(Math.random() * filteredProblems.length);
-    const problem = filteredProblems[randomIndex];
-    const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-
-    const getDistributedPosition = () => {
-      // Находим все текущие горизонтальные позиции задач
-      const currentPositions = problems.map(p => p.left);
-
-      // Пробуем 5 раз найти позицию, не близкую к существующим
-      for (let i = 0; i < 5; i++) {
-        const sector = Math.floor(Math.random() * 4); // 4 сектора
-        const newPos = (sector * 20) + (Math.random() * 15);
-
-        // Проверяем, нет ли рядом других задач (на расстоянии менее 20%)
-        const isTooClose = currentPositions.some(pos => Math.abs(pos - newPos) < 20);
-        if (!isTooClose) {
-          return newPos; // Нашли хорошую позицию
-        }
-      }
-
-      // Если не нашли хорошую позицию, возвращаем случайную
-      return Math.random() * 70;
-    };
-
-    const leftPosition = getDistributedPosition();
-
-    // Добавляем новую задачу
-    console.log(`✅ Добавляем задачу ${newProblemId}: ${problem.problem}`);
-
-    // Важно: используем функциональное обновление для состояния
-    setProblems(prev => {
-      const newProblems = [...prev, {
-        ...problem,
-        id: newProblemId,
-        left: leftPosition,
-        top: 0, // Начальная позиция (в процентах)
-        answered: false
-      }];
-      console.log(`📊 Всего задач после добавления: ${newProblems.length}`);
-      return newProblems;
-    });
-
-    // Запланировать удаление задачи после того, как она выпадет из поля зрения
-    problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
-      console.log(`⏱️ Таймаут для задачи ${newProblemId} сработал`);
+    problemTimeoutsRef.current[instanceId] = setTimeout(() => {
+      if (isPausedRef.current || isForcePausedRef.current) return;
 
       setProblems(prev => {
-        const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
-        if (problemExists) {
-          // Задача упала без ответа
-          console.log(`❌ Задача ${newProblemId} упала без ответа`);
-          setLives(l => {
-            const newLives = l - 1;
-            if (newLives <= 0) {
-              console.log("☠️ Все жизни потеряны, игра завершается");
-              endGame();
-            }
-            return newLives;
-          });
-
-          setFeedback("Упущенная задача!", "error");
+        const exists = prev.find(p => p.instanceId === instanceId && !p.answered);
+        if (exists) {
+          activeProblemsRef.current = Math.max(0, activeProblemsRef.current - 1);
+          const newLives = livesRef.current - 1;
+          setLives(newLives);
+          if (newLives <= 0) endGame();
+          currentScoreRef.current = Math.max(0, currentScoreRef.current - 5);
+          setScore(currentScoreRef.current);
+          setPointsLost(pl => pl + 5);
+          setFeedback('Пропущена задача! −5 очков', 'error');
         }
-        return prev.filter(p => p.id !== newProblemId);
+        return prev.filter(p => p.instanceId !== instanceId);
       });
+      delete problemTimeoutsRef.current[instanceId];
+    }, speed + 1200);
+  }, [difficultyLevel, problemBank, endGame, setFeedback, speed]);
 
-      // Удаляем таймер из списка
-      delete problemTimeoutsRef.current[newProblemId];
-    }, speed + 2000); // Время падения + буфер
-  }, [difficultyLevel, problemBank, lives, gameOver, gameStarted, gamePaused,
-    speed, setFeedback, endGame, problems]);
+  const setupProblemInterval = useCallback(() => {
+    stopProblemInterval();
+    const ms = difficultyLevel === 'easy' ? 6000 : difficultyLevel === 'medium' ? 5000 : 3500;
+    gameIntervalRef.current = setInterval(() => {
+      if (!isPausedRef.current && !isForcePausedRef.current && gameActiveRef.current) createProblem();
+    }, ms);
+  }, [difficultyLevel, createProblem, stopProblemInterval]);
 
-  // Обработать выбор ответа
-  const handleAnswerSelect = useCallback((problemId: string, selectedOption: string, correctAnswer: string) => {
-    // Отмечаем задачу как отвеченную
-    setProblems(prev =>
-        prev.map(p => p.id === problemId ?
-            {...p, answered: true, correct: selectedOption === correctAnswer} : p)
-    );
-
-    // Убираем таймер удаления для этой задачи
-    if (problemTimeoutsRef.current[problemId]) {
-      clearTimeout(problemTimeoutsRef.current[problemId]);
-      delete problemTimeoutsRef.current[problemId];
-    }
-
-    if (selectedOption === correctAnswer) {
-      console.log(`Правильный ответ для задачи ${problemId}`);
-      setScore(s => s + 10);
-      setProblemsCompleted(p => p + 1);
-      setFeedback("Правильно! +10 очков", "success");
-    } else {
-      console.log(`Неправильный ответ для задачи ${problemId}`);
-      setFeedback(`Неверно! Правильный ответ: ${correctAnswer}`, "error");
-    }
-
-    // Удалить задачу после ответа с анимацией
-    setTimeout(() => {
-      setProblems(prev => prev.filter(p => p.id !== problemId));
-    }, 800);
-  }, [setFeedback]);
-
-  // Сбросить игру
-  const resetGame = useCallback(() => {
-    // Очищаем все таймеры
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (gameIntervalRef.current) {
-      clearInterval(gameIntervalRef.current);
-      gameIntervalRef.current = null;
-    }
-
-    // Очищаем таймеры для задач
-    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
-    problemTimeoutsRef.current = {};
-
-    // Сбрасываем состояния
-    setProblems([]);
-    setScore(0);
-    setLives(3);
-    setGameOver(false);
-    setGameStarted(false);
-    setGamePaused(false);
-    setTimeRemaining(timeLimit);
-    setProblemsCompleted(0);
-    setShowFeedback(false);
-
-    // ВАЖНО: сбрасываем ref
-    gameActiveRef.current = false;
-  }, [timeLimit]);
-
-  // Начать игру
-  const startGame = useCallback(() => {
-    console.log("💡 startGame вызвана, gameStarted =", gameStarted);
-
-    // Повторно устанавливаем gameStarted, чтобы гарантировать обновление
-    setGameStarted(true);
-    setGamePaused(false);
-
-    // ВАЖНО: Синхронно устанавливаем ref
-    gameActiveRef.current = true;
-
-    // Очистим все таймеры перед новой игрой
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
-    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
-    problemTimeoutsRef.current = {};
-
-    // Настроить скорость в зависимости от сложности
-    switch(difficultyLevel) {
-      case 'easy': setSpeed(6000); break;
-      case 'medium': setSpeed(4000); break;
-      case 'hard': setSpeed(2500); break;
-    }
-
-    // Запустить таймер игры
+  const startTimer = useCallback(() => {
+    stopTimer();
     timerRef.current = setInterval(() => {
-      if (!gamePaused) {
+      if (!isPausedRef.current && !isForcePausedRef.current) {
         setTimeRemaining(prev => {
-          if (prev <= 1) {
-            console.log("⏱️ Время вышло, игра завершается");
-            endGame();
-            return 0;
-          }
+          if (prev <= 1) { endGame(); return 0; }
           return prev - 1;
         });
       }
     }, 1000);
+  }, [stopTimer, endGame]);
 
-    // Создаем первую задачу вручную
-    console.log("🎮 Создаем первую задачу напрямую");
-
-    const randomIndex = Math.floor(Math.random() * problemBank.length);
-    const problem = problemBank[randomIndex];
-    const newProblemId = `prob-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-    const leftPosition = Math.random() * 70; // или getDistributedPosition(), если доступна
-
-    // Добавляем задачу напрямую
-    setProblems(prev => [
-      ...prev,
-      {
-        ...problem,
-        id: newProblemId,
-        left: leftPosition,
-        top: 0,
-        answered: false
+  // Внешняя принудительная пауза (диалог выхода)
+  useEffect(() => {
+    if (!gameStarted || gameOver) return;
+    isForcePausedRef.current = forcePause;
+    if (forcePause) {
+      stopTimer();
+      stopProblemInterval();
+      setGamePaused(true);
+    } else {
+      if (!isPausedRef.current) {
+        lastProblemTimeRef.current = 0;
+        startTimer();
+        setupProblemInterval();
+        setGamePaused(false);
       }
-    ]);
+    }
+  }, [forcePause, gameStarted, gameOver, stopTimer, stopProblemInterval, startTimer, setupProblemInterval]);
 
-    console.log(`✅ Первая задача добавлена: ${problem.problem}`);
+  const handleAnswerSelect = useCallback((instanceId: string, selected: string, correct: string) => {
+    activeProblemsRef.current = Math.max(0, activeProblemsRef.current - 1);
+    setProblems(prev => prev.map(p =>
+        p.instanceId === instanceId ? { ...p, answered: true, correct: selected === correct } : p
+    ));
+    if (problemTimeoutsRef.current[instanceId]) {
+      clearTimeout(problemTimeoutsRef.current[instanceId]);
+      delete problemTimeoutsRef.current[instanceId];
+    }
+    if (selected === correct) {
+      currentScoreRef.current += 10;
+      setScore(currentScoreRef.current);
+      setPointsEarned(pe => pe + 10);
+      setProblemsCompleted(pc => pc + 1);
+      setFeedback('Правильно! +10 очков', 'success');
+    } else {
+      currentScoreRef.current = Math.max(0, currentScoreRef.current - 5);
+      setScore(currentScoreRef.current);
+      setPointsLost(pl => pl + 5);
+      setProblemsIncorrect(pi => pi + 1);
+      setFeedback(`Неверно! −5 очков`, 'error');
+    }
+    setTimeout(() => setProblems(prev => prev.filter(p => p.instanceId !== instanceId)), 700);
+  }, [setFeedback]);
 
-    // Настраиваем таймаут для неё
-    problemTimeoutsRef.current[newProblemId] = setTimeout(() => {
-      setProblems(prev => {
-        const problemExists = prev.find(p => p.id === newProblemId && !p.answered);
-        if (problemExists) {
-          setLives(l => {
-            const newLives = l - 1;
-            if (newLives <= 0) {
-              endGame();
-            }
-            return newLives;
-          });
-          setFeedback("Упущенная задача!", "error");
-        }
-        return prev.filter(p => p.id !== newProblemId);
-      });
-      delete problemTimeoutsRef.current[newProblemId];
-    }, speed + 2000);
+  const resetGame = useCallback(() => {
+    stopTimer(); stopProblemInterval();
+    Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
+    problemTimeoutsRef.current = {};
 
-    // Запускаем интервал для создания последующих задач
-    const interval = difficultyLevel === 'hard' ? 2500 :
-        difficultyLevel === 'medium' ? 3500 : 4500;
+    setProblems([]); setScore(0); setPointsEarned(0); setPointsLost(0); setLives(3);
+    setGameOver(false); setGameStarted(false); setGamePaused(false);
+    setTimeRemaining(timeLimit); setProblemsCompleted(0); setProblemsIncorrect(0); setShowFeedback(false);
 
-    console.log(`🎮 Установка интервала генерации задач: ${interval}ms`);
+    currentScoreRef.current      = 0;
+    problemsCompletedRef.current = 0;
+    totalProblemsSeenRef.current = 0;
+    gameActiveRef.current        = false;
+    isPausedRef.current          = false;
+    isForcePausedRef.current     = false;
+    lastProblemTimeRef.current   = 0;
+    activeProblemsRef.current    = 0;
+    livesRef.current             = 3;
+  }, [timeLimit, stopTimer, stopProblemInterval]);
 
-    gameIntervalRef.current = setInterval(() => {
-      // Используем gameActiveRef.current вместо gameStarted
-      if (!gamePaused && gameActiveRef.current) {
-        createProblem();
-      }
-    }, interval);
+  const startGame = useCallback(() => {
+    if (gameActiveRef.current) return;
+    setGameStarted(true); setGamePaused(false);
+    isPausedRef.current = false; gameActiveRef.current = true;
+    setTimeRemaining(timeLimit);
+    startTimer();
+    setTimeout(() => { createProblem(); setupProblemInterval(); }, 1000);
+  }, [timeLimit, startTimer, createProblem, setupProblemInterval]);
 
-  }, [difficultyLevel, problemBank, speed, gamePaused, setFeedback, endGame, createProblem]);
+  const togglePause = useCallback(() => {
+    if (isForcePausedRef.current) return;
+    const pausing = !isPausedRef.current;
+    isPausedRef.current = pausing;
+    if (pausing) {
+      stopTimer(); stopProblemInterval(); setGamePaused(true);
+    } else {
+      lastProblemTimeRef.current = 0;
+      startTimer(); setupProblemInterval(); setGamePaused(false);
+    }
+  }, [stopTimer, stopProblemInterval, startTimer, setupProblemInterval]);
 
-  // Начать игру с обратным отсчетом
   const startGameWithCountdown = useCallback(() => {
-    resetGame();
-    setCountdownActive(true);
-    setCountdown(3);
-
-    // Запускаем обратный отсчет
-    const countdownTimer = setInterval(() => {
+    resetGame(); setCountdownActive(true); setCountdown(3);
+    const t = setInterval(() => {
       setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownTimer);
-          setCountdownActive(false);
-
-          // Не устанавливаем здесь gameStarted
-          // т.к. это делается в startGame
-
-          startGame();
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(t); setCountdownActive(false); startGame(); return 0; }
         return prev - 1;
       });
     }, 1000);
   }, [resetGame, startGame]);
 
-  // Поставить игру на паузу
-  const togglePause = useCallback(() => {
-    setGamePaused(prev => !prev);
-  }, []);
-
-  // Очистка интервалов при размонтировании
   useEffect(() => {
-    return () => {
-      console.log("Размонтирование компонента, очистка ресурсов");
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (gameIntervalRef.current) clearInterval(gameIntervalRef.current);
+    setProblemBank(problemsSource);
+  }, [problemsSource]);
 
-      // Очищаем таймеры для задач
-      Object.values(problemTimeoutsRef.current).forEach(clearTimeout);
-    };
-  }, []);
+  useEffect(() => {
+    if (difficulty <= 2)      { setDifficultyLevel('easy');   setSpeed(8000); }
+    else if (difficulty >= 5) { setDifficultyLevel('hard');   setSpeed(5000); }
+    else                      { setDifficultyLevel('medium'); setSpeed(6500); }
+  }, [difficulty]);
 
-  // Форматирование времени
-  const formatTime = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
-  };
+  useEffect(() => () => { stopTimer(); stopProblemInterval(); Object.values(problemTimeoutsRef.current).forEach(clearTimeout); }, [stopTimer, stopProblemInterval]);
+
+  const formatTime    = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  const diffText      = () => difficulty <= 2 ? 'Легкий' : difficulty >= 5 ? 'Сложный' : 'Средний';
+  const isAnywayPaused = gamePaused || forcePause;
 
   return (
-      <div className="w-full h-full flex flex-col bg-gray-700 dark:bg-gray-200 rounded-lg overflow-hidden transition-colors">
-        {/* Верхняя панель */}
-        <div className="px-4 py-3 flex justify-between items-center bg-gray-600 dark:bg-gray-300 border-b border-gray-500 dark:border-gray-400 transition-colors">
-          <div className="flex items-center space-x-6">
-            <div className="text-gray-100 dark:text-gray-900 font-medium transition-colors">
-              Счет: <span className="font-bold">{score}</span>
-            </div>
-            <div className="flex items-center">
-              <span className="text-gray-100 dark:text-gray-900 mr-2 transition-colors">Жизни:</span>
-              <span className="text-red-500 dark:text-red-600 transition-colors">{Array(lives).fill('❤️').join('')}</span>
-            </div>
+      <div className="w-full h-full flex flex-col bg-white dark:bg-gray-800 rounded-lg overflow-hidden transition-colors">
 
-            <div className="text-yellow-500 dark:text-yellow-600 font-medium transition-colors">
-              Время: {formatTime(timeRemaining)}
-            </div>
+        {/* ── Шапка ── */}
+        <div className="px-4 py-2.5 flex justify-between items-center bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex-shrink-0 transition-colors">
+          <div className="flex items-center gap-5 text-sm">
+                    <span className="text-gray-700 dark:text-gray-200 font-medium transition-colors">
+                        Счёт: <strong>{score}</strong>
+                    </span>
+            <span className="flex items-center gap-1">
+                        <span className="text-gray-600 dark:text-gray-300 transition-colors">Жизни:</span>
+                        <span>{Array(Math.max(0, lives)).fill('❤️').join('')}</span>
+                    </span>
+            <span className="text-yellow-600 dark:text-yellow-400 font-medium transition-colors">
+                        {formatTime(timeRemaining)}
+                    </span>
           </div>
-
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-2">
             {gameStarted && !gameOver && (
                 <button
-                    className={`px-3 py-1 rounded-md text-sm font-medium ${
-                        gamePaused
-                            ? 'bg-green-700 dark:bg-green-200 text-white dark:text-gray-900'
-                            : 'bg-amber-700 dark:bg-amber-200 text-white dark:text-gray-900'
-                    } transition-colors`}
+                    style={{ padding: '0.2rem 0.65rem' }}
+                    className={`rounded-lg text-xs font-medium transition-colors ${
+                        isAnywayPaused
+                            ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/30'
+                            : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30'
+                    }`}
                     onClick={togglePause}
+                    disabled={forcePause}
                 >
-                  {gamePaused ? 'Продолжить' : 'Пауза'}
+                  {isAnywayPaused ? 'Продолжить' : 'Пауза'}
                 </button>
             )}
-
-            <div className="px-2 py-1 rounded-md text-sm font-medium bg-gray-500 dark:bg-gray-400 text-white dark:text-gray-900 transition-colors">
-              {difficultyLevel === 'easy' ? 'Легкий' : difficultyLevel === 'medium' ? 'Средний' : 'Сложный'}
-            </div>
+            <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-500 transition-colors">
+                        {diffText()} {difficulty}/5
+                    </span>
           </div>
         </div>
 
-        {/* Игровая область */}
-        <div
-            ref={gameAreaRef}
-            className="relative flex-1 overflow-hidden bg-gray-700 dark:bg-gray-200 transition-colors"
-            style={{height: '500px', position: 'relative'}} // Добавляем position: 'relative'
-        >
-          {/* Падающие задачи */}
+        {/* ── Игровая зона ── */}
+        <div className="relative flex-1 overflow-hidden bg-gray-100 dark:bg-gray-900 transition-colors">
+
+          {/* Сетка фона */}
+          <div className="absolute inset-0 grid grid-cols-8 grid-rows-6 gap-0.5 pointer-events-none opacity-20">
+            {Array(48).fill(0).map((_, i) => (
+                <div key={i} className="bg-gray-400 dark:bg-gray-600" />
+            ))}
+          </div>
+
+          {/* ── Падающие карточки ── */}
           {problems.map(problem => (
               !problem.answered ? (
                   <div
-                      key={problem.id}
-                      className="absolute bg-blue-700 dark:bg-blue-200 p-3 rounded-lg shadow-lg text-center transition-colors"
+                      key={problem.instanceId}
+                      className="absolute rounded-2xl shadow-xl text-center transition-opacity duration-200"
                       style={{
-                        left: `${problem.left}%`,
-                        top: '-80px',
-                        width: '250px', // Фиксированная ширина
-                        transform: `translateX(-50%)`, // Центрирование относительно позиции
-                        animation: gamePaused ? 'none' : `fallNew ${speed / 1000}s linear forwards`,
-                        zIndex: parseInt(problem.id.split('-')[1]) % 10, // Разные уровни z-index
+                        left:   `${problem.left}%`,
+                        top:    '-120px',
+                        width:  `${CARD_WIDTH}px`,
+                        transform: 'translateX(-50%)',
+                        animation: `derivFall ${speed / 1000}s linear forwards`,
+                        animationPlayState: isAnywayPaused ? 'paused' : 'running',
+                        opacity:       isAnywayPaused ? 0 : 1,
+                        pointerEvents: isAnywayPaused ? 'none' : 'auto',
+                        background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
                       }}
                   >
-                    <div className="text-lg mb-2 font-medium text-white dark:text-gray-900 transition-colors">
-                      {problem.problem}
+                    {/* Условие */}
+                    <div className="px-4 pt-4 pb-3 border-b border-white/20">
+                      <div className="text-xs text-indigo-200 mb-1 font-medium tracking-wide">НАЙДИТЕ ПРОИЗВОДНУЮ</div>
+                      <div className="text-white text-xl font-semibold leading-snug katex-display-fix">
+                        <M tex={problem.problem} />
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {problem.options.map((option, idx) => (
+
+                    {/* Варианты ответов */}
+                    <div className="grid grid-cols-2 gap-2 p-3">
+                      {problem.options.map((opt, i) => (
                           <button
-                              key={idx}
-                              className="bg-purple-700 dark:bg-purple-200 text-white dark:text-gray-900 hover:bg-purple-600 dark:hover:bg-purple-300 px-2 py-1 rounded-lg transition-colors"
-                              onClick={() => handleAnswerSelect(problem.id, option, problem.answer)}
-                              disabled={gamePaused}
+                              key={i}
+                              style={{ padding: '0.5rem 0.25rem', minHeight: '48px' }}
+                              className="bg-white/15 hover:bg-white/30 active:bg-white/40 text-white rounded-xl transition-all text-sm font-medium flex items-center justify-center"
+                              onClick={() => handleAnswerSelect(problem.instanceId, opt, problem.answer)}
+                              title={opt}
                           >
-                            {option}
+                            <M tex={opt} />
                           </button>
                       ))}
                     </div>
                   </div>
               ) : (
                   <div
-                      key={problem.id}
-                      className="absolute p-3 rounded-lg shadow-lg text-center w-64 transition-colors"
+                      key={problem.instanceId}
+                      className="absolute rounded-2xl shadow-xl text-center text-white flex flex-col items-center justify-center gap-1"
                       style={{
-                        left: `${problem.left}%`,
-                        top: `${problem.top}%`,
-                        animation: 'fadeOut 0.8s forwards',
-                        backgroundColor: problem.correct
-                            ? 'var(--bg-green-700, rgb(21, 128, 61))'
-                            : 'var(--bg-red-700, rgb(185, 28, 28))',
-                        color: 'white'
+                        left:      `${problem.left}%`,
+                        top:       '-120px',
+                        width:     `${CARD_WIDTH}px`,
+                        minHeight: '80px',
+                        padding:   '0.75rem',
+                        transform: 'translateX(-50%)',
+                        animation: 'derivFadeOut 0.7s forwards',
+                        backgroundColor: problem.correct ? 'rgb(21,128,61)' : 'rgb(185,28,28)',
                       }}
                   >
-                    <div className="text-lg mb-2 font-medium text-white dark:text-gray-900 transition-colors">
-                      {problem.problem}
-                    </div>
-                    <div className="font-bold">
-                      {problem.correct ? 'Верно!' : `Ответ: ${problem.answer}`}
-                    </div>
+                    <div className="text-base font-bold">{problem.correct ? '✓ Верно!' : '✗ Неверно'}</div>
+                    {!problem.correct && (
+                        <div className="text-xs opacity-90">
+                          Ответ: <M tex={problem.answer} />
+                        </div>
+                    )}
                   </div>
               )
           ))}
 
-          {/* Наложение паузы */}
-          {gamePaused && gameStarted && !gameOver && (
-              <div
-                  className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex flex-col items-center justify-center z-30 transition-colors">
+          {/* Пауза */}
+          {gamePaused && !forcePause && gameStarted && !gameOver && (
+              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-30">
                 <div className="text-4xl font-bold text-white mb-6">ПАУЗА</div>
-                <Button
-                    onClick={togglePause}
-                    variant="primary"
-                >
-                  Продолжить
-                </Button>
+                <Button onClick={togglePause} variant="primary">Продолжить</Button>
               </div>
           )}
 
-          {/* Экран окончания игры */}
+          {/* Конец игры */}
           {gameOver && (
-              <div
-                  className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 dark:bg-opacity-70 z-20 transition-colors">
-                <div
-                    className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
-                  <h2 className="text-2xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">Игра
-                    окончена!</h2>
-                  <p className="mb-6 text-xl text-white dark:text-gray-900 transition-colors">
-                    Итоговый счет: <span className="font-bold">{score}</span>
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-20">
+                <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 rounded-2xl shadow-xl max-w-sm w-full mx-4 transition-colors">
+                  <h2 className="text-2xl mb-4 font-bold text-gray-900 dark:text-white">Игра окончена!</h2>
+                  <p className="mb-3 text-xl text-gray-900 dark:text-white">
+                    Итоговый счёт: <strong>{score}</strong>
                   </p>
-                  <p className="mb-6 text-gray-300 dark:text-gray-700 transition-colors">
-                    Решено задач: <span className="font-bold">{problemsCompleted}</span>
-                  </p>
-                  <Button
-                      onClick={startGameWithCountdown}
-                  >
-                    Играть снова
-                  </Button>
+                  <div className="mb-6 grid grid-cols-2 gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <div>Заработано:</div>  <div className="font-bold text-green-600 dark:text-green-400">+{pointsEarned}</div>
+                    <div>Потеряно:</div>    <div className="font-bold text-red-500 dark:text-red-400">−{pointsLost}</div>
+                    <div>Правильных:</div>  <div className="font-bold text-gray-900 dark:text-white">{problemsCompleted}</div>
+                    <div>Неверных:</div>    <div className="font-bold text-gray-900 dark:text-white">{problemsIncorrect}</div>
+                    <div>Пропущено:</div>   <div className="font-bold text-gray-900 dark:text-white">{3 - lives}</div>
+                  </div>
+                  <Button onClick={startGameWithCountdown}>Играть снова</Button>
                 </div>
               </div>
           )}
 
-          {/* Экран начала игры */}
+          {/* Старт */}
           {!gameStarted && !gameOver && !countdownActive && (
               <div className="absolute inset-0 flex items-center justify-center z-20">
-                <div
-                    className="text-center bg-gray-600 dark:bg-gray-300 p-6 rounded-lg shadow-xl max-w-md mx-auto transition-colors">
-                  <h2 className="text-xl mb-4 font-bold text-white dark:text-gray-900 transition-colors">
-                    Игра "Падающие производные"
+                <div className="text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 rounded-2xl shadow-xl max-w-sm w-full mx-4 transition-colors">
+                  <h2 className="text-xl mb-3 font-bold text-gray-900 dark:text-white">
+                    Падающие производные
                   </h2>
-                  <p className="mb-4 text-gray-200 dark:text-gray-800 transition-colors">
-                    Решайте задачи на нахождение производных до того, как они упадут!
+                  <p className="mb-4 text-gray-600 dark:text-gray-400 text-sm">
+                    Нажимайте на правильный ответ до того, как карточка упадёт!
                   </p>
-                  <p className="mb-6 text-gray-200 dark:text-gray-800 transition-colors">
-                    Сложность: <span className="font-medium">
-                  {difficultyLevel === 'easy' ? 'Легкая' : difficultyLevel === 'medium' ? 'Средняя' : 'Сложная'}
-                </span>
+                  <p className="mb-5 text-gray-600 dark:text-gray-400 text-sm">
+                    Сложность: <strong className="text-gray-900 dark:text-white">{diffText()} ({difficulty}/5)</strong>
                   </p>
-                  <div className="mb-4 p-4 bg-gray-500 dark:bg-gray-400 rounded-lg transition-colors">
-                    <h3 className="font-bold text-white dark:text-gray-900 mb-2 transition-colors">Как играть:</h3>
-                    <ul className="text-left text-gray-200 dark:text-gray-800 list-disc pl-5 transition-colors">
-                      <li>Выбирайте правильный ответ из вариантов</li>
-                      <li>Выберите до того, как задача упадет</li>
-                      <li>За каждый правильный ответ +10 очков</li>
-                      <li>3 упущенные задачи = конец игры</li>
+                  <div className="mb-5 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-left transition-colors">
+                    <p className="font-bold text-gray-900 dark:text-white text-sm mb-2">Правила:</p>
+                    <ul className="text-xs text-gray-600 dark:text-gray-400 list-disc pl-4 space-y-1">
+                      <li>Правильный ответ: <span className="text-green-600 dark:text-green-400 font-medium">+10 очков</span></li>
+                      <li>Неправильный: <span className="text-red-500 font-medium">−5 очков</span></li>
+                      <li>Пропуск: <span className="text-red-500 font-medium">−5 очков и −1 жизнь</span></li>
+                      <li>3 пропуска = конец игры</li>
+                      <li>Время: {formatTime(timeLimit)}</li>
                     </ul>
                   </div>
-                  <Button
-                      onClick={startGameWithCountdown}
-                  >
-                    Начать игру
-                  </Button>
+                  <Button onClick={startGameWithCountdown}>Начать игру</Button>
                 </div>
               </div>
           )}
 
-          {/* Обратный отсчет перед началом */}
+          {/* Обратный отсчёт */}
           {countdownActive && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-80 z-30">
-                <div className="text-9xl font-bold text-white" style={{animation: 'pulse 1.5s infinite'}}>
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-30">
+                <div className="text-9xl font-bold text-white" style={{ animation: 'derivPulse 1s infinite' }}>
                   {countdown}
                 </div>
               </div>
           )}
 
-          {/* Уведомление с обратной связью */}
-          {showFeedback && (
-              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-40"
-                   style={{
-                     animation: 'bounce 0.5s',
-                     backgroundColor: feedbackType === 'success'
-                         ? 'var(--bg-green-700, rgb(21, 128, 61))'
-                         : 'var(--bg-red-700, rgb(185, 28, 28))',
-                     color: 'white'
-                   }}>
+          {/* Фидбек */}
+          {showFeedback && !isAnywayPaused && (
+              <div
+                  className="absolute bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl shadow-lg z-40 text-white font-medium text-sm whitespace-nowrap"
+                  style={{
+                    animation: 'derivBounce 0.5s',
+                    backgroundColor: feedbackType === 'success' ? 'rgb(21,128,61)' : 'rgb(185,28,28)',
+                  }}
+              >
                 {feedbackMessage}
               </div>
           )}
-
-          {/* Добавляем фоновую сетку для лучшего визуального восприятия */}
-          <div className="absolute inset-0 grid grid-cols-8 grid-rows-6 gap-0.5 pointer-events-none">
-            {Array(48).fill(0).map((_, idx) => (
-                <div key={idx}
-                     className="bg-gray-600 dark:bg-gray-300 bg-opacity-20 dark:bg-opacity-20 transition-colors"></div>
-            ))}
-          </div>
         </div>
 
-        {/* Стили для анимаций */}
-        <style>
-          {`
-          @keyframes fall {
-            from { top: -20px; }
-            to { top: 100%; }
-          }
-          
-          @keyframes fallTransform {
-            from { transform: translateY(-20px); }
-            to { transform: translateY(calc(100vh - 100px)); }
-          }
-          
-          @keyframes fallNew {
-            0% { top: -80px; }
-            100% { top: 100%; }
-          }
-          
-          @keyframes fadeOut {
-            from { opacity: 1; }
-            to { opacity: 0; }
-          }
-          
-          @keyframes pulse {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.8; transform: scale(1.05); }
-            100% { opacity: 1; transform: scale(1); }
-          }
-          
-          @keyframes bounce {
-            0%, 100% { transform: translateX(-50%) translateY(0); }
-            50% { transform: translateX(-50%) translateY(-10px); }
-          }
-        `}
-        </style>
+        <style>{`
+                @keyframes derivFall    { 0% { top: -120px; } 100% { top: 105%; } }
+                @keyframes derivFadeOut { from { opacity: 1; } to { opacity: 0; transform: translateX(-50%) scale(0.9); } }
+                @keyframes derivPulse   { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+                @keyframes derivBounce  { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-8px); } }
+
+                /* KaTeX внутри кнопок — сбрасываем цвет */
+                .katex { color: inherit !important; }
+                .katex-display-fix .katex { font-size: 1.15em; }
+            `}</style>
       </div>
   );
 };
