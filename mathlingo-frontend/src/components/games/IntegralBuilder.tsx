@@ -44,6 +44,12 @@ const IntegralBuilder: React.FC<IntegralBuilderProps> = ({
   const [problemsCompleted, setProblemsCompleted] = useState(0);
 
   const timerRef = React.useRef<NodeJS.Timeout | null>(null);
+  // Защита от двойного вызова endGame()/onComplete: раньше endGame()
+  // вызывался прямо внутри updater-функции setTimeRemaining — под React
+  // StrictMode такие updater'ы могут быть вызваны дважды за один рендер
+  // (см. тот же баг в DerivFall.tsx, найденный по дублирующимся попыткам
+  // submit-attempt в проде).
+  const gameEndedRef = React.useRef(false);
 
   // Загрузка проблем из источника
   useEffect(() => {
@@ -68,24 +74,28 @@ const IntegralBuilder: React.FC<IntegralBuilderProps> = ({
     setGameStarted(true);
     setTimeRemaining(timeLimit);
     setProblemsCompleted(0);
+    gameEndedRef.current = false;
 
-    // Запустить таймер игры
+    // Запустить таймер игры — только чистое вычисление следующего
+    // состояния, endGame() вызывается из эффекта ниже (см. gameEndedRef).
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) {
-          endGame();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeRemaining(prev => Math.max(0, prev - 1));
     }, 1000);
 
     loadNewProblem();
   };
 
+  useEffect(() => {
+    if (gameStarted && !gameOver && timeRemaining <= 0) endGame();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeRemaining, gameStarted, gameOver]);
+
   // Завершить игру
   const endGame = () => {
+    if (gameEndedRef.current) return;
+    gameEndedRef.current = true;
+
     setGameOver(true);
     setGameStarted(false);
     setFeedback('Время истекло!');
