@@ -98,13 +98,13 @@ function Home() {
                 <div className="flex items-center justify-center gap-4 flex-wrap">
                     <Link
                         to="/register"
-                        className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white font-semibold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                        className="brand-gradient brand-gradient-hover flex items-center gap-2 text-white font-semibold px-8 py-3.5 rounded-xl shadow-lg shadow-indigo-500/25"
                     >
                         Начать бесплатно <ArrowRight className="w-5 h-5" />
                     </Link>
                     <Link
                         to="/login"
-                        className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-white font-semibold px-8 py-3.5 rounded-xl transition-all"
+                        className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 hover:scale-[1.03] active:scale-95 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-white font-semibold px-8 py-3.5 rounded-xl transition-all"
                     >
                         У меня есть аккаунт
                     </Link>
