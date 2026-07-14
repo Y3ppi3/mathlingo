@@ -10,7 +10,11 @@ from fastapi.responses import JSONResponse
 from app.database import get_db
 from app.models import AuditLog
 from app.auth import get_admin_current_user_optional
-from app.routes import users, tasks, admin, gamification, subjects, subject_operations, skills, game_scenarios, dashboard
+from app.routes import (
+    users, tasks, admin, admin_tasks, admin_ai, admin_content_quality,
+    gamification_maps, gamification_tasks, gamification_mastery,
+    subjects, subject_operations, skills, game_scenarios, dashboard,
+)
 from app.routes.admin_gamification import router as admin_gamification_router
 
 app = FastAPI(title="MathLingo API")
@@ -207,14 +211,20 @@ app.add_middleware(
 
 # Regular routes
 app.include_router(admin.router)
+app.include_router(admin_tasks.router)
+app.include_router(admin_ai.router)
+app.include_router(admin_content_quality.router)
 app.include_router(users.router, prefix="/api", tags=["users"])
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 app.include_router(subjects.router, prefix="/api/subjects", tags=["subjects"])
-app.include_router(gamification.router, prefix="/gamification")
+app.include_router(gamification_maps.router)
+app.include_router(gamification_tasks.router)
+app.include_router(gamification_mastery.router)
 app.include_router(admin_gamification_router)
 app.include_router(subject_operations.router)
 app.include_router(skills.router)
 app.include_router(game_scenarios.router)
+app.include_router(game_scenarios.student_router)
 app.include_router(dashboard.router)
 
 
