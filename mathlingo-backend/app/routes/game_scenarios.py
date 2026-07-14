@@ -4,6 +4,11 @@ R3 task 2: CRUD игровых сценариев + чек-лист + preview-г
 docs/roadmap/product-technical-plan.md, R3 §3, §5). Сам конструктор
 (форма + live-предпросмотр от лица ученика в UI) — R3 задача 5; здесь —
 backend-контракт, на который он будет опираться.
+
+Студенческие эндпоинты активного сценария и попытки игры (R3 задачи 3, 6)
+переехали сюда из gamification.py при разбиении по доменам (R4) — тот же
+домен (GameScenario), что и admin-CRUD выше, только другой префикс и роли,
+поэтому отдельный router (student_router) в этом же файле.
 """
 from datetime import datetime
 
@@ -12,14 +17,16 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.database import get_db
-from app.models import Admin, GameScenario, GameScenarioChecklistItem, Skill
+from app.models import Admin, GameScenario, GameScenarioChecklistItem, Skill, User
 from app.schemas import (
+    ActiveGameScenarioResponse, GameAttemptSubmissionRequest, GameAttemptSubmissionResponse,
     GameScenarioChecklistItemResponse, GameScenarioCreate, GameScenarioResponse, GameScenarioUpdate,
 )
-from app.auth import get_admin_current_user, require_role
-from app.services import game_config
+from app.auth import get_admin_current_user, get_current_user, require_role
+from app.services import game_attempts, game_config
 
 router = APIRouter(prefix="/admin/game-scenarios", tags=["game_scenarios"])
+student_router = APIRouter(prefix="/gamification/game-scenarios", tags=["game_scenarios"])
 
 # Создание/редактирование/публикация/архивация сценария — superadmin и
 # content_manager (симметрично CAN_MANAGE_CONTENT в admin.py). Просмотр,
@@ -275,3 +282,88 @@ def archive_scenario(
     db.commit()
     db.refresh(scenario)
     return scenario
+
+
+# --- Студенческие эндпоинты (см. docstring модуля) ---
+
+@student_router.get("/active/{template_key}", response_model=ActiveGameScenarioResponse)
+def get_active_game_scenario(
+        template_key: str,
+        mode: Optional[str] = None,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    """
+    R3 task 3/4: единственная точка, откуда игровые компоненты берут конфиг —
+    DerivFall/IntegralBuilder/MathLab больше не хранят задания в коде, а
+    запрашивают текущий опубликованный сценарий шаблона здесь. Если
+    опубликованных сценариев несколько (после задачи 5, когда появится
+    конструктор) — берём самый свежий по published_at; выбор "какой именно
+    сценарий подходит ученику" (level_range/группы) — вне scope этой задачи,
+    минимально жизнеспособная выборка.
+
+    `mode` — только для mathlab: derivatives/integrals делят один
+    template_key, но это разные опубликованные сценарии (см.
+    MathLabConfig.mode), поэтому фильтруем по config->mode в Python, а не
+    в SQL — набор опубликованных сценариев одного шаблона мал, а
+    JSON-фильтрация в SQL отличалась бы между SQLite (тесты) и Postgres
+    (dev/prod) без practической пользы.
+    """
+    if template_key not in GameScenario.TEMPLATE_KEYS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Неизвестный template_key: {template_key}")
+
+    now = datetime.utcnow()
+    scenarios = (
+        db.query(GameScenario)
+        .filter(
+            GameScenario.template_key == template_key,
+            GameScenario.status == "published",
+            (GameScenario.availability_from == None) | (GameScenario.availability_from <= now),
+            (GameScenario.availability_to == None) | (GameScenario.availability_to >= now),
+        )
+        .order_by(GameScenario.published_at.desc())
+        .all()
+    )
+    if mode is not None:
+        scenarios = [s for s in scenarios if s.config.get("mode") == mode]
+
+    if not scenarios:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Для этого шаблона нет доступного опубликованного сценария")
+
+    return scenarios[0]
+
+
+def _is_scenario_active(scenario: GameScenario, now: datetime) -> bool:
+    if scenario.status != "published":
+        return False
+    if scenario.availability_from is not None and scenario.availability_from > now:
+        return False
+    if scenario.availability_to is not None and scenario.availability_to < now:
+        return False
+    return True
+
+
+@student_router.post("/{scenario_id}/submit-attempt", response_model=GameAttemptSubmissionResponse)
+def submit_game_attempt(
+        scenario_id: int,
+        body: GameAttemptSubmissionRequest,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    """
+    R3 task 6: игра пишет ОДНУ попытку на всю сессию (score/max_score), а не
+    на каждый внутриигровой ответ — см. app/services/game_attempts.py.
+    Дополнительно валидирует, что content_id — активный (опубликованный и в
+    окне доступности) game_scenario, как того требует план (R3 §3).
+    """
+    scenario = db.query(GameScenario).filter(GameScenario.id == scenario_id).first()
+    if not scenario:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сценарий не найден")
+    if not _is_scenario_active(scenario, datetime.utcnow()):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Сценарий недоступен для игры")
+
+    attempt = game_attempts.record_attempt(
+        db, current_user.id, scenario,
+        score=body.score, max_score=body.max_score, time_spent_ms=body.time_spent_ms,
+    )
+    return GameAttemptSubmissionResponse(is_correct=attempt.is_correct)
