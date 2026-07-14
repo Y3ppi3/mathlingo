@@ -114,7 +114,16 @@ const GameLauncherPage = () => {
                     },
                 ];
 
-                let filteredGames = availableGames.filter(g => g.subject === subjectTheme);
+                // "Приближение"/"Наполнение" (limits/series) не привязаны ни
+                // к какому Subject в модели данных (skill_id = null у их
+                // GameScenario — играются "без темы", см. GameScenariosPanel.tsx)
+                // — в БД вообще нет предмета с именем "Пределы"/"Ряды", поэтому
+                // subjectTheme для них никогда не совпадёт ни на одном реальном
+                // предмете. Показываем их всегда, независимо от темы — иначе
+                // эти игры физически недостижимы через выбор игры по предмету.
+                let filteredGames = availableGames.filter(g =>
+                    g.subject === subjectTheme || g.subject === 'limits' || g.subject === 'series'
+                );
 
                 if (mechanicType) {
                     const mechanicMap: Record<string, string> = {
