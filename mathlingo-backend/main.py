@@ -200,7 +200,8 @@ origins = [
     "http://192.168.0.157:8000",
     "http://localhost:8000",
     "http://localhost:8001",
-    "http://localhost:8080"
+    "http://localhost:8080",
+    "http://192.168.1.159:5173"
     # Добавьте здесь ваши production домены, когда перейдете в production
 ]
 
@@ -214,7 +215,12 @@ app.add_middleware(
     allow_credentials=True,  # Важно для передачи куки
     allow_methods=["*"],     # Разрешаем все методы
     allow_headers=["*"],     # Разрешаем все заголовки
-    expose_headers=["Content-Type", "Authorization"],
+    # X-CSRF-Token обязателен здесь: фронтенд (5173) и бэкенд (8000) — разные
+    # origin, а без явного expose_headers браузер скрывает от JS ЛЮБОЙ
+    # нестандартный заголовок ответа независимо от того, fetch это или axios.
+    # Без этой строки response.headers['x-csrf-token'] на клиенте всегда
+    # undefined — токен в Redis выпускается исправно, но JS его не видит.
+    expose_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
     max_age=86400,           # Кэширование preflight запросов на 24 часа
 )
 
