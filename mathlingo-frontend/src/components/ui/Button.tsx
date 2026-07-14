@@ -23,7 +23,10 @@ const Button: React.FC<ButtonProps> = ({
     let baseStyles = 'py-2 px-4 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ';
 
     if (variant === 'primary') {
-        baseStyles += 'bg-indigo-600 hover:bg-indigo-500 text-white focus:ring-indigo-500 ';
+        // Тот же градиент, что на Login/Register/Dashboard (.brand-gradient,
+        // см. index.css) — раньше здесь был плоский bg-indigo-600, и кнопка
+        // выглядела иначе, чем везде в остальном приложении (R4).
+        baseStyles += 'brand-gradient brand-gradient-hover text-white focus:ring-indigo-500 ';
     } else if (variant === 'outline') {
         baseStyles += 'border border-indigo-500 text-indigo-500 hover:bg-indigo-50 focus:ring-indigo-500 ';
     } else if (variant === 'danger') {
