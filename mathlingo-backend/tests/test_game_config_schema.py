@@ -192,3 +192,52 @@ def test_derivatives_mode_does_not_require_approach_x():
     # проверка ограничена mode="limits" (см. game_config.py).
     result = game_config.validate_config("mathlab", _valid_mathlab_config())
     assert result["tasks"][0]["approach_x"] is None
+
+
+# --- mathlab mode="series" ("Наполнение", R4) ---
+
+def _valid_series_config():
+    return {
+        "mode": "series",
+        "difficulty": 3,
+        "tasks": [
+            {
+                "id": "s1", "type": "series", "question": "К чему стремится сумма ряда?",
+                "function_expression": "1/2^n",
+                "correct_answer": "1", "options": ["1", "2", "расходится", "0"],
+                "difficulty": 3, "hints": [],
+            },
+        ],
+    }
+
+
+def test_series_valid_config_passes():
+    result = game_config.validate_config("mathlab", _valid_series_config())
+    assert result["mode"] == "series"
+    assert result["tasks"][0]["function_expression"] == "1/2^n"
+
+
+def test_series_requires_type_series():
+    config = _valid_series_config()
+    config["tasks"][0]["type"] = "limit"
+    with pytest.raises(ValueError, match="type должен быть 'series'"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_series_requires_options():
+    config = _valid_series_config()
+    config["tasks"][0]["options"] = None
+    with pytest.raises(ValueError, match="options обязательны"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_series_correct_answer_not_in_options_rejected():
+    config = _valid_series_config()
+    config["tasks"][0]["correct_answer"] = "not-an-option"
+    with pytest.raises(ValueError, match="correct_answer must be one of options"):
+        game_config.validate_config("mathlab", config)
+
+
+def test_series_does_not_require_approach_x():
+    result = game_config.validate_config("mathlab", _valid_series_config())
+    assert result["tasks"][0]["approach_x"] is None

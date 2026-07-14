@@ -58,8 +58,12 @@ class IntegralBuilderConfig(BaseModel):
 
 class MathLabTaskConfig(BaseModel):
     id: str
-    type: Literal["analyze", "find", "calculate", "limit"]
+    type: Literal["analyze", "find", "calculate", "limit", "series"]
     question: str
+    # Для mode="series" — это формула общего члена ряда a(n), например
+    # "1/2^n" (переменная n, не x) — переиспользуем то же поле, а не
+    # заводим отдельное: смысл тот же ("выражение, вокруг которого
+    # построено задание"), только имя переменной определяется режимом.
     function_expression: str
     correct_answer: str
     options: Optional[List[str]] = None
@@ -67,24 +71,25 @@ class MathLabTaskConfig(BaseModel):
     hints: List[str] = Field(default_factory=list)
     # Точка приближения (R4, mode="limits") — "2", "infinity", "-infinity".
     # Не число, т.к. должна кодировать и предел на бесконечности; None для
-    # derivatives/integrals, где этого понятия нет.
+    # derivatives/integrals/series, где этого понятия нет.
     approach_x: Optional[str] = None
 
 
 class MathLabConfig(BaseModel):
     template_key: Literal["mathlab"] = "mathlab"
-    mode: Literal["derivatives", "integrals", "limits"]
+    mode: Literal["derivatives", "integrals", "limits", "series"]
     difficulty: int = Field(ge=1, le=5, default=3)
     tasks: List[MathLabTaskConfig] = Field(min_length=1)
 
     @model_validator(mode="after")
-    def _limits_tasks_require_approach_x_and_options(self):
-        # mode="limits" — геймплей "Приближение" (R4): всегда MC (выбор
-        # значения предела, не печать выражения) и всегда нужна точка
-        # приближения для анимации графика на фронтенде. Проверка
-        # correct_answer-in-options тоже только здесь (не для всех
-        # MathLabTaskConfig) — у derivatives/integrals options историчес-
-        # ки не всегда буквально содержат correct_answer (см. backfill).
+    def _limits_and_series_tasks_are_multiple_choice(self):
+        # mode="limits" ("Приближение") и mode="series" ("Наполнение") —
+        # оба геймплея всегда MC (выбор ответа, не ввод формулы) — та же
+        # причина, по которой печать выражения как ответ была признана
+        # неудачной задумкой у старого MathLab (см. решение по R4).
+        # Проверка correct_answer-in-options ограничена этими режимами —
+        # у derivatives/integrals options исторически не всегда буквально
+        # содержат correct_answer (см. backfill, test_game_content_snapshot).
         if self.mode == "limits":
             for t in self.tasks:
                 if t.type != "limit":
@@ -93,6 +98,14 @@ class MathLabConfig(BaseModel):
                     raise ValueError(f"task '{t.id}': approach_x обязателен для mode=limits")
                 if not t.options:
                     raise ValueError(f"task '{t.id}': options обязательны для mode=limits (ответ — выбор, не ввод)")
+                if t.correct_answer not in t.options:
+                    raise ValueError(f"task '{t.id}': correct_answer must be one of options")
+        elif self.mode == "series":
+            for t in self.tasks:
+                if t.type != "series":
+                    raise ValueError(f"task '{t.id}': type должен быть 'series' для mode=series")
+                if not t.options:
+                    raise ValueError(f"task '{t.id}': options обязательны для mode=series (ответ — выбор, не ввод)")
                 if t.correct_answer not in t.options:
                     raise ValueError(f"task '{t.id}': correct_answer must be one of options")
         return self
