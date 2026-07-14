@@ -17,7 +17,7 @@ export const api = axios.create({
 });
 
 // Интерцептор для добавления токенов и CSRF
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
     // Добавляем авторизационные токены
     const adminToken = localStorage.getItem('adminToken');
     const userToken = localStorage.getItem('token');
@@ -28,8 +28,26 @@ api.interceptors.request.use((config) => {
         config.headers['Authorization'] = `Bearer ${userToken}`;
     }
 
-    // Добавляем CSRF-токен для методов, изменяющих данные
-    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method?.toUpperCase() || '')) {
+    // Добавляем CSRF-токен для методов, изменяющих данные. Админские
+    // эндпоинты аутентифицируются Bearer-токеном, а не cookie-сессией, и
+    // backend их из CSRF-проверки исключает (main.py) — им это не нужно.
+    const isMutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method?.toUpperCase() || '');
+    const isAdminRequest = config.url?.startsWith('/admin');
+    if (isMutating && !isAdminRequest) {
+        // Токена ещё нет (например, самая первая мутация за сессию, пока
+        // AuthContext/login ещё не успели дёрнуть /api/me) — получаем его
+        // ДО отправки запроса, а не постфактум через retry в
+        // response-интерцепторе. Раньше это означало гарантированный первый
+        // 403 (самовосстанавливающийся, но видимый в консоли браузера как
+        // красная ошибка сети независимо от того, что JS его обработал).
+        if (!csrfToken) {
+            try {
+                await api.get('/api/me');
+            } catch {
+                // не авторизован/нет сети — отправляем как есть, дальше
+                // сработает обычная обработка 403 в response-интерцепторе.
+            }
+        }
         if (csrfToken) {
             config.headers['X-CSRF-Token'] = csrfToken;
             console.log('Отправляем CSRF-токен:', csrfToken);
