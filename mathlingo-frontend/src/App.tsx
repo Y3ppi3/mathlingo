@@ -1,7 +1,7 @@
 // App.tsx
 import { useLocation } from 'react-router-dom';
 import AppRoutes from './routes';
-import Navbar from './components/Navbar';
+import Navbar from './components/layout/Navbar';
 
 function App() {
     const { pathname } = useLocation();

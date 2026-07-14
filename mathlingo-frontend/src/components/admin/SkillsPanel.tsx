@@ -1,7 +1,7 @@
 // src/components/admin/SkillsPanel.tsx
 import { useEffect, useState } from 'react';
 import { AxiosError } from 'axios';
-import { fetchSkills, createSkill, updateSkill, fetchSubjects, Skill, Subject } from '../../utils/adminApi';
+import { fetchSkills, createSkill, updateSkill, fetchSubjects, Skill, Subject } from '../../api/adminApi';
 import { adminHasRole } from '../../utils/auth';
 
 const inputCls = "w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors";

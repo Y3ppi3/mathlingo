@@ -1,7 +1,7 @@
 // src/pages/TaskSolverPage.tsx
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import Navbar from '../components/layout/Navbar';
 import TaskSolver from '../components/adventure/TaskSolver';
 
 const TaskSolverPage: React.FC = () => {

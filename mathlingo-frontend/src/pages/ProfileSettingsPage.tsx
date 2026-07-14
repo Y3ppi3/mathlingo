@@ -1,114 +1,64 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import Navbar from '../components/layout/Navbar';
 import { useUser } from '../hooks/useUser';
-import AvatarSelector from '../components/AvatarSelector';
-import Button from '../components/Button';
-import Input from '../components/Input';
-import { fetchWithRetry } from '../utils/fetchUtils';
+import AvatarSelector from '../components/ui/AvatarSelector';
+import Input from '../components/ui/Input';
+import { ArrowLeft, Save, User, Image, Mail, Lock, Bell, Trash2 } from 'lucide-react';
 
-const ProfileSettingsPage: React.FC = () => {
+type NotificationKey = 'email' | 'browser' | 'weekly' | 'achievements';
+
+interface NotificationSettings {
+    email: boolean;
+    browser: boolean;
+    weekly: boolean;
+    achievements: boolean;
+}
+
+const ProfileSettingsPage = () => {
     const { user, loading, error, refreshUserData } = useUser();
     const navigate = useNavigate();
     const isMounted = useRef(true);
 
-    // Состояния формы
     const [formData, setFormData] = useState({
         username: '',
-        avatarId: undefined as number | undefined
+        avatarId: undefined as number | undefined,
     });
-
-    // Состояние для хранения оригинальных данных при загрузке
     const [originalData, setOriginalData] = useState({
         username: '',
-        avatarId: undefined as number | undefined
+        avatarId: undefined as number | undefined,
     });
 
-    const [formError, setFormError] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
+    const [formError, setFormError]           = useState('');
+    const [isSaving, setIsSaving]             = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
-    const [formKey, setFormKey] = useState(Date.now()); // Ключ для полного пересоздания формы
+    const [formKey, setFormKey]               = useState(Date.now());
 
-    // Инициализация начальных данных
+    const [passwords, setPasswords] = useState({
+        current: '', next: '', confirm: '',
+    });
+
+    const [notifications, setNotifications] = useState<NotificationSettings>({
+        email: true, browser: false, weekly: true, achievements: true,
+    });
+
     useEffect(() => {
         if (user) {
-            const userData = {
-                username: user.username,
-                avatarId: user.avatarId
-            };
-
+            const userData = { username: user.username, avatarId: user.avatarId };
             setFormData(userData);
             setOriginalData(userData);
-
-            console.log("Инициализация данных пользователя:", userData);
         }
     }, [user]);
 
-    // Вычисляем, есть ли изменения в форме
-    const hasFormChanges = useCallback(() => {
-        return formData.username !== originalData.username ||
-            formData.avatarId !== originalData.avatarId;
-    }, [formData, originalData]);
-
-    // Эффект для очистки
     useEffect(() => {
-        return () => {
-            isMounted.current = false;
-        };
+        return () => { isMounted.current = false; };
     }, []);
 
-    // Обработчики изменения формы
-    const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData(prev => ({
-            ...prev,
-            username: e.target.value
-        }));
-    };
+    const hasFormChanges = useCallback(() =>
+            formData.username !== originalData.username ||
+            formData.avatarId !== originalData.avatarId,
+        [formData, originalData]);
 
-    const handleAvatarSelect = (id: number) => {
-        setFormData(prev => ({
-            ...prev,
-            avatarId: id
-        }));
-    };
-
-    // Полная перезагрузка формы и данных пользователя
-    const resetFormWithFreshData = async () => {
-        if (!isMounted.current) return;
-
-        try {
-            // Устанавливаем флаг, что идет обновление формы
-            const updatingFormFlag = 'updating_profile_form';
-            if (sessionStorage.getItem(updatingFormFlag)) {
-                console.log('🔄 Обновление формы уже выполняется, пропускаем');
-                return;
-            }
-
-            sessionStorage.setItem(updatingFormFlag, '1');
-
-            const freshUser = await refreshUserData();
-
-            if (freshUser) {
-                const freshData = {
-                    username: freshUser.username,
-                    avatarId: freshUser.avatarId
-                };
-
-                // Атомарное обновление состояния формы
-                setFormData(freshData);
-                setOriginalData(freshData);
-                setFormKey(Date.now());
-            }
-
-            // Очищаем флаг
-            sessionStorage.removeItem(updatingFormFlag);
-        } catch (err) {
-            console.error("❌ Ошибка при обновлении данных формы:", err);
-            sessionStorage.removeItem('updating_profile_form');
-        }
-    };
-
-    // Обработчик отправки формы
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -122,28 +72,20 @@ const ProfileSettingsPage: React.FC = () => {
         setIsSaving(true);
 
         try {
-            // Создаём объект только с измененными данными
-            const updateData: {username?: string, avatarId?: number | null} = {};
-
-            if (formData.username !== originalData.username) {
-                updateData.username = formData.username;
-            }
-
-            if (formData.avatarId !== originalData.avatarId) {
-                updateData.avatarId = formData.avatarId ?? null;
-            }
+            const updateData: { username?: string; avatarId?: number | null } = {};
+            if (formData.username !== originalData.username) updateData.username = formData.username;
+            if (formData.avatarId !== originalData.avatarId) updateData.avatarId = formData.avatarId ?? null;
 
             const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-            // Использовать fetch с учетом CSRF-защиты
             const response = await fetch(`${API_URL}/api/me/update`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 },
                 body: JSON.stringify(updateData),
-                credentials: 'include', // Отправлять куки
+                credentials: 'include',
             });
 
             if (!response.ok) {
@@ -152,43 +94,63 @@ const ProfileSettingsPage: React.FC = () => {
             }
 
             const responseData = await response.json();
+            setSuccessMessage(responseData.message || 'Профиль успешно обновлён!');
 
-            // НЕ сохраняем данные в localStorage
-
-            setSuccessMessage(responseData.message || 'Профиль успешно обновлен!');
-
-            // Обновить состояние формы с новыми данными
-            await refreshUserData();
+            const freshUser = await refreshUserData();
+            if (freshUser && isMounted.current) {
+                const freshData = { username: freshUser.username, avatarId: freshUser.avatarId };
+                setFormData(freshData);
+                setOriginalData(freshData);
+                setFormKey(Date.now());
+            }
         } catch (err) {
-            console.error('Ошибка при сохранении:', err);
-            setFormError(`Не удалось сохранить изменения: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`);
+            setFormError(`Не удалось сохранить: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`);
         } finally {
-            setIsSaving(false);
+            if (isMounted.current) setIsSaving(false);
         }
-    };    // Отображение состояния загрузки
+    };
+
+    const toggleNotification = (key: NotificationKey) => {
+        setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const notificationItems: { key: NotificationKey; label: string; desc: string }[] = [
+        { key: 'email',        label: 'Email-уведомления',    desc: 'Получать уведомления на почту'    },
+        { key: 'browser',      label: 'Уведомления браузера', desc: 'Push-уведомления в браузере'      },
+        { key: 'weekly',       label: 'Еженедельный отчёт',   desc: 'Сводка прогресса за неделю'       },
+        { key: 'achievements', label: 'Достижения',           desc: 'Уведомления о новых достижениях'  },
+    ];
+
+    // — Loading —
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-900 dark:bg-white">
+            <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
                 <Navbar />
-                <div className="container mx-auto px-4 py-8 mt-16">
-                    <div className="flex justify-center items-center h-96">
-                        <div className="text-lg text-gray-400">Загрузка профиля...</div>
+                <div className="container mx-auto px-4 mt-16 flex justify-center items-center h-96">
+                    <div className="flex items-center gap-3 text-gray-400 dark:text-slate-400">
+                        <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                        Загрузка...
                     </div>
                 </div>
             </div>
         );
     }
 
-    // Отображение ошибки
+    // — Error —
     if (error || !user) {
         return (
-            <div className="min-h-screen bg-gray-900 dark:bg-white">
+            <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
                 <Navbar />
-                <div className="container mx-auto px-4 py-8 mt-16">
-                    <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg p-6 text-center">
-                        <h2 className="text-xl text-red-500 mb-4">{error || 'Не удалось загрузить профиль'}</h2>
-                        <Link to="/dashboard">
-                            <Button>Вернуться на главную</Button>
+                <div className="container mx-auto px-4 mt-16 py-8">
+                    <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-8 text-center transition-colors">
+                        <p className="text-red-500 dark:text-red-400 text-lg mb-4">
+                            {error || 'Не удалось загрузить профиль'}
+                        </p>
+                        <Link
+                            to="/dashboard"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-sm font-medium rounded-xl transition-all"
+                        >
+                            Вернуться на главную
                         </Link>
                     </div>
                 </div>
@@ -196,101 +158,188 @@ const ProfileSettingsPage: React.FC = () => {
         );
     }
 
-    // Определяем, есть ли изменения для кнопки
     const isFormChanged = hasFormChanges();
 
     return (
-        <div className="min-h-screen bg-gray-900 dark:bg-white">
+        <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
             <Navbar />
-            <div className="container mx-auto px-4 py-8 mt-16">
-                <div className="bg-gray-800 dark:bg-gray-100 rounded-lg shadow-lg p-6">
-                    <div className="flex items-center mb-6">
-                        <button
-                            className="text-indigo-400 hover:text-indigo-300 mr-2"
-                            onClick={() => navigate('/profile')}
-                        >
-                            ← Назад
-                        </button>
-                        <h1 className="text-2xl font-bold text-white dark:text-gray-900">Настройки профиля</h1>
-                    </div>
+            <div className="max-w-3xl mx-auto px-4 py-8 mt-16">
 
+                {/* Заголовок */}
+                <div className="mb-8 flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/profile')}
+                        style={{padding: 0}} // глобальный button { padding: 0.6em 1.2em } из index.css ломает w-10 h-10
+                        className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all"
+                        aria-label="Назад к профилю"
+                    >
+                        <ArrowLeft className="w-5 h-5"/>
+                    </button>
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white transition-colors">
+                            Настройки профиля
+                        </h1>
+                        <p className="text-gray-400 dark:text-slate-400 mt-0.5 text-sm transition-colors">
+                            Управление аккаунтом и предпочтениями
+                        </p>
+                    </div>
+                </div>
+
+                <form key={formKey} onSubmit={handleSubmit} className="space-y-6">
+
+                    {/* Уведомления формы */}
                     {formError && (
-                        <div className="mb-4 p-3 bg-red-900/50 dark:bg-red-100 text-red-200 dark:text-red-700 rounded">
+                        <div
+                            className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-red-600 dark:text-red-400 text-sm transition-colors">
                             {formError}
                         </div>
                     )}
-
                     {successMessage && (
-                        <div className="mb-4 p-3 bg-green-900/50 dark:bg-green-100 text-green-200 dark:text-green-700 rounded">
+                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 py-3 text-green-600 dark:text-green-400 text-sm transition-colors">
                             {successMessage}
                         </div>
                     )}
 
-                    {/* Используем ключ для полного пересоздания формы при обновлении данных */}
-                    <form key={formKey} onSubmit={handleSubmit} className="max-w-xl">
-                        <div className="mb-6">
-                            <h2 className="text-lg font-semibold mb-3 text-white dark:text-gray-900">Основная информация</h2>
-
-                            <div className="mb-4">
-                                <label htmlFor="username-field" className="block mb-2 text-gray-300 dark:text-gray-700">
-                                    Имя пользователя
-                                </label>
-                                <Input
-                                    id="username-field"
-                                    name="username"
-                                    type="text"
-                                    value={formData.username}
-                                    onChange={handleUsernameChange}
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mb-6">
-                            <h2 className="text-lg font-semibold mb-3 text-white dark:text-gray-900">Аватар</h2>
-
-                            <AvatarSelector
-                                selectedAvatar={formData.avatarId}
-                                onSelect={handleAvatarSelect}
-                            />
-
-                            <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
-                                Выберите аватар из галереи, который будет отображаться в вашем профиле.
-                            </p>
-                        </div>
-
-                        <div className="mb-6">
-                            <h2 className="text-lg font-semibold mb-3 text-white dark:text-gray-900">Email</h2>
-                            <p className="text-gray-300 dark:text-gray-700 mb-2">
-                                {user.email}
-                            </p>
-                            <p className="text-gray-400 dark:text-gray-500 text-sm">
-                                Вы не можете изменить email после регистрации.
-                            </p>
-                        </div>
-
-                        <div className="flex justify-end space-x-4">
-                            <Button
-                                variant="outline"
-                                onClick={() => navigate('/profile')}
-                                type="button"
-                            >
-                                Отмена
-                            </Button>
-
+                    {/* — Имя пользователя — */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                            <User className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                            Основная информация
+                        </h2>
+                        <label className="block text-xs font-medium text-gray-400 dark:text-slate-400 mb-1.5 uppercase tracking-wider transition-colors">
+                            Имя пользователя
+                        </label>
+                        <Input
+                            id="username-field"
+                            name="username"
+                            type="text"
+                            value={formData.username}
+                            onChange={e => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                            required
+                        />
+                        <div className="mt-5 flex justify-end">
                             <button
                                 type="submit"
                                 disabled={isSaving || !isFormChanged}
-                                className={`px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-                                ${isFormChanged
-                                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white focus:ring-indigo-500'
-                                    : 'bg-gray-400 cursor-not-allowed text-white'}`}
+                                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                    isFormChanged && !isSaving
+                                        ? 'bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white shadow-sm shadow-indigo-500/25'
+                                        : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+                                }`}
                             >
-                                {isSaving ? 'Сохранение...' : 'Сохранить изменения'}
+                                <Save className="w-4 h-4" />
+                                {isSaving ? 'Сохранение...' : 'Сохранить'}
                             </button>
                         </div>
-                    </form>
+                    </div>
+
+                    {/* — Аватар — */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                            <Image className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                            Аватар
+                        </h2>
+                        <AvatarSelector
+                            selectedAvatar={formData.avatarId}
+                            onSelect={id => setFormData(prev => ({ ...prev, avatarId: id }))}
+                        />
+                        <p className="text-xs text-gray-400 dark:text-slate-500 mt-3 transition-colors">
+                            Выберите аватар из галереи — он будет отображаться в профиле и меню.
+                        </p>
+                    </div>
+
+                    {/* — Email — */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                            <Mail className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                            Email
+                        </h2>
+                        <div className="bg-white dark:bg-gray-700/50 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-3 transition-colors">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white transition-colors">
+                                {user.email}
+                            </p>
+                        </div>
+                        <p className="text-xs text-gray-400 dark:text-slate-500 mt-2 transition-colors">
+                            Email нельзя изменить после регистрации.
+                        </p>
+                    </div>
+
+                </form>
+
+                {/* — Смена пароля — (отдельно от form) */}
+                <div className="mt-6 bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                        <Lock className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                        Смена пароля
+                    </h2>
+                    <div className="grid sm:grid-cols-3 gap-4">
+                        {(['current', 'next', 'confirm'] as const).map((key, i) => (
+                            <div key={key}>
+                                <label className="block text-xs font-medium text-gray-400 dark:text-slate-400 mb-1.5 uppercase tracking-wider transition-colors">
+                                    {['Текущий пароль', 'Новый пароль', 'Подтвердите'][i]}
+                                </label>
+                                <input
+                                    type="password"
+                                    placeholder="••••••••"
+                                    value={passwords[key]}
+                                    onChange={e => setPasswords(prev => ({ ...prev, [key]: e.target.value }))}
+                                    className="w-full bg-white dark:bg-gray-900/80 border border-gray-300 dark:border-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-2.5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-all text-sm"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-4">
+                        <button className="px-6 py-2.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 rounded-xl text-gray-700 dark:text-white text-sm font-medium transition-all">
+                            Изменить пароль
+                        </button>
+                    </div>
                 </div>
+
+                {/* — Уведомления — */}
+                <div className="mt-6 bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                        <Bell className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                        Уведомления
+                    </h2>
+                    <div className="space-y-4">
+                        {notificationItems.map(n => (
+                            <div key={n.key} className="flex items-center justify-between py-1">
+                                <div>
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white transition-colors">{n.label}</div>
+                                    <div className="text-xs text-gray-400 dark:text-slate-500 transition-colors">{n.desc}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleNotification(n.key)}
+                                    aria-label={`Переключить ${n.label}`}
+                                    className={`relative w-12 h-6 rounded-full transition-all ${
+                                        notifications[n.key] ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-slate-700'
+                                    }`}
+                                >
+                                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                                        notifications[n.key] ? 'left-7' : 'left-1'
+                                    }`} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* — Danger zone — */}
+                <div className="mt-6 bg-red-50 dark:bg-red-500/5 border border-red-200 dark:border-red-500/20 rounded-2xl p-6 backdrop-blur transition-colors">
+                    <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2 transition-colors">
+                        <Trash2 className="w-5 h-5" />
+                        Опасная зона
+                    </h2>
+                    <p className="text-gray-500 dark:text-slate-400 text-sm mb-4 transition-colors">
+                        Удаление аккаунта необратимо. Все данные будут уничтожены.
+                    </p>
+                    <button className="flex items-center gap-2 px-5 py-2.5 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 border border-red-200 dark:border-red-500/30 hover:border-red-300 dark:hover:border-red-500/50 text-red-600 dark:text-red-400 rounded-xl text-sm font-medium transition-all">
+                        <Trash2 className="w-4 h-4" />
+                        Удалить аккаунт
+                    </button>
+                </div>
+
             </div>
         </div>
     );

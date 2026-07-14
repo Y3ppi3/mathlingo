@@ -1,7 +1,7 @@
 // src/components/adventure/TaskSolver.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchTaskGroup, submitTaskAnswer } from '../../utils/api';
+import { fetchTaskGroup, submitTaskAnswer } from '../../api/studentApi';
 import ProgressBar from '../ui/ProgressBar';
 import RewardPopup from './RewardPopup';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';

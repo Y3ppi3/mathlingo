@@ -1,11 +1,11 @@
-// src/components/Navbar.tsx
+// src/components/layout/Navbar.tsx
 import { useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import logo from "../assets/logo.png";
-import UserAvatar from "./UserAvatar";
+import { useAuth } from "../../context/AuthContext";
+import logo from "../../assets/logo.png";
+import UserAvatar from "../ui/UserAvatar";
 import UserMenu from "./UserMenu";
-import { useUser } from "../hooks/useUser";
+import { useUser } from "../../hooks/useUser";
 
 function Navbar() {
     const { isAuthenticated, logout } = useAuth();
@@ -27,7 +27,7 @@ function Navbar() {
     };
 
     return (
-        <nav className="bg-gray-900 text-white dark:bg-white dark:text-gray-900 p-4 fixed top-0 left-0 w-full z-50 shadow-md transition-colors">
+        <nav className="bg-white text-gray-900 dark:bg-gray-900 dark:text-white p-4 fixed top-0 left-0 w-full z-50 shadow-md transition-colors">
             <div className="max-w-7xl mx-auto px-4">
                 <div className="flex justify-between items-center h-16">
                     {/* Левая часть: лого + название */}

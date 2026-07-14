@@ -1,6 +1,6 @@
 // src/components/admin/AuditLogPanel.tsx
 import { useEffect, useState } from 'react';
-import { fetchAuditLog, AuditLogEntry } from '../../utils/adminApi';
+import { fetchAuditLog, AuditLogEntry } from '../../api/adminApi';
 
 const inputCls = "px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors";
 

@@ -1,6 +1,6 @@
 // src/components/adventure/LevelPicker.tsx
 import { useEffect, useState } from 'react';
-import { fetchSkillLevel, setSkillLevelOverride, clearSkillLevelOverride, SkillLevel, SkillLevelValue } from '../../utils/api';
+import { fetchSkillLevel, setSkillLevelOverride, clearSkillLevelOverride, SkillLevel, SkillLevelValue } from '../../api/studentApi';
 
 const LEVELS_ORDER: SkillLevelValue[] = ['basic', 'standard', 'advanced'];
 const LEVEL_LABELS: Record<SkillLevelValue, string> = {

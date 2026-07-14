@@ -1,6 +1,6 @@
 // src/components/admin/AdminOverviewPanel.tsx
 import { useEffect, useState } from 'react';
-import { fetchDashboardOverview, DashboardOverview } from '../../utils/adminApi';
+import { fetchDashboardOverview, DashboardOverview } from '../../api/adminApi';
 
 const TEMPLATE_LABEL: Record<string, string> = {
     derivfall: 'DerivFall',

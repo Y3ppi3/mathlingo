@@ -1,7 +1,7 @@
 // src/components/adventure/DiagnosticSolver.tsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchSkillDiagnostic, submitDiagnostic, DiagnosticData, DiagnosticAnswer, DiagnosticSubmitResult } from '../../utils/api';
+import { fetchSkillDiagnostic, submitDiagnostic, DiagnosticData, DiagnosticAnswer, DiagnosticSubmitResult } from '../../api/studentApi';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import LevelPicker from './LevelPicker';
 

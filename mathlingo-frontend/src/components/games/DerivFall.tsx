@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
-import Button from '../Button';
+import Button from '../ui/Button';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 // ─── KaTeX рендерер ───────────────────────────────────────────────────────────

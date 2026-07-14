@@ -1,7 +1,7 @@
 // src/components/admin/TasksPanel.tsx
 import { useEffect, useState } from 'react';
 import { AxiosError } from 'axios';
-import { fetchTasks, deleteTask, transitionTask, downloadTasksExport, Task, TaskStatus, TaskTransitionAction } from '../../utils/adminApi';
+import { fetchTasks, deleteTask, transitionTask, downloadTasksExport, Task, TaskStatus, TaskTransitionAction } from '../../api/adminApi';
 import { adminHasRole, AdminRole } from '../../utils/auth';
 import TaskForm from './TaskForm';
 
@@ -171,7 +171,7 @@ const TasksPanel = () => {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 transition-colors">
                     <thead>
                     <tr className="bg-gray-50 dark:bg-gray-700/50 transition-colors">
-                        {['ID', 'Название', 'Предмет', 'Уровень', 'Статус', 'Действия'].map(h => (
+                        {['ID', 'Название', 'Предмет', 'Уровень', 'Статус', 'Источник', 'Действия'].map(h => (
                             <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider transition-colors">
                                 {h}
                             </th>
@@ -181,7 +181,7 @@ const TasksPanel = () => {
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-800 transition-colors">
                     {tasks.length === 0 ? (
                         <tr>
-                            <td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-400 dark:text-gray-500 transition-colors">
+                            <td colSpan={7} className="px-5 py-12 text-center text-sm text-gray-400 dark:text-gray-500 transition-colors">
                                 Заданий пока нет.{' '}
                                 {canManageContent && (
                                     <button onClick={handleAdd} className="text-indigo-600 dark:text-indigo-400 hover:underline">
@@ -216,6 +216,15 @@ const TasksPanel = () => {
                                         <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium transition-colors ${STATUS_COLOR[status]}`}>
                                             {STATUS_LABELS[status]}
                                         </span>
+                                    </td>
+                                    <td className="px-5 py-3.5">
+                                        {task.source === 'ai' ? (
+                                            <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
+                                                AI
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-400 dark:text-gray-500">вручную</span>
+                                        )}
                                     </td>
                                     <td className="px-5 py-3.5">
                                         <div className="flex items-center gap-3 flex-wrap">

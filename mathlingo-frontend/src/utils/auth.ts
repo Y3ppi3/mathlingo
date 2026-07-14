@@ -1,5 +1,5 @@
 // src/utils/auth.ts (исправленный)
-import { getCurrentUser } from './api';
+import { getCurrentUser } from '../api/studentApi';
 
 // Функции для обычных пользователей
 export const login = async (email: string, password: string): Promise<any> => {
