@@ -410,6 +410,7 @@ GameScenarioStatus = Literal["draft", "published", "archived"]
 class GameScenarioCreate(BaseModel):
     template_key: GameTemplateKey
     config: Dict[str, Any]
+    skill_id: Optional[int] = None
     level_range: Optional[List[int]] = None
     availability_from: Optional[datetime] = None
     availability_to: Optional[datetime] = None
@@ -417,6 +418,7 @@ class GameScenarioCreate(BaseModel):
 
 class GameScenarioUpdate(BaseModel):
     config: Optional[Dict[str, Any]] = None
+    skill_id: Optional[int] = None
     level_range: Optional[List[int]] = None
     availability_from: Optional[datetime] = None
     availability_to: Optional[datetime] = None
@@ -427,6 +429,7 @@ class GameScenarioResponse(BaseModel):
     template_key: GameTemplateKey
     config: Dict[str, Any]
     status: GameScenarioStatus
+    skill_id: Optional[int] = None
     level_range: Optional[List[int]] = None
     availability_from: Optional[datetime] = None
     availability_to: Optional[datetime] = None
@@ -454,6 +457,18 @@ class ActiveGameScenarioResponse(BaseModel):
     template_key: GameTemplateKey
     config: Dict[str, Any]
     level_range: Optional[List[int]] = None
+
+
+# R3 task 6: итог игровой сессии — одна попытка на всю сессию, см.
+# app/services/game_attempts.py.
+class GameAttemptSubmissionRequest(BaseModel):
+    score: int
+    max_score: int
+    time_spent_ms: Optional[int] = None
+
+
+class GameAttemptSubmissionResponse(BaseModel):
+    is_correct: bool
 
 
 # Student-facing: то же самое, что задание в task-groups/data — без

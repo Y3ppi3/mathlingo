@@ -479,6 +479,24 @@ export const fetchActiveGameScenario = async <TConfig,>(templateKey: string, mod
     return response.data;
 };
 
+// R3 task 6: одна попытка на всю сыгранную сессию (не на каждый
+// внутриигровой ответ) — см. app/services/game_attempts.py на бэкенде.
+export interface GameAttemptSubmission {
+    is_correct: boolean;
+}
+
+export const submitGameAttempt = async (
+    scenarioId: number,
+    score: number,
+    maxScore: number,
+    timeSpentMs?: number,
+): Promise<GameAttemptSubmission> => {
+    const response = await api.post(`/gamification/game-scenarios/${scenarioId}/submit-attempt`, {
+        score, max_score: maxScore, time_spent_ms: timeSpentMs,
+    });
+    return response.data;
+};
+
 // API для прогресса пользователя
 export const fetchUserProgress = async () => {
     try {
