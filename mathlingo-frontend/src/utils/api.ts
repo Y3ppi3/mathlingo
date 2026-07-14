@@ -392,6 +392,38 @@ export interface DerivFallGameConfig {
     problems: DerivFallProblemConfig[];
 }
 
+// R3 task 4
+export interface IntegralBuilderProblemConfig {
+    id: string;
+    question: string;
+    solution_pieces: string[];
+    distractors: string[];
+    difficulty: 'easy' | 'medium' | 'hard';
+}
+
+export interface IntegralBuilderGameConfig {
+    initial_difficulty: number;
+    time_limit: number;
+    problems: IntegralBuilderProblemConfig[];
+}
+
+export interface MathLabTaskConfig {
+    id: string;
+    type: 'analyze' | 'find' | 'calculate';
+    question: string;
+    function_expression: string;
+    correct_answer: string;
+    options?: string[];
+    difficulty: number;
+    hints: string[];
+}
+
+export interface MathLabGameConfig {
+    mode: 'derivatives' | 'integrals';
+    difficulty: number;
+    tasks: MathLabTaskConfig[];
+}
+
 export interface ActiveGameScenario<TConfig> {
     id: number;
     template_key: string;
@@ -399,8 +431,8 @@ export interface ActiveGameScenario<TConfig> {
     level_range: number[] | null;
 }
 
-export const fetchActiveGameScenario = async <TConfig,>(templateKey: string): Promise<ActiveGameScenario<TConfig>> => {
-    const response = await api.get(`/gamification/game-scenarios/active/${templateKey}`);
+export const fetchActiveGameScenario = async <TConfig,>(templateKey: string, mode?: string): Promise<ActiveGameScenario<TConfig>> => {
+    const response = await api.get(`/gamification/game-scenarios/active/${templateKey}`, { params: mode ? { mode } : undefined });
     return response.data;
 };
 

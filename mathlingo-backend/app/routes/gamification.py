@@ -693,23 +693,31 @@ def clear_skill_level_override(
 @router.get("/game-scenarios/active/{template_key}", response_model=ActiveGameScenarioResponse)
 def get_active_game_scenario(
         template_key: str,
+        mode: Optional[str] = None,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user),
 ):
     """
-    R3 task 3: единственная точка, откуда игровые компоненты берут конфиг —
-    DerivFall (и, после задачи 4, IntegralBuilder/MathLab) больше не
-    хранят задания в коде, а запрашивают текущий опубликованный сценарий
-    шаблона здесь. Если опубликованных сценариев несколько (после задачи 5,
-    когда появится конструктор) — берём самый свежий по published_at; выбор
-    "какой именно сценарий подходит ученику" (level_range/группы) — вне
-    scope этой задачи, минимально жизнеспособная выборка.
+    R3 task 3/4: единственная точка, откуда игровые компоненты берут конфиг —
+    DerivFall/IntegralBuilder/MathLab больше не хранят задания в коде, а
+    запрашивают текущий опубликованный сценарий шаблона здесь. Если
+    опубликованных сценариев несколько (после задачи 5, когда появится
+    конструктор) — берём самый свежий по published_at; выбор "какой именно
+    сценарий подходит ученику" (level_range/группы) — вне scope этой задачи,
+    минимально жизнеспособная выборка.
+
+    `mode` — только для mathlab: derivatives/integrals делят один
+    template_key, но это разные опубликованные сценарии (см.
+    MathLabConfig.mode), поэтому фильтруем по config->mode в Python, а не
+    в SQL — набор опубликованных сценариев одного шаблона мал, а
+    JSON-фильтрация в SQL отличалась бы между SQLite (тесты) и Postgres
+    (dev/prod) без practической пользы.
     """
     if template_key not in GameScenario.TEMPLATE_KEYS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Неизвестный template_key: {template_key}")
 
     now = datetime.utcnow()
-    scenario = (
+    scenarios = (
         db.query(GameScenario)
         .filter(
             GameScenario.template_key == template_key,
@@ -718,9 +726,12 @@ def get_active_game_scenario(
             (GameScenario.availability_to == None) | (GameScenario.availability_to >= now),
         )
         .order_by(GameScenario.published_at.desc())
-        .first()
+        .all()
     )
-    if not scenario:
+    if mode is not None:
+        scenarios = [s for s in scenarios if s.config.get("mode") == mode]
+
+    if not scenarios:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Для этого шаблона нет доступного опубликованного сценария")
 
-    return scenario
+    return scenarios[0]
