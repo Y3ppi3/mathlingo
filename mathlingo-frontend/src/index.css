@@ -7,10 +7,15 @@
    Новые экраны используют эти классы вместо копирования утилит. */
 @layer components {
   .brand-gradient {
-    @apply bg-gradient-to-r from-indigo-500 to-violet-500;
+    @apply bg-gradient-to-r from-indigo-500 to-violet-500 transition-transform duration-150;
   }
+  /* Лёгкое увеличение при наведении/нажатии — как кнопки на игровых
+     консолях, подчёркивает игровой характер обучения (R4, правка
+     пользователя). Раньше здесь была только смена цвета градиента —
+     сам текст на кнопке иногда сливался с фоном из-за глобального
+     "a:hover { color }" ниже (см. правку в этом же коммите). */
   .brand-gradient-hover {
-    @apply hover:from-indigo-600 hover:to-violet-600;
+    @apply hover:from-indigo-600 hover:to-violet-600 hover:scale-[1.03] active:scale-95;
   }
   .brand-icon-badge {
     @apply inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500;
@@ -38,15 +43,6 @@ h1 {
   line-height: 1.1;
 }
 */
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
 
 body {
   margin: 0;

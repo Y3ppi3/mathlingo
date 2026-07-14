@@ -1,7 +1,16 @@
 import { Link } from "react-router-dom";
-import { Sigma, Home as HomeIcon, ArrowLeft } from "lucide-react";
+import { Sigma, Home as HomeIcon, User as UserIcon, ArrowLeft } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 const NotFound = () => {
+    const { isAuthenticated } = useAuth();
+    // Авторизованного пользователя "На главную" ведёт в его профиль, а не
+    // на маркетинговый Home — на него он и не рассчитан после входа
+    // (правка пользователя, R4).
+    const primaryDestination = isAuthenticated ? "/profile" : "/";
+    const PrimaryIcon = isAuthenticated ? UserIcon : HomeIcon;
+    const primaryLabel = isAuthenticated ? "В профиль" : "На главную";
+
     return (
         <div className="fixed inset-0 bg-white dark:bg-gray-900 flex items-center justify-center px-4 overflow-hidden transition-colors">
             {/* Декоративные математические символы — тот же приём, что на Login/Register */}
@@ -34,11 +43,11 @@ const NotFound = () => {
                         <ArrowLeft className="w-4 h-4" /> Назад
                     </button>
                     <Link
-                        to="/"
+                        to={primaryDestination}
                         style={{ padding: '0.75rem 1.25rem' }}
-                        className="brand-gradient brand-gradient-hover flex items-center gap-2 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                        className="brand-gradient brand-gradient-hover flex items-center gap-2 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-500/25"
                     >
-                        <HomeIcon className="w-4 h-4" /> На главную
+                        <PrimaryIcon className="w-4 h-4" /> {primaryLabel}
                     </Link>
                 </div>
             </div>
