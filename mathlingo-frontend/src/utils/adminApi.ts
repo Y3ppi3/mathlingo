@@ -568,3 +568,154 @@ export const setAiQuota = async (adminId: number, monthlyLimit: number): Promise
     const response = await adminApi.put(`/admin/ai/quota/${adminId}`, { monthly_limit: monthlyLimit });
     return response.data;
 };
+
+// Пост-публикационный мониторинг (R2 task 7)
+export type ContentFlagType = 'anomaly' | 'complaint';
+export type ContentFlagStatus = 'open' | 'resolved' | 'dismissed';
+
+export interface ContentFlag {
+    id: number;
+    task_id: number;
+    flag_type: ContentFlagType;
+    details?: Record<string, unknown> | null;
+    status: ContentFlagStatus;
+    created_by_admin_id?: number | null;
+    resolved_by_admin_id?: number | null;
+    created_at: string;
+    resolved_at?: string | null;
+}
+
+export interface TaskQuality {
+    task_id: number;
+    title: string;
+    status: TaskStatus;
+    sample_size: number;
+    accuracy?: number | null;
+    avg_time_spent_ms?: number | null;
+    avg_hints_used?: number | null;
+    open_flags: number;
+    flags: ContentFlag[];
+}
+
+export const fetchAiTaskQuality = async (): Promise<TaskQuality[]> => {
+    const response = await adminApi.get('/admin/quality/ai-tasks');
+    return response.data;
+};
+
+export const fileContentComplaint = async (taskId: number, comment: string): Promise<ContentFlag> => {
+    const response = await adminApi.post(`/admin/tasks/${taskId}/flags`, { comment });
+    return response.data;
+};
+
+export const updateContentFlag = async (flagId: number, status: 'resolved' | 'dismissed'): Promise<ContentFlag> => {
+    const response = await adminApi.put(`/admin/content-flags/${flagId}`, { status });
+    return response.data;
+};
+
+export const returnTaskToReview = async (taskId: number): Promise<Task> => {
+    const response = await adminApi.post(`/admin/tasks/${taskId}/return-to-review`);
+    return response.data;
+};
+
+// Игровые сценарии (R3 task 2 backend, task 5 конструктор) — конфиг
+// типизирован per-template в самой панели через DerivFallGameConfig /
+// IntegralBuilderGameConfig / MathLabGameConfig из utils/api.ts (тот же
+// контракт, что использует студенческий эндпоинт активного сценария).
+//
+// Ниже функции сами проверяют response.status и бросают Error с detail —
+// перехватчик adminApi выше нарочно РЕЗОЛВИТ (не реджектит) любой ответ с
+// телом ошибки (используется для confirmation-flow при удалении), из-за
+// этого try/catch вокруг обычного adminApi.post/put в остальном файле не
+// ловит 4xx для этих ручек. Трогать общий перехватчик рискованно — на нём
+// завязан confirmation-flow в deleteSubject/deleteAdventureMap; вместо
+// этого разворачиваем ответ здесь же, точечно.
+const unwrapGameScenarioResponse = <T,>(response: { status: number; data: unknown }): T => {
+    if (response.status >= 400) {
+        throw new Error((response.data as { detail?: string } | undefined)?.detail || 'Запрос не выполнен');
+    }
+    return response.data as T;
+};
+
+export type GameScenarioTemplateKey = 'derivfall' | 'integralbuilder' | 'mathlab';
+export type GameScenarioStatus = 'draft' | 'published' | 'archived';
+
+export interface GameScenario {
+    id: number;
+    template_key: GameScenarioTemplateKey;
+    config: Record<string, unknown>;
+    status: GameScenarioStatus;
+    level_range?: [number, number] | null;
+    availability_from?: string | null;
+    availability_to?: string | null;
+    created_by_admin_id?: number | null;
+    preview_passed_at?: string | null;
+    published_at?: string | null;
+    created_at: string;
+    updated_at?: string | null;
+}
+
+// Синхронизировано с GameScenarioChecklistItem.ITEM_KEYS (app/models.py).
+export const CHECKLIST_ITEM_KEYS = ['texts_correct', 'no_placeholders', 'katex_renders'] as const;
+export type ChecklistItemKey = typeof CHECKLIST_ITEM_KEYS[number];
+
+export interface GameScenarioChecklistItem {
+    item_key: string;
+    checked_by_admin_id?: number | null;
+    checked_at?: string | null;
+}
+
+export const fetchGameScenarios = async (filters?: { status_filter?: GameScenarioStatus; template_key?: GameScenarioTemplateKey }): Promise<GameScenario[]> => {
+    const response = await adminApi.get('/admin/game-scenarios/', { params: filters });
+    return unwrapGameScenarioResponse<GameScenario[]>(response);
+};
+
+export const fetchGameScenario = async (id: number): Promise<GameScenario> => {
+    const response = await adminApi.get(`/admin/game-scenarios/${id}`);
+    return unwrapGameScenarioResponse<GameScenario>(response);
+};
+
+export const createGameScenario = async (data: {
+    template_key: GameScenarioTemplateKey;
+    config: Record<string, unknown>;
+    level_range?: [number, number] | null;
+    availability_from?: string | null;
+    availability_to?: string | null;
+}): Promise<GameScenario> => {
+    const response = await adminApi.post('/admin/game-scenarios/', data);
+    return unwrapGameScenarioResponse<GameScenario>(response);
+};
+
+export const updateGameScenario = async (id: number, data: {
+    config?: Record<string, unknown>;
+    level_range?: [number, number] | null;
+    availability_from?: string | null;
+    availability_to?: string | null;
+}): Promise<GameScenario> => {
+    const response = await adminApi.put(`/admin/game-scenarios/${id}`, data);
+    return unwrapGameScenarioResponse<GameScenario>(response);
+};
+
+export const fetchGameScenarioChecklist = async (id: number): Promise<GameScenarioChecklistItem[]> => {
+    const response = await adminApi.get(`/admin/game-scenarios/${id}/checklist`);
+    return unwrapGameScenarioResponse<GameScenarioChecklistItem[]>(response);
+};
+
+export const checkGameScenarioChecklistItem = async (id: number, itemKey: ChecklistItemKey): Promise<GameScenarioChecklistItem> => {
+    const response = await adminApi.post(`/admin/game-scenarios/${id}/checklist/${itemKey}`);
+    return unwrapGameScenarioResponse<GameScenarioChecklistItem>(response);
+};
+
+export const previewGameScenario = async (id: number): Promise<GameScenario> => {
+    const response = await adminApi.post(`/admin/game-scenarios/${id}/preview`);
+    return unwrapGameScenarioResponse<GameScenario>(response);
+};
+
+export const publishGameScenario = async (id: number): Promise<GameScenario> => {
+    const response = await adminApi.post(`/admin/game-scenarios/${id}/publish`);
+    return unwrapGameScenarioResponse<GameScenario>(response);
+};
+
+export const archiveGameScenario = async (id: number): Promise<GameScenario> => {
+    const response = await adminApi.post(`/admin/game-scenarios/${id}/archive`);
+    return unwrapGameScenarioResponse<GameScenario>(response);
+};

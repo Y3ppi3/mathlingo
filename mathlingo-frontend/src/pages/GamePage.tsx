@@ -15,6 +15,8 @@ import {
     DerivFallGameConfig,
     IntegralBuilderGameConfig,
     MathLabGameConfig,
+    mapIntegralBuilderProblems,
+    mapMathLabTasks,
 } from '../utils/api';
 
 // Navbar = p-4 (16px) + h-16 (64px) + p-4 (16px) = 96px
@@ -113,13 +115,7 @@ const GamePage = () => {
                     <IntegralBuilder
                         initialDifficulty={customDifficulty !== undefined ? customDifficulty : integralBuilderConfig.initial_difficulty}
                         timeLimit={integralBuilderConfig.time_limit}
-                        problemsSource={integralBuilderConfig.problems.map(p => ({
-                            id: p.id,
-                            question: p.question,
-                            solutionPieces: p.solution_pieces,
-                            distractors: p.distractors,
-                            difficulty: p.difficulty,
-                        }))}
+                        problemsSource={mapIntegralBuilderProblems(integralBuilderConfig.problems)}
                         onComplete={handleGameComplete}
                     />
                 );
@@ -130,16 +126,7 @@ const GamePage = () => {
                     <MathLab
                         mode={mathLabConfig.mode}
                         difficulty={customDifficulty !== undefined ? customDifficulty : mathLabConfig.difficulty}
-                        tasksSource={mathLabConfig.tasks.map(t => ({
-                            id: t.id,
-                            type: t.type,
-                            question: t.question,
-                            functionExpression: t.function_expression,
-                            correctAnswer: t.correct_answer,
-                            options: t.options,
-                            difficulty: t.difficulty,
-                            hints: t.hints,
-                        }))}
+                        tasksSource={mapMathLabTasks(mathLabConfig.tasks)}
                         onComplete={handleGameComplete}
                     />
                 );

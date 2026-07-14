@@ -23,8 +23,9 @@ import ContentZonePanel from "./components/admin/ContentZonePanel";
 import UsersPanel from "./components/admin/UsersPanel";
 import StaffPanel from "./components/admin/StaffPanel";
 import AuditLogPanel from "./components/admin/AuditLogPanel";
-import StubZonePanel from "./components/admin/StubZonePanel";
 import AiQueuePanel from "./components/admin/AiQueuePanel";
+import QualityPanel from "./components/admin/QualityPanel";
+import GameScenariosPanel from "./components/admin/GameScenariosPanel";
 
 // Компонент для защиты маршрутов админа
 function AdminProtectedRoute({ children }: { children: JSX.Element }) {
@@ -162,17 +163,9 @@ function AppRoutes() {
                 <Route path="content" element={<ContentZonePanel />} />
                 <Route path="ai-queue" element={<AiQueuePanel />} />
                 <Route path="games" element={<GamificationPanel />} />
+                <Route path="game-scenarios" element={<GameScenariosPanel />} />
                 <Route path="students" element={<UsersPanel />} />
-                <Route
-                    path="quality"
-                    element={
-                        <StubZonePanel
-                            title="Аналитика качества"
-                            availableFrom="R2"
-                            description="Точность, время решения, жалобы и оценки преподавателей по AI-сгенерированным заданиям."
-                        />
-                    }
-                />
+                <Route path="quality" element={<QualityPanel />} />
                 <Route path="staff" element={<StaffPanel />} />
                 <Route path="audit" element={<AuditLogPanel />} />
             </Route>
