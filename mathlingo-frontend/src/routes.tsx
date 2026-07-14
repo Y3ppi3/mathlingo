@@ -9,6 +9,7 @@ import LogoutPage from "./pages/LogoutPage";
 import AdventureMapPage from "./pages/AdventureMapPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
+import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // R4: весь admin-поддерево и игровые компоненты (katex/mathjs/recharts/
@@ -181,6 +182,9 @@ function AppRoutes() {
                 <Route path="staff" element={<StaffPanel />} />
                 <Route path="audit" element={<AuditLogPanel />} />
             </Route>
+
+            {/* Любой не совпавший путь — дружелюбная 404, а не пустой экран */}
+            <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>
     );
