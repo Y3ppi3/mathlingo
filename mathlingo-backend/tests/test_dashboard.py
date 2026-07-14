@@ -129,12 +129,14 @@ def test_review_queue_and_publish_errors(client, db, subject):
     db.add(Task(title="in-review", subject="derivatives", status="in_review"))
     db.commit()
 
+    skill = _make_skill(db, subject, code="skill-review-queue")
+
     template = PromptTemplate(name="t", version=1, template_text="x", task_type="single_answer")
     db.add(template)
     db.commit()
     db.refresh(template)
     order = AIGenerationOrder(
-        subject_id=subject.id, skill_id=1, task_type="single_answer", count=1,
+        subject_id=subject.id, skill_id=skill.id, task_type="single_answer", count=1,
         prompt_template_id=template.id, status="completed",
     )
     db.add(order)

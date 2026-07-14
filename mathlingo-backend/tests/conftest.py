@@ -5,8 +5,8 @@ os.environ["SECRET_KEY"] = "test-secret-key-with-at-least-thirty-two-characters"
 
 import fakeredis
 import pytest
+from sqlalchemy import create_engine, event
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -21,6 +21,20 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
+
+
+# SQLite не проверяет FK-констрейнты (в т.ч. ON DELETE CASCADE/SET NULL) без
+# этого — без него тесты бы молча пропустили как раз тот класс багов,
+# который здесь чинится (R4: DELETE /admin/tasks/{id} падал 500 на
+# Postgres из-за отсутствовавшего ON DELETE, но в тестах на SQLite
+# ничего не отражало проблему).
+@event.listens_for(engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, _):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

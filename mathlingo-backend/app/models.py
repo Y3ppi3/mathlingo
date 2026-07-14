@@ -325,7 +325,10 @@ class AIGenerationItem(Base):
     sanitization_result = Column(JSON, nullable=True)
     deterministic_check_result = Column(JSON, nullable=True)
     ai_critic_result = Column(JSON, nullable=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
+    # ondelete=SET NULL (R4): жёсткое удаление задания не должно ронять
+    # удаление ошибкой FK — история AI-генерации (draft/validation/critic)
+    # ценна сама по себе и переживает удаление итогового Task.
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     order = relationship("AIGenerationOrder", back_populates="items")
@@ -383,7 +386,10 @@ class ContentStatusHistory(Base):
     __tablename__ = "content_status_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    # ondelete=CASCADE (R4): история переходов статуса не имеет смысла без
+    # самого задания — раньше DELETE /admin/tasks/{id} падал 500 (FK
+    # violation) для любого задания, прошедшего хоть один переход статуса.
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
     from_status = Column(String, nullable=True)
     to_status = Column(String, nullable=False)
     actor_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
@@ -477,7 +483,9 @@ class ContentFlag(Base):
     STATUSES = ("open", "resolved", "dismissed")
 
     id = Column(Integer, primary_key=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    # ondelete=CASCADE (R4) — та же причина, что у ContentStatusHistory
+    # выше: жалоба/аномалия на удалённое задание бессмысленна сама по себе.
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
     flag_type = Column(String, nullable=False)
     details = Column(JSON, nullable=True)
     status = Column(String, nullable=False, default="open")
