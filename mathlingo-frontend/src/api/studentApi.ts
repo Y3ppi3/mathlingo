@@ -52,14 +52,32 @@ api.interceptors.response.use(
         }
         return response;
     },
-    (error) => {
-        // Для 403 ошибок, связанных с CSRF
-        if (error.response && error.response.status === 403 &&
-            error.response.data?.detail?.includes('CSRF')) {
-            console.error('CSRF ошибка:', error.response.data.detail);
-
-            // Можно попробовать получить новый токен
-            api.get('/api/me').catch(() => {});
+    async (error) => {
+        // Для 403 ошибок, связанных с CSRF — токен в памяти протух (Redis TTL
+        // 3600с при более долгой сессии) либо отсутствовал (гонка на старте).
+        // Раньше здесь только "тихо" освежали токен на будущее, а исходный
+        // запрос (например, отправка результата только что сыгранной игры)
+        // считался окончательно проваленным — результат терялся безвозвратно
+        // (см. отчёт "прошёл DerivFall на 120/120, очки не засчитало", 403 в
+        // логах на submit-attempt). Теперь повторяем исходный запрос один раз
+        // со свежим токеном вместо того, чтобы просто готовиться к следующему.
+        const originalRequest = error.config;
+        if (
+            error.response && error.response.status === 403 &&
+            error.response.data?.detail?.includes('CSRF') &&
+            originalRequest && !originalRequest._csrfRetry
+        ) {
+            originalRequest._csrfRetry = true;
+            try {
+                const meResponse = await api.get('/api/me');
+                const freshToken = meResponse.headers['x-csrf-token'];
+                if (freshToken) {
+                    originalRequest.headers['X-CSRF-Token'] = freshToken;
+                    return api.request(originalRequest);
+                }
+            } catch {
+                // Не авторизован либо сеть недоступна — падаем в обычную обработку ниже.
+            }
         }
 
         // Аккаунт деактивирован администратором уже ПОСЛЕ выдачи токена
