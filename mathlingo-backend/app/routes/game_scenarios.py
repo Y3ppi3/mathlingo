@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.database import get_db
-from app.models import Admin, GameScenario, GameScenarioChecklistItem
+from app.models import Admin, GameScenario, GameScenarioChecklistItem, Skill
 from app.schemas import (
     GameScenarioChecklistItemResponse, GameScenarioCreate, GameScenarioResponse, GameScenarioUpdate,
 )
@@ -36,6 +36,17 @@ def _get_scenario_or_404(db: Session, scenario_id: int) -> GameScenario:
     return scenario
 
 
+def _validate_skill_exists(db: Session, skill_id: Optional[int]) -> None:
+    # skill_id нужен для mastery_service (см. app/services/game_attempts.py,
+    # R3 task 6) — без темы попытки в этом сценарии не будут влиять на
+    # mastery_state, но сам сценарий валиден и без неё (nullable, как и
+    # Task.skill_id в R1 "на первое время").
+    if skill_id is None:
+        return
+    if not db.query(Skill).filter(Skill.id == skill_id).first():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тема (skill) не найдена")
+
+
 @router.post("/", response_model=GameScenarioResponse)
 def create_scenario(
         body: GameScenarioCreate,
@@ -47,10 +58,13 @@ def create_scenario(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
+    _validate_skill_exists(db, body.skill_id)
+
     scenario = GameScenario(
         template_key=body.template_key,
         config=validated_config,
         status="draft",
+        skill_id=body.skill_id,
         level_range=body.level_range,
         availability_from=body.availability_from,
         availability_to=body.availability_to,
@@ -114,6 +128,9 @@ def update_scenario(
         scenario.preview_passed_at = None
         scenario.updated_at = datetime.utcnow()
 
+    if body.skill_id is not None:
+        _validate_skill_exists(db, body.skill_id)
+        scenario.skill_id = body.skill_id
     if body.level_range is not None:
         scenario.level_range = body.level_range
     if body.availability_from is not None:

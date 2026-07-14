@@ -1,5 +1,5 @@
 // src/pages/GamePage.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { LogOut, AlertTriangle } from 'lucide-react';
@@ -12,6 +12,7 @@ import RewardPopup from '../components/adventure/RewardPopup';
 import { mockGameData } from '../utils/gameMockData';
 import {
     fetchActiveGameScenario,
+    submitGameAttempt,
     DerivFallGameConfig,
     IntegralBuilderGameConfig,
     MathLabGameConfig,
@@ -43,9 +44,16 @@ const GamePage = () => {
     const [mathLabConfig, setMathLabConfig] = useState<MathLabGameConfig | null>(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+    // R3 task 6: сценарий, за который отчитываемся попыткой по завершении
+    // сессии — id из fetchActiveGameScenario, а не из URL (gameId — это
+    // мнемоника механики, не id сценария).
+    const activeScenarioIdRef = useRef<number | null>(null);
+    const sessionStartRef = useRef<number | null>(null);
+
     useEffect(() => {
         const loadGameInfo = async () => {
             setLoading(true);
+            activeScenarioIdRef.current = null;
             try {
                 if (!gameId || !(gameId in mockGameData)) {
                     setError('Игра не найдена');
@@ -62,16 +70,21 @@ const GamePage = () => {
                 if (gameId === 'deriv-fall') {
                     const scenario = await fetchActiveGameScenario<DerivFallGameConfig>('derivfall');
                     setDerivFallConfig(scenario.config);
+                    activeScenarioIdRef.current = scenario.id;
                 } else if (gameId === 'integral-builder') {
                     const scenario = await fetchActiveGameScenario<IntegralBuilderGameConfig>('integralbuilder');
                     setIntegralBuilderConfig(scenario.config);
+                    activeScenarioIdRef.current = scenario.id;
                 } else if (gameId === 'math-lab-derivatives') {
                     const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'derivatives');
                     setMathLabConfig(scenario.config);
+                    activeScenarioIdRef.current = scenario.id;
                 } else if (gameId === 'math-lab-integrals') {
                     const scenario = await fetchActiveGameScenario<MathLabGameConfig>('mathlab', 'integrals');
                     setMathLabConfig(scenario.config);
+                    activeScenarioIdRef.current = scenario.id;
                 }
+                sessionStartRef.current = Date.now();
             } catch (err) {
                 if (axios.isAxiosError(err) && err.response?.status === 404) {
                     setError('Игра временно недоступна — сценарий не опубликован');
@@ -89,6 +102,14 @@ const GamePage = () => {
         setScore(finalScore);
         setMaxScore(finalMaxScore);
         setGameCompleted(true);
+
+        // Best-effort: попытка — это телеметрия/mastery, не должна блокировать
+        // экран награды, если бэкенд недоступен.
+        if (activeScenarioIdRef.current !== null) {
+            const timeSpentMs = sessionStartRef.current !== null ? Date.now() - sessionStartRef.current : undefined;
+            submitGameAttempt(activeScenarioIdRef.current, finalScore, finalMaxScore, timeSpentMs)
+                .catch(err => console.error('Не удалось записать попытку игры:', err));
+        }
     };
 
     const handleReturnToMap = () => navigate(`/subject/${subjectId}/map`);

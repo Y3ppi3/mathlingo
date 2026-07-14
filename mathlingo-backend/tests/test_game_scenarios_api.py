@@ -238,3 +238,45 @@ def test_teacher_cannot_archive_scenario(client, content_manager_admin, teacher_
     scenario_id = _create_scenario(client, content_manager_admin).json()["id"]
     response = client.post(f"/admin/game-scenarios/{scenario_id}/archive", headers=authorization_header(teacher_admin))
     assert response.status_code == 403
+
+
+# --- skill_id (R3 task 6) ---
+
+def test_create_with_unknown_skill_id_rejected(client, content_manager_admin):
+    response = client.post(
+        "/admin/game-scenarios/",
+        headers=authorization_header(content_manager_admin),
+        json={"template_key": "derivfall", "config": VALID_DERIVFALL_CONFIG, "skill_id": 999999},
+    )
+    assert response.status_code == 404
+
+
+def test_create_with_valid_skill_id(client, content_manager_admin, db):
+    from app.models import Skill, Subject
+
+    subj = Subject(name="Derivatives", code="derivatives-skill-test")
+    db.add(subj)
+    db.commit()
+    db.refresh(subj)
+    skill = Skill(subject_id=subj.id, name="Chain rule", code="chain-rule")
+    db.add(skill)
+    db.commit()
+    db.refresh(skill)
+
+    response = client.post(
+        "/admin/game-scenarios/",
+        headers=authorization_header(content_manager_admin),
+        json={"template_key": "derivfall", "config": VALID_DERIVFALL_CONFIG, "skill_id": skill.id},
+    )
+    assert response.status_code == 200
+    assert response.json()["skill_id"] == skill.id
+
+
+def test_update_with_unknown_skill_id_rejected(client, content_manager_admin):
+    scenario_id = _create_scenario(client, content_manager_admin).json()["id"]
+    response = client.put(
+        f"/admin/game-scenarios/{scenario_id}",
+        headers=authorization_header(content_manager_admin),
+        json={"skill_id": 999999},
+    )
+    assert response.status_code == 404

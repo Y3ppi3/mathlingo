@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from app.database import get_db
 from app.models import Admin, Attempt, Diagnostic, GameScenario, MasteryState, User, Task, TaskGroup, MapLocation, AdventureMap, UserProgress, Achievement
 from app.auth import get_admin_current_user, get_current_user, get_token_from_request, require_role
-from app.services import content_quality, mastery
+from app.services import content_quality, game_attempts, mastery
 from app.schemas import (
     AdminCreate,
     AdminResponse,
@@ -35,6 +35,8 @@ from app.schemas import (
     LevelOverrideRequest,
     LevelOverrideResponse,
     ActiveGameScenarioResponse,
+    GameAttemptSubmissionRequest,
+    GameAttemptSubmissionResponse,
 )
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -735,3 +737,39 @@ def get_active_game_scenario(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Для этого шаблона нет доступного опубликованного сценария")
 
     return scenarios[0]
+
+
+def _is_scenario_active(scenario: GameScenario, now: datetime) -> bool:
+    if scenario.status != "published":
+        return False
+    if scenario.availability_from is not None and scenario.availability_from > now:
+        return False
+    if scenario.availability_to is not None and scenario.availability_to < now:
+        return False
+    return True
+
+
+@router.post("/game-scenarios/{scenario_id}/submit-attempt", response_model=GameAttemptSubmissionResponse)
+def submit_game_attempt(
+        scenario_id: int,
+        body: GameAttemptSubmissionRequest,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    """
+    R3 task 6: игра пишет ОДНУ попытку на всю сессию (score/max_score), а не
+    на каждый внутриигровой ответ — см. app/services/game_attempts.py.
+    Дополнительно валидирует, что content_id — активный (опубликованный и в
+    окне доступности) game_scenario, как того требует план (R3 §3).
+    """
+    scenario = db.query(GameScenario).filter(GameScenario.id == scenario_id).first()
+    if not scenario:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сценарий не найден")
+    if not _is_scenario_active(scenario, datetime.utcnow()):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Сценарий недоступен для игры")
+
+    attempt = game_attempts.record_attempt(
+        db, current_user.id, scenario,
+        score=body.score, max_score=body.max_score, time_spent_ms=body.time_spent_ms,
+    )
+    return GameAttemptSubmissionResponse(is_correct=attempt.is_correct)

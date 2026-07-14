@@ -4,8 +4,9 @@ import {
     fetchGameScenarios, createGameScenario, updateGameScenario,
     fetchGameScenarioChecklist, checkGameScenarioChecklistItem,
     previewGameScenario, publishGameScenario, archiveGameScenario,
+    fetchSkills,
     GameScenario, GameScenarioTemplateKey, GameScenarioStatus,
-    GameScenarioChecklistItem, CHECKLIST_ITEM_KEYS,
+    GameScenarioChecklistItem, CHECKLIST_ITEM_KEYS, Skill,
 } from '../../utils/adminApi';
 import {
     DerivFallGameConfig, DerivFallProblemConfig,
@@ -236,11 +237,12 @@ const MathLabForm = ({ config, onChange }: { config: Extract<FormConfig, { templ
 );
 
 // ── Форма создания/редактирования сценария ──────────────────────────────────────
-const ScenarioForm = ({ initial, onClose, onSaved }: { initial: GameScenario | null; onClose: () => void; onSaved: () => void }) => {
+const ScenarioForm = ({ initial, skills, onClose, onSaved }: { initial: GameScenario | null; skills: Skill[]; onClose: () => void; onSaved: () => void }) => {
     const [templateKey, setTemplateKey] = useState<GameScenarioTemplateKey>(initial?.template_key ?? 'derivfall');
     const [config, setConfig] = useState<FormConfig>(
         initial ? ({ ...initial.config, template_key: initial.template_key } as FormConfig) : emptyConfig(templateKey)
     );
+    const [skillId, setSkillId] = useState<string>(initial?.skill_id?.toString() ?? '');
     const [levelMin, setLevelMin] = useState<string>(initial?.level_range?.[0]?.toString() ?? '');
     const [levelMax, setLevelMax] = useState<string>(initial?.level_range?.[1]?.toString() ?? '');
     const [availFrom, setAvailFrom] = useState<string>(initial?.availability_from?.slice(0, 16) ?? '');
@@ -264,6 +266,7 @@ const ScenarioForm = ({ initial, onClose, onSaved }: { initial: GameScenario | n
             if (initial) {
                 await updateGameScenario(initial.id, {
                     config: configBody,
+                    skill_id: skillId ? parseInt(skillId, 10) : null,
                     level_range: levelRange ?? null,
                     availability_from: availFrom ? new Date(availFrom).toISOString() : null,
                     availability_to: availTo ? new Date(availTo).toISOString() : null,
@@ -272,6 +275,7 @@ const ScenarioForm = ({ initial, onClose, onSaved }: { initial: GameScenario | n
                 await createGameScenario({
                     template_key,
                     config: configBody,
+                    skill_id: skillId ? parseInt(skillId, 10) : undefined,
                     level_range: levelRange,
                     availability_from: availFrom ? new Date(availFrom).toISOString() : undefined,
                     availability_to: availTo ? new Date(availTo).toISOString() : undefined,
@@ -299,6 +303,15 @@ const ScenarioForm = ({ initial, onClose, onSaved }: { initial: GameScenario | n
                         {(Object.keys(TEMPLATE_LABEL) as GameScenarioTemplateKey[]).map(k => <option key={k} value={k}>{TEMPLATE_LABEL[k]}</option>)}
                     </select>
                     {initial && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Шаблон нельзя сменить после создания.</p>}
+                </div>
+
+                <div>
+                    <label className={labelCls}>Тема (необязательно)</label>
+                    <select className={inputCls} value={skillId} onChange={e => setSkillId(e.target.value)}>
+                        <option value="">— без темы —</option>
+                        {skills.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Без темы попытки в игре пишутся в статистику, но не влияют на рекомендованный уровень ученика.</p>
                 </div>
 
                 {config.template_key === 'derivfall' && <DerivFallForm config={config} onChange={setConfig} />}
@@ -492,6 +505,7 @@ const ScenarioDetail = ({ scenario, onChanged }: { scenario: GameScenario; onCha
 // ── Основной компонент ────────────────────────────────────────────────────────
 const GameScenariosPanel = () => {
     const [scenarios, setScenarios] = useState<GameScenario[]>([]);
+    const [skills, setSkills] = useState<Skill[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [statusFilter, setStatusFilter] = useState<GameScenarioStatus | ''>('');
@@ -501,6 +515,7 @@ const GameScenariosPanel = () => {
     const [editingScenario, setEditingScenario] = useState<GameScenario | null>(null);
 
     const canManage = adminHasRole('superadmin', 'content_manager');
+    const skillsById = new Map(skills.map(s => [s.id, s.name]));
 
     const load = () => {
         setLoading(true);
@@ -514,6 +529,7 @@ const GameScenariosPanel = () => {
     };
 
     useEffect(load, [statusFilter, templateFilter]);
+    useEffect(() => { fetchSkills().then(setSkills).catch(() => {}); }, []);
 
     const handleCreate = () => { setEditingScenario(null); setShowForm(true); };
     const handleEdit = (s: GameScenario) => { setEditingScenario(s); setShowForm(true); };
@@ -562,6 +578,9 @@ const GameScenariosPanel = () => {
                                         </span>
                                     )}
                                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[s.status]}`}>{STATUS_LABEL[s.status]}</span>
+                                    {s.skill_id != null && (
+                                        <span className="text-xs text-gray-400 dark:text-gray-500">{skillsById.get(s.skill_id) ?? `тема #${s.skill_id}`}</span>
+                                    )}
                                     {s.level_range && (
                                         <span className="text-xs text-gray-400 dark:text-gray-500">уровень {s.level_range[0]}–{s.level_range[1]}</span>
                                     )}
@@ -588,6 +607,7 @@ const GameScenariosPanel = () => {
             {showForm && (
                 <ScenarioForm
                     initial={editingScenario}
+                    skills={skills}
                     onClose={() => { setShowForm(false); setEditingScenario(null); }}
                     onSaved={handleFormSaved}
                 />

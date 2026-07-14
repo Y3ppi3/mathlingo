@@ -644,6 +644,7 @@ export interface GameScenario {
     template_key: GameScenarioTemplateKey;
     config: Record<string, unknown>;
     status: GameScenarioStatus;
+    skill_id?: number | null;
     level_range?: [number, number] | null;
     availability_from?: string | null;
     availability_to?: string | null;
@@ -677,6 +678,7 @@ export const fetchGameScenario = async (id: number): Promise<GameScenario> => {
 export const createGameScenario = async (data: {
     template_key: GameScenarioTemplateKey;
     config: Record<string, unknown>;
+    skill_id?: number | null;
     level_range?: [number, number] | null;
     availability_from?: string | null;
     availability_to?: string | null;
@@ -687,6 +689,7 @@ export const createGameScenario = async (data: {
 
 export const updateGameScenario = async (id: number, data: {
     config?: Record<string, unknown>;
+    skill_id?: number | null;
     level_range?: [number, number] | null;
     availability_from?: string | null;
     availability_to?: string | null;

@@ -418,6 +418,10 @@ class GameScenario(Base):
     level_range = Column(JSON, nullable=True)  # [min, max], 1..5 — та же шкала, что difficulty-проп у всех трёх шаблонов
     availability_from = Column(DateTime, nullable=True)
     availability_to = Column(DateTime, nullable=True)
+    # R3 task 6: nullable "на первое время", как и Task.skill_id в R1 — без
+    # темы попытка всё равно пишется в attempts (аналитика/дашборд), но
+    # mastery_service нечего пересчитывать (см. app/services/game_attempts.py).
+    skill_id = Column(Integer, ForeignKey("skills.id"), nullable=True)
     created_by_admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
     preview_passed_at = Column(DateTime, nullable=True)
     published_at = Column(DateTime, nullable=True)
@@ -429,6 +433,7 @@ class GameScenario(Base):
     updated_at = Column(DateTime, nullable=True)
 
     created_by_admin = relationship("Admin")
+    skill = relationship("Skill")
 
 
 class GameScenarioChecklistItem(Base):
