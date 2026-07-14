@@ -435,7 +435,7 @@ export interface IntegralBuilderGameConfig {
 
 export interface MathLabTaskConfig {
     id: string;
-    type: 'analyze' | 'find' | 'calculate' | 'limit';
+    type: 'analyze' | 'find' | 'calculate' | 'limit' | 'series';
     question: string;
     function_expression: string;
     correct_answer: string;
@@ -447,7 +447,7 @@ export interface MathLabTaskConfig {
 }
 
 export interface MathLabGameConfig {
-    mode: 'derivatives' | 'integrals' | 'limits';
+    mode: 'derivatives' | 'integrals' | 'limits' | 'series';
     difficulty: number;
     tasks: MathLabTaskConfig[];
 }
@@ -517,6 +517,29 @@ export const mapLimitsTasks = (tasks: MathLabTaskConfig[]): LimitsTaskProp[] =>
         question: t.question,
         functionExpression: t.function_expression,
         approachX: t.approach_x as string,
+        correctAnswer: t.correct_answer,
+        options: t.options as string[],
+        difficulty: t.difficulty,
+        hints: t.hints,
+    }));
+
+// mode="series" (R4, игра "Наполнение") — function_expression здесь
+// хранит формулу общего члена a(n) (переменная n, не x), см. game_config.py.
+export interface SeriesTaskProp {
+    id: string;
+    question: string;
+    termExpression: string;
+    correctAnswer: string;
+    options: string[];
+    difficulty: number;
+    hints: string[];
+}
+
+export const mapSeriesTasks = (tasks: MathLabTaskConfig[]): SeriesTaskProp[] =>
+    tasks.map(t => ({
+        id: t.id,
+        question: t.question,
+        termExpression: t.function_expression,
         correctAnswer: t.correct_answer,
         options: t.options as string[],
         difficulty: t.difficulty,

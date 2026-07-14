@@ -24,5 +24,11 @@ export const mockGameData = {
         description: 'Смотрите, к чему стремится функция, и угадывайте предел!',
         difficulty: 3,
         rewardPoints: 120
+    },
+    'series-filling': {
+        title: 'Наполнение',
+        description: 'Смотрите, как растёт сумма ряда, и угадывайте, сходится ли она!',
+        difficulty: 3,
+        rewardPoints: 120
     }
 };
