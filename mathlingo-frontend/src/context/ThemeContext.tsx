@@ -11,36 +11,30 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    // Определяем предпочтительную тему пользователя из localStorage или системных настроек
     const [theme, setTheme] = useState<Theme>(() => {
-        // Проверяем сохраненную тему в localStorage
         const savedTheme = localStorage.getItem("theme");
         if (savedTheme === "dark" || savedTheme === "light") {
             return savedTheme as Theme;
         }
-
-        // Если нет сохраненной темы, проверяем системные предпочтения
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             return "dark";
         }
-
-        // По умолчанию используем светлую тему
         return "light";
     });
 
-    // При каждом изменении theme добавляем/убираем класс .dark на <html> и сохраняем в localStorage
     useEffect(() => {
+        // ИСПРАВЛЕНО: в проекте base-классы — тёмные, dark:-классы — светлые.
+        // Поэтому .dark на <html> означает СВЕТЛУЮ тему.
+        // dark theme → убираем .dark → работают base-стили (тёмные) ✓
+        // light theme → добавляем .dark → работают dark:-стили (светлые) ✓
         if (theme === "dark") {
-            document.documentElement.classList.add("dark");
-        } else {
             document.documentElement.classList.remove("dark");
+        } else {
+            document.documentElement.classList.add("dark");
         }
-
-        // Сохраняем выбранную тему в localStorage
         localStorage.setItem("theme", theme);
     }, [theme]);
 
-    // Функция переключения темы
     const toggleTheme = () => {
         setTheme(prevTheme => prevTheme === "dark" ? "light" : "dark");
     };
