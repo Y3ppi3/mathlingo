@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
@@ -94,6 +94,7 @@ class UserResponse(UserBase):
     is_active: bool
     created_at: datetime
     avatarId: Optional[int] = None
+    level: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -781,3 +782,208 @@ class TaskSubmissionResponse(BaseModel):
     isCorrect: bool
     points: Optional[int] = 0
     feedback: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Матричные мини-игры (Фаза 0): телеметрия, прогресс, конфиг уровней.
+# game_id ограничен известными играми на уровне схемы — неизвестная игра
+# отбрасывается 422 до похода в БД.
+# ---------------------------------------------------------------------------
+
+GameId = Literal["gauss_jordan", "eigen_arrow"]
+
+# Потолок на размер батча событий — офлайн-очередь (Фаза 7) может накопить
+# много, но один запрос не должен превращаться в неограниченную вставку.
+MAX_EVENTS_PER_BATCH = 200
+
+
+class GameEventIn(BaseModel):
+    event_type: str = Field(min_length=1, max_length=64)
+    payload: Optional[Dict[str, Any]] = None
+    # Время события на клиенте (для порядка в офлайн-очереди, см. модель).
+    client_ts: Optional[datetime] = None
+
+
+class GameEventsBatchRequest(BaseModel):
+    game_id: GameId
+    # Нет session_id -> сервер откроет новую сессию и вернёт её id.
+    session_id: Optional[int] = None
+    events: List[GameEventIn] = Field(min_length=1, max_length=MAX_EVENTS_PER_BATCH)
+    end_session: bool = False
+
+
+class GameEventsBatchResponse(BaseModel):
+    session_id: int
+    accepted: int
+
+
+class GameProgressUpsertRequest(BaseModel):
+    game_id: GameId
+    level_id: str = Field(min_length=1, max_length=64)
+    stars: int = Field(ge=0, le=3)
+    # Ходы (игра A) / итерации (игра B), меньше = лучше. None допустимо, если
+    # уровень «пройден», но метрика неприменима.
+    metric: Optional[int] = Field(default=None, ge=0)
+
+
+class GameProgressResponse(BaseModel):
+    game_id: str
+    level_id: str
+    best_stars: int
+    best_metric: Optional[int] = None
+    completed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class GameLevelConfig(BaseModel):
+    """Один уровень в конфиге игры (Фаза 0 — мок; позже из GameScenario)."""
+    level_id: str
+    title: str
+    difficulty: int
+    # Специфичные для игры параметры уровня (матрица, бюджет итераций и т.п.).
+    params: Dict[str, Any] = {}
+
+
+class GameLevelsResponse(BaseModel):
+    game_id: str
+    levels: List[GameLevelConfig]
+
+
+# --- Аналитика вовлечённости (Фаза 5) ---
+
+class GameLevelEngagement(BaseModel):
+    """Воронка и качество прохождения одного уровня."""
+    level_id: str
+    starts: int
+    completes: int
+    abandons: int
+    completion_rate: Optional[float] = None  # completes / starts
+    avg_stars: Optional[float] = None
+    avg_metric: Optional[float] = None        # ср. ходов (A) или тиков (B)
+
+
+class GameEngagementStats(BaseModel):
+    """Сводка вовлечённости по одной игре за окно наблюдения."""
+    game_id: str
+    players: int
+    sessions_total: int
+    sessions_completed: int   # сессий с ≥1 level_complete
+    sessions_abandoned: int   # явный level_abandon без завершения
+    sessions_open: int        # ушли, не закрыв сессию (ended_at IS NULL)
+    avg_session_seconds: Optional[float] = None
+    level_starts: int
+    level_completes: int
+    completion_rate: Optional[float] = None
+    avg_stars: Optional[float] = None
+    three_star_share: Optional[float] = None   # доля заходов на 3★
+    levels_mastered: int                       # (user,level) с 3★
+    players_with_mastery: int
+    per_level: List[GameLevelEngagement]
+
+
+class GamesAnalyticsResponse(BaseModel):
+    since: Optional[datetime] = None  # None = за всё время
+    games: List[GameEngagementStats]
+
+
+# --- Диагностический квиз до/после (Фаза 6) ---
+
+class AssessmentQuestion(BaseModel):
+    """Вопрос без правильного ответа — то, что видит студент."""
+    id: str
+    concept: str  # inverse | eigen
+    prompt: str
+    options: List[str]
+
+
+class AssessmentQuizResponse(BaseModel):
+    quiz_type: str  # pre | post
+    max_score: int
+    already_taken: bool
+    questions: List[AssessmentQuestion]
+
+
+class AssessmentStatusResponse(BaseModel):
+    pre_taken: bool
+    post_taken: bool
+    max_score: int
+
+
+class AssessmentSubmitRequest(BaseModel):
+    # question_id -> индекс выбранного варианта.
+    answers: Dict[str, int]
+
+
+class AssessmentResultResponse(BaseModel):
+    quiz_type: str
+    score: int
+    max_score: int
+    primary_game: Optional[str] = None
+    taken_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LearningDeltaByGame(BaseModel):
+    primary_game: str
+    paired_users: int
+    avg_pre: Optional[float] = None
+    avg_post: Optional[float] = None
+    avg_delta: Optional[float] = None
+
+
+class LearningAnalyticsResponse(BaseModel):
+    max_score: int
+    pre_count: int
+    post_count: int
+    paired_users: int          # сдали и pre, и post
+    avg_pre: Optional[float] = None
+    avg_post: Optional[float] = None
+    avg_delta: Optional[float] = None
+    by_game: List[LearningDeltaByGame]
+
+
+# --- Учебный уровень и единый каталог игр ---
+
+class UserLevelUpdate(BaseModel):
+    level: Optional[str] = None  # school | student | advanced | None (сброс)
+
+
+class GameLaunch(BaseModel):
+    # kind="matrix" -> внутренний маршрут /games/{id};
+    # kind="subject" -> тематическая игра через /subject/{id}/game/{game_id}.
+    kind: str
+    subject_hint: Optional[str] = None
+
+
+class GameCatalogEntry(BaseModel):
+    id: str
+    title: str
+    description: str
+    icon: str
+    category: str
+    levels: List[str]     # для каких учебных уровней уместна игра
+    launch: GameLaunch
+
+
+class GameCatalogResponse(BaseModel):
+    entries: List[GameCatalogEntry]
+
+
+# --- Рейтинг и лидерборды ---
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    user_id: int
+    username: str
+    stars: int              # рейтинг = сумма звёзд по уровням
+    levels_completed: int
+
+
+class LeaderboardResponse(BaseModel):
+    game_id: Optional[str] = None   # None = сводный рейтинг по всем играм
+    entries: List[LeaderboardEntry]
+    me: Optional[LeaderboardEntry] = None  # позиция текущего игрока (может быть вне топа)

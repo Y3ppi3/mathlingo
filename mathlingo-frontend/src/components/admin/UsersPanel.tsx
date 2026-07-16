@@ -1,7 +1,14 @@
 // src/components/admin/UsersPanel.tsx
 import { useEffect, useState } from 'react';
-import { fetchUsers, User, deleteUser, updateUserStatus, bulkUpdateUserStatus } from '../../api/adminApi';
+import { fetchUsers, User, deleteUser, updateUserStatus, bulkUpdateUserStatus, updateUserLevel } from '../../api/adminApi';
 import { adminHasRole } from '../../utils/auth';
+
+const LEVEL_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: '', label: '— не задан' },
+    { value: 'school', label: 'Школьник' },
+    { value: 'student', label: 'Студент' },
+    { value: 'advanced', label: 'Продвинутый' },
+];
 
 const UsersPanel = () => {
     const [users, setUsers]   = useState<User[]>([]);
@@ -14,6 +21,20 @@ const UsersPanel = () => {
     // require_role("superadmin")). teacher/content_manager видят список
     // на чтение — это их зона "учащиеся и прогресс", не управление доступом.
     const canManageAccounts = adminHasRole('superadmin');
+    // Учебный уровень может менять любой admin с доступом к панели (teacher/
+    // content_manager/superadmin) — это учебная настройка, не управление доступом.
+    const canSetLevel = adminHasRole('superadmin', 'content_manager', 'teacher');
+
+    const handleSetLevel = async (userId: number, level: string) => {
+        // Оптимистично обновляем строку, чтобы select не «прыгал».
+        setUsers(prev => prev.map(u => (u.id === userId ? { ...u, level: level || null } : u)));
+        try {
+            await updateUserLevel(userId, level || null);
+        } catch {
+            setError('Не удалось изменить уровень');
+            loadUsers();
+        }
+    };
 
     const loadUsers = async () => {
         try {
@@ -125,7 +146,7 @@ const UsersPanel = () => {
                     <thead>
                     <tr className="bg-gray-50 dark:bg-gray-700/50 transition-colors">
                         {canManageAccounts && <th className="px-5 py-3 w-8"></th>}
-                        {['ID', 'Пользователь', 'Email', 'Статус', 'Дата регистрации', 'Действия'].map(h => (
+                        {['ID', 'Пользователь', 'Email', 'Статус', 'Уровень', 'Дата регистрации', 'Действия'].map(h => (
                             <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider transition-colors">
                                 {h}
                             </th>
@@ -135,7 +156,7 @@ const UsersPanel = () => {
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-800 transition-colors">
                     {users.length === 0 ? (
                         <tr>
-                            <td colSpan={canManageAccounts ? 7 : 6} className="px-5 py-12 text-center text-sm text-gray-400 dark:text-gray-500 transition-colors">
+                            <td colSpan={canManageAccounts ? 8 : 7} className="px-5 py-12 text-center text-sm text-gray-400 dark:text-gray-500 transition-colors">
                                 Пользователей пока нет.
                             </td>
                         </tr>
@@ -178,6 +199,23 @@ const UsersPanel = () => {
                                             <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${user.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
                                             {user.is_active ? 'Активен' : 'Неактивен'}
                                         </span>
+                                </td>
+                                <td className="px-5 py-3.5">
+                                    {canSetLevel ? (
+                                        <select
+                                            value={user.level ?? ''}
+                                            onChange={e => handleSetLevel(user.id, e.target.value)}
+                                            className="text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                                        >
+                                            {LEVEL_OPTIONS.map(o => (
+                                                <option key={o.value} value={o.value}>{o.label}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {LEVEL_OPTIONS.find(o => o.value === (user.level ?? ''))?.label ?? '—'}
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-gray-400 transition-colors">
                                     {new Date(user.created_at).toLocaleDateString('ru-RU')}

@@ -15,6 +15,7 @@ from app.routes import (
     users, tasks, admin, admin_tasks, admin_ai, admin_content_quality,
     gamification_maps, gamification_tasks, gamification_mastery,
     subjects, subject_operations, skills, game_scenarios, dashboard, password_reset,
+    games, admin_games_analytics, assessment,
 )
 from app.routes.admin_gamification import router as admin_gamification_router
 
@@ -241,6 +242,9 @@ app.include_router(subject_operations.router)
 app.include_router(skills.router)
 app.include_router(game_scenarios.router)
 app.include_router(game_scenarios.student_router)
+app.include_router(games.router)
+app.include_router(assessment.router)
+app.include_router(admin_games_analytics.router)
 app.include_router(dashboard.router)
 
 

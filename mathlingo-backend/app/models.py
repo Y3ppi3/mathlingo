@@ -27,12 +27,18 @@ class Admin(Base):
 class User(Base):
     __tablename__ = "users"
 
+    # Учебный уровень (трек): задаёт, какие игры показывать в каталоге. NULL —
+    # ученик ещё не выбрал (спросим при первом заходе в игры). Ученик ставит
+    # сам, админ может переопределить.
+    LEVELS = ("school", "student", "advanced")
+
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     avatar_id = Column(Integer, nullable=True)
+    level = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Связь с заданиями
@@ -544,3 +550,108 @@ class Skill(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     subject = relationship("Subject", back_populates="skills")
+
+
+# ---------------------------------------------------------------------------
+# Матричные мини-игры (roadmap «Матричные мини-игры», Фаза 0)
+#
+# Гибридная модель (см. решение по roadmap): завершение игры продолжает идти
+# через GameScenario/submit-attempt -> attempts (дашборд + mastery), а эти
+# таблицы добавляют то, чего в существующей схеме НЕТ: гранулярную телеметрию
+# каждого действия (для воронки по уровням и поиска точек отвала, Фаза 5),
+# межсессионный прогресс по уровням и результаты pre/post-квизов (Фаза 6).
+# game_id — строковый ключ игры ('gauss_jordan' | 'eigen_arrow'), а не FK:
+# семейство матричных игр живёт своим набором уровней, не привязанным 1:1 к
+# конкретной строке subjects/skills. PK — Integer, как во всей остальной схеме.
+# ---------------------------------------------------------------------------
+
+class GameSession(Base):
+    """
+    Один заход пользователя в конкретную матричную игру. Группирует события
+    (game_events) в сессию, чтобы Фаза 5 могла считать длину сессии и число
+    уровней за сессию. ended_at проставляется, когда клиент присылает батч с
+    end_session=true (или остаётся NULL, если игрок ушёл, не закрыв сессию —
+    это тоже сигнал для аналитики, а не ошибка).
+    """
+    __tablename__ = "game_sessions"
+
+    GAME_IDS = ("gauss_jordan", "eigen_arrow")
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    game_id = Column(String, nullable=False, index=True)
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    ended_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+
+
+class GameEvent(Base):
+    """
+    Одно телеметрическое событие внутри сессии (level_start, move_made,
+    iteration_made, level_complete, level_abandon, ...). event_type — свободная
+    строка (набор типов задаёт клиент каждой игры, backend их не
+    перечисляет — новый тип события не должен требовать миграции). payload —
+    произвольный JSON с деталями события (тип хода, Δθ, число ходов и т.п.).
+    client_ts — время события НА КЛИЕНТЕ: события могут копиться в офлайн-
+    очереди (Фаза 7) и долетать пачкой позже created_at, поэтому порядок для
+    аналитики надо брать по client_ts, а не по времени вставки.
+    """
+    __tablename__ = "game_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("game_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    payload = Column(JSON, nullable=True)
+    client_ts = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    session = relationship("GameSession")
+
+
+class UserGameProgress(Base):
+    """
+    Лучший результат пользователя на каждом уровне игры — межсессионно, в
+    Postgres (не localStorage: иначе retention и прогресс между устройствами
+    физически не собрать). best_metric — ходы (игра A) или итерации (игра B);
+    в обеих играх МЕНЬШЕ = лучше, поэтому апсерт хранит минимум при равных
+    звёздах (см. app/routes/games.py). level_id — строковый ключ уровня из
+    конфига игры.
+    """
+    __tablename__ = "user_game_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", "game_id", "level_id", name="uq_user_game_progress_user_game_level"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    game_id = Column(String, nullable=False)
+    level_id = Column(String, nullable=False)
+    best_stars = Column(Integer, nullable=False, default=0)
+    best_metric = Column(Integer, nullable=True)  # ходы (A) / итерации (B), меньше = лучше
+    completed_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class AssessmentResult(Base):
+    """
+    Результат диагностического квиза до (pre) или после (post) использования
+    игр — ось «качество усвоения» (Фаза 6), отдельная от вовлечённости
+    (Фаза 5). primary_game фиксирует, в какую игру пользователь играл больше
+    на момент теста, чтобы считать Δ(score) в разрезе по игре. answers — сырые
+    ответы для последующего разбора, score — итоговый балл.
+    """
+    __tablename__ = "assessment_results"
+
+    QUIZ_TYPES = ("pre", "post")
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    quiz_type = Column(String, nullable=False)
+    primary_game = Column(String, nullable=True)
+    score = Column(Integer, nullable=False, default=0)
+    answers = Column(JSON, nullable=True)
+    taken_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")

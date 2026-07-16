@@ -30,17 +30,35 @@ function Navbar() {
         <nav className="bg-white text-gray-900 dark:bg-gray-900 dark:text-white p-4 fixed top-0 left-0 w-full z-50 shadow-md transition-colors">
             <div className="max-w-7xl mx-auto px-4">
                 <div className="flex justify-between items-center h-16">
-                    {/* Левая часть: лого + название */}
-                    <Link to="/" className="flex items-center space-x-4">
-                        <img
-                            src={logo}
-                            alt="MathLingo Logo"
-                            className="h-8 w-8 object-contain"
-                        />
-                        <span className="text-xl font-bold hover:text-indigo-400 transition-colors">
-                            MathLingo
-                        </span>
-                    </Link>
+                    {/* Левая часть: лого + название + основная навигация */}
+                    <div className="flex items-center gap-6">
+                        <Link to="/" className="flex items-center space-x-4">
+                            <img
+                                src={logo}
+                                alt="MathLingo Logo"
+                                className="h-8 w-8 object-contain"
+                            />
+                            <span className="text-xl font-bold hover:text-indigo-400 transition-colors">
+                                MathLingo
+                            </span>
+                        </Link>
+                        {isAuthenticated && (
+                            <div className="hidden sm:flex items-center gap-1">
+                                <Link
+                                    to="/games"
+                                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    Игры
+                                </Link>
+                                <Link
+                                    to="/games/leaderboard"
+                                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    🏆 Лидерборд
+                                </Link>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Правая часть: аватар или кнопки входа */}
                     <div className="relative">

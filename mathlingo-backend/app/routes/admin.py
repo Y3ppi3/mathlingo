@@ -12,7 +12,7 @@ from app.models import (
 from app.schemas import (
     AdminAccountResponse, AdminCreate, AdminResponse, AuditLogResponse,
     DiagnosticCreate, DiagnosticResponse, DiagnosticUpdate,
-    UserBulkStatusUpdate, UserResponse, SubjectCreate, SubjectUpdate, SubjectResponse, AdminLogin)
+    UserBulkStatusUpdate, UserResponse, UserLevelUpdate, SubjectCreate, SubjectUpdate, SubjectResponse, AdminLogin)
 from app.auth import get_admin_current_user, get_admin_current_user_optional, create_access_token, hash_password, verify_password, require_role
 from app.routes._admin_rbac import CAN_MANAGE_CONTENT
 from app.routes.subjects import SUBJECTS_LIST_CACHE_PREFIX
@@ -260,6 +260,25 @@ def update_user_status(
     user.is_active = status_update.is_active  # Используем is_active из модели
     db.commit()
     return {"message": f"Пользователь {'активирован' if status_update.is_active else 'деактивирован'} успешно"}
+
+
+@router.put("/users/{user_id}/level")
+def update_user_level(
+        user_id: int,
+        body: UserLevelUpdate,
+        db: Session = Depends(get_db),
+        current_admin: Admin = Depends(require_role("superadmin", "content_manager", "teacher")),
+):
+    """Админ/преподаватель переопределяет учебный уровень ученика (или сбрасывает
+    в null). Ученик может задать его и сам через PUT /api/me/level."""
+    if body.level is not None and body.level not in User.LEVELS:
+        raise HTTPException(status_code=400, detail="Недопустимый учебный уровень")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    user.level = body.level
+    db.commit()
+    return {"id": user.id, "level": user.level}
 
 
 @router.post("/users/bulk-status")

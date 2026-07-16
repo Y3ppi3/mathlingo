@@ -137,6 +137,7 @@ export interface User {
     email: string;
     is_active: boolean;
     created_at: string;
+    level?: string | null;  // school | student | advanced | null
 }
 
 // Task functions
@@ -438,6 +439,11 @@ export const updateUserStatus = async (userId: number, isActive: boolean): Promi
     }
 };
 
+// Переопределение учебного уровня ученика (school|student|advanced|null).
+export const updateUserLevel = async (userId: number, level: string | null): Promise<void> => {
+    await adminApi.put(`/admin/users/${userId}/level`, { level });
+};
+
 // Adventure map functions
 export const deleteAdventureMap = async (mapId: number, force: boolean = false): Promise<any> => {
     try {
@@ -615,6 +621,72 @@ export interface TaskQuality {
 
 export const fetchAiTaskQuality = async (): Promise<TaskQuality[]> => {
     const response = await adminApi.get('/admin/quality/ai-tasks');
+    return response.data;
+};
+
+// --- Аналитика вовлечённости матричных мини-игр (Фаза 5) ---
+
+export interface GameLevelEngagement {
+    level_id: string;
+    starts: number;
+    completes: number;
+    abandons: number;
+    completion_rate: number | null;
+    avg_stars: number | null;
+    avg_metric: number | null;
+}
+
+export interface GameEngagementStats {
+    game_id: string;
+    players: number;
+    sessions_total: number;
+    sessions_completed: number;
+    sessions_abandoned: number;
+    sessions_open: number;
+    avg_session_seconds: number | null;
+    level_starts: number;
+    level_completes: number;
+    completion_rate: number | null;
+    avg_stars: number | null;
+    three_star_share: number | null;
+    levels_mastered: number;
+    players_with_mastery: number;
+    per_level: GameLevelEngagement[];
+}
+
+export interface GamesAnalytics {
+    since: string | null;
+    games: GameEngagementStats[];
+}
+
+export const fetchGamesAnalytics = async (days?: number): Promise<GamesAnalytics> => {
+    const response = await adminApi.get('/admin/games/analytics', {
+        params: days ? { days } : undefined,
+    });
+    return response.data;
+};
+
+export interface LearningDeltaByGame {
+    primary_game: string;
+    paired_users: number;
+    avg_pre: number | null;
+    avg_post: number | null;
+    avg_delta: number | null;
+}
+
+export interface LearningAnalytics {
+    max_score: number;
+    pre_count: number;
+    post_count: number;
+    paired_users: number;
+    avg_pre: number | null;
+    avg_post: number | null;
+    avg_delta: number | null;
+    by_game: LearningDeltaByGame[];
+}
+
+export const fetchLearningAnalytics = async (): Promise<LearningAnalytics> => {
+    const response = await adminApi.get('/admin/games/learning');
     return response.data;
 };
 

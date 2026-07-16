@@ -1,5 +1,5 @@
 // routes.tsx (обновленный)
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { JSX, lazy, Suspense } from "react";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -25,6 +25,14 @@ const DiagnosticSolver = lazy(() => import("./components/adventure/DiagnosticSol
 const GamificationPanel = lazy(() => import("./components/admin/GamificationPanel"));
 const GameLauncherPage = lazy(() => import("./pages/GameLauncherPage"));
 const GamePage = lazy(() => import("./pages/GamePage"));
+// Матричные мини-игры (Фаза 0) — отдельный хаб верхнего уровня /games, не
+// привязанный к subject: семейство живёт своим набором игр вне subject-навигации.
+const GamesHubPage = lazy(() => import("./pages/GamesHubPage"));
+const MatrixGameStubPage = lazy(() => import("./pages/MatrixGameStubPage"));
+const GaussJordanGamePage = lazy(() => import("./pages/GaussJordanGamePage"));
+const EigenArrowGamePage = lazy(() => import("./pages/EigenArrowGamePage"));
+const QuizPage = lazy(() => import("./pages/QuizPage"));
+const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage"));
 
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminLayout = lazy(() => import("./pages/AdminLayout"));
@@ -36,6 +44,7 @@ const StaffPanel = lazy(() => import("./components/admin/StaffPanel"));
 const AuditLogPanel = lazy(() => import("./components/admin/AuditLogPanel"));
 const AiQueuePanel = lazy(() => import("./components/admin/AiQueuePanel"));
 const QualityPanel = lazy(() => import("./components/admin/QualityPanel"));
+const GamesAnalyticsPanel = lazy(() => import("./components/admin/GamesAnalyticsPanel"));
 const GameScenariosPanel = lazy(() => import("./components/admin/GameScenariosPanel"));
 
 const RouteFallback = () => (
@@ -53,6 +62,16 @@ function AdminProtectedRoute({ children }: { children: JSX.Element }) {
     }
 
     return children;
+}
+
+// Диспетчер конкретной матричной игры: у обеих игр есть движок (Гаусс-Жордан —
+// Фаза 2, «Стрелка Судьбы» — Фаза 4); заглушка остаётся запасным вариантом на
+// случай будущих незаконченных game_id.
+function MatrixGameRoute() {
+    const { gameId } = useParams<{ gameId: string }>();
+    if (gameId === 'gauss_jordan') return <GaussJordanGamePage />;
+    if (gameId === 'eigen_arrow') return <EigenArrowGamePage />;
+    return <MatrixGameStubPage />;
 }
 
 // Компонент для перенаправления с task-group на games
@@ -157,6 +176,40 @@ function AppRoutes() {
                 }
             />
 
+            {/* Матричные мини-игры (Фаза 0): хаб верхнего уровня + заглушки игр */}
+            <Route
+                path="/games"
+                element={
+                    <ProtectedRoute>
+                        <GamesHubPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/games/quiz/:quizType"
+                element={
+                    <ProtectedRoute>
+                        <QuizPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/games/leaderboard"
+                element={
+                    <ProtectedRoute>
+                        <LeaderboardPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/games/:gameId"
+                element={
+                    <ProtectedRoute>
+                        <MatrixGameRoute />
+                    </ProtectedRoute>
+                }
+            />
+
             {/* Маршруты для админ-панели ("God Mode" — см. docs/roadmap/product-technical-plan.md, R1 §3) */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route
@@ -187,6 +240,7 @@ function AppRoutes() {
                 <Route path="game-scenarios" element={<GameScenariosPanel />} />
                 <Route path="students" element={<UsersPanel />} />
                 <Route path="quality" element={<QualityPanel />} />
+                <Route path="games-analytics" element={<GamesAnalyticsPanel />} />
                 <Route path="staff" element={<StaffPanel />} />
                 <Route path="audit" element={<AuditLogPanel />} />
             </Route>

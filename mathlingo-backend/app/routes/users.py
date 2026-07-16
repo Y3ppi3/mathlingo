@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.models import User
-from app.schemas import UserLogin, UserCreate
+from app.schemas import UserLogin, UserCreate, UserLevelUpdate
 from app.auth import verify_password, hash_password, create_access_token, get_current_user
 
 router = APIRouter()
@@ -87,8 +87,25 @@ def get_current_user_info(user: User = Depends(get_current_user)):
         "id": user.id,
         "username": user.username,
         "email": user.email,
-        "avatarId": user.avatar_id
+        "avatarId": user.avatar_id,
+        "level": user.level,
     }
+
+
+@router.put("/me/level")
+def set_my_level(
+        data: UserLevelUpdate,
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+):
+    """Ученик сам выбирает учебный уровень (school|student|advanced) или сбрасывает
+    его (null). Уровень задаёт, какие игры показываются в каталоге."""
+    if data.level is not None and data.level not in User.LEVELS:
+        raise HTTPException(status_code=400, detail="Недопустимый учебный уровень")
+    user.level = data.level
+    db.commit()
+    db.refresh(user)
+    return {"level": user.level}
 
 
 class UserProfileUpdate(BaseModel):

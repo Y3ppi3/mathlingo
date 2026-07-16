@@ -680,3 +680,179 @@ export const fetchStudentDashboard = async (): Promise<StudentDashboard> => {
     const response = await api.get('/gamification/dashboard');
     return response.data;
 };
+
+// ---------------------------------------------------------------------------
+// Матричные мини-игры (Фаза 0). Все мутирующие вызовы идут через общий api-
+// инстанс, поэтому X-CSRF-Token проставляется автоматически (см. интерцептор
+// выше) — телеметрия и прогресс не теряются на 403, в отличие от raw fetch.
+// ---------------------------------------------------------------------------
+
+export type MatrixGameId = 'gauss_jordan' | 'eigen_arrow';
+
+export interface GameEvent {
+    event_type: string;
+    payload?: Record<string, unknown>;
+    // Время события на клиенте — важно для порядка при офлайн-очереди (Фаза 7).
+    client_ts?: string;
+}
+
+export interface GameEventsBatch {
+    game_id: MatrixGameId;
+    // Нет session_id -> сервер откроет новую сессию и вернёт её id.
+    session_id?: number;
+    events: GameEvent[];
+    end_session?: boolean;
+}
+
+export interface GameEventsBatchResult {
+    session_id: number;
+    accepted: number;
+}
+
+export const postGameEvents = async (batch: GameEventsBatch): Promise<GameEventsBatchResult> => {
+    const response = await api.post('/api/games/events', batch);
+    return response.data;
+};
+
+export interface GameProgress {
+    game_id: string;
+    level_id: string;
+    best_stars: number;
+    best_metric: number | null;
+    completed_at: string | null;
+}
+
+export const getGameProgress = async (gameId?: MatrixGameId): Promise<GameProgress[]> => {
+    const response = await api.get('/api/games/progress', { params: gameId ? { game_id: gameId } : undefined });
+    return response.data;
+};
+
+export const upsertGameProgress = async (
+    gameId: MatrixGameId,
+    levelId: string,
+    stars: number,
+    metric?: number,
+): Promise<GameProgress> => {
+    const response = await api.post('/api/games/progress', {
+        game_id: gameId, level_id: levelId, stars, metric,
+    });
+    return response.data;
+};
+
+export interface GameLevelConfig {
+    level_id: string;
+    title: string;
+    difficulty: number;
+    params: Record<string, unknown>;
+}
+
+export interface GameLevels {
+    game_id: string;
+    levels: GameLevelConfig[];
+}
+
+export const getGameLevels = async (gameId: MatrixGameId): Promise<GameLevels> => {
+    const response = await api.get(`/api/games/levels/${gameId}`);
+    return response.data;
+};
+
+// --- Диагностический квиз до/после (Фаза 6) ---
+
+export type QuizType = 'pre' | 'post';
+
+export interface AssessmentQuestion {
+    id: string;
+    concept: 'inverse' | 'eigen';
+    prompt: string;
+    options: string[];
+}
+
+export interface AssessmentQuiz {
+    quiz_type: QuizType;
+    max_score: number;
+    already_taken: boolean;
+    questions: AssessmentQuestion[];
+}
+
+export interface AssessmentStatus {
+    pre_taken: boolean;
+    post_taken: boolean;
+    max_score: number;
+}
+
+export interface AssessmentResult {
+    quiz_type: QuizType;
+    score: number;
+    max_score: number;
+    primary_game: string | null;
+    taken_at: string | null;
+}
+
+export const getAssessmentStatus = async (): Promise<AssessmentStatus> => {
+    const response = await api.get('/api/games/assessment/status');
+    return response.data;
+};
+
+export const getQuiz = async (quizType: QuizType): Promise<AssessmentQuiz> => {
+    const response = await api.get(`/api/games/assessment/${quizType}`);
+    return response.data;
+};
+
+export const submitQuiz = async (
+    quizType: QuizType,
+    answers: Record<string, number>,
+): Promise<AssessmentResult> => {
+    const response = await api.post(`/api/games/assessment/${quizType}`, { answers });
+    return response.data;
+};
+
+// --- Единый каталог, уровень ученика и лидерборды ---
+
+export type LearnerLevel = 'school' | 'student' | 'advanced';
+
+export interface GameCatalogEntry {
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    category: string;
+    levels: LearnerLevel[];
+    launch: { kind: 'matrix' | 'subject'; subject_hint?: string };
+}
+
+export const getGameCatalog = async (): Promise<GameCatalogEntry[]> => {
+    const response = await api.get('/api/games/catalog');
+    return response.data.entries;
+};
+
+export const getMyLevel = async (): Promise<LearnerLevel | null> => {
+    const response = await api.get('/api/me');
+    return (response.data.level as LearnerLevel | null) ?? null;
+};
+
+export const setMyLevel = async (level: LearnerLevel | null): Promise<LearnerLevel | null> => {
+    const response = await api.put('/api/me/level', { level });
+    return response.data.level ?? null;
+};
+
+export interface LeaderboardEntry {
+    rank: number;
+    user_id: number;
+    username: string;
+    stars: number;
+    levels_completed: number;
+}
+
+export interface Leaderboard {
+    game_id: string | null;
+    entries: LeaderboardEntry[];
+    me: LeaderboardEntry | null;
+}
+
+export const getLeaderboard = async (gameId?: string, limit?: number): Promise<Leaderboard> => {
+    const params: Record<string, string | number> = {};
+    if (gameId) params.game_id = gameId;
+    if (limit) params.limit = limit;
+    const response = await api.get('/api/games/leaderboard', { params });
+    return response.data;
+};

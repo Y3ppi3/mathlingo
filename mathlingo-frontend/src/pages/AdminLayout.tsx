@@ -84,6 +84,16 @@ const ZONES: Zone[] = [
         ),
     },
     {
+        path: 'games-analytics',
+        label: 'Вовлечённость игр',
+        roles: null,
+        icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+        ),
+    },
+    {
         path: 'staff',
         label: 'Пользователи и роли',
         roles: ['superadmin'],

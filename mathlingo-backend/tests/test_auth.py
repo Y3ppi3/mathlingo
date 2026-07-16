@@ -65,6 +65,7 @@ def test_current_user_returns_authenticated_user(client, user):
         "username": user.username,
         "email": user.email,
         "avatarId": None,
+        "level": None,
     }
 
 
