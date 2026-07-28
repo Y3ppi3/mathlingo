@@ -1,56 +1,60 @@
-// src/components/Button.tsx
+// src/components/ui/Button.tsx
+// Тактильная «объёмная» кнопка в духе Duolingo: скруглённая, жирная, с нижней
+// кромкой-«губой», которая вдавливается при нажатии (см. .btn-3d в index.css).
 import React from 'react';
+
+type Variant = 'primary' | 'success' | 'sky' | 'outline' | 'danger' | 'ghost';
+type Size = 'sm' | 'md' | 'lg';
 
 type ButtonProps = {
     children: React.ReactNode;
     type?: 'button' | 'submit' | 'reset';
     onClick?: () => void;
-    variant?: 'primary' | 'outline' | 'danger';
+    variant?: Variant;
+    size?: Size;
     fullWidth?: boolean;
     className?: string;
     disabled?: boolean;
+    'aria-label'?: string;
+};
+
+// Цвет фона + тёмная нижняя кромка + фокус-кольцо на вариант.
+const VARIANT: Record<Variant, string> = {
+    primary: 'bg-brand hover:bg-brand-dark border-brand-deep text-white focus-visible:ring-brand-light',
+    success: 'bg-feather hover:brightness-105 border-feather-shade text-white focus-visible:ring-feather-light',
+    sky:     'bg-macaw hover:brightness-105 border-macaw-shade text-white focus-visible:ring-macaw-light',
+    danger:  'bg-cardinal hover:brightness-105 border-cardinal-shade text-white focus-visible:ring-cardinal',
+    outline: 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-100 focus-visible:ring-gray-300',
+    // ghost — без объёма (плоская), для второстепенных действий.
+    ghost:   'bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent text-gray-600 dark:text-gray-300 focus-visible:ring-gray-300 active:translate-y-0 active:border-b-4',
+};
+
+const SIZE: Record<Size, string> = {
+    sm: 'text-sm px-4 py-2',
+    md: 'text-base px-5 py-2.5',
+    lg: 'text-lg px-8 py-3.5',
 };
 
 const Button: React.FC<ButtonProps> = ({
-                                           children,
-                                           type = 'button',
-                                           onClick,
-                                           variant = 'primary',
-                                           fullWidth = false,
-                                           className = '',
-                                           disabled = false,
-                                       }) => {
-    let baseStyles = 'py-2 px-4 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ';
-
-    if (variant === 'primary') {
-        // Тот же градиент, что на Login/Register/Dashboard (.brand-gradient,
-        // см. index.css) — раньше здесь был плоский bg-indigo-600, и кнопка
-        // выглядела иначе, чем везде в остальном приложении (R4).
-        baseStyles += 'brand-gradient brand-gradient-hover text-white focus:ring-indigo-500 ';
-    } else if (variant === 'outline') {
-        baseStyles += 'border border-indigo-500 text-indigo-500 hover:bg-indigo-50 focus:ring-indigo-500 ';
-    } else if (variant === 'danger') {
-        baseStyles += 'bg-red-600 hover:bg-red-500 text-white focus:ring-red-500 ';
-    }
-
-    if (fullWidth) {
-        baseStyles += 'w-full ';
-    }
-
-    if (disabled) {
-        baseStyles += 'opacity-50 cursor-not-allowed ';
-    }
-
-    return (
-        <button
-            type={type}
-            onClick={onClick}
-            className={`${baseStyles} ${className}`}
-            disabled={disabled}
-        >
-            {children}
-        </button>
-    );
-};
+    children,
+    type = 'button',
+    onClick,
+    variant = 'primary',
+    size = 'md',
+    fullWidth = false,
+    className = '',
+    disabled = false,
+    'aria-label': ariaLabel,
+}) => (
+    <button
+        type={type}
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        className={`btn-3d ${VARIANT[variant]} ${SIZE[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
+    >
+        {children}
+    </button>
+);
 
 export default Button;

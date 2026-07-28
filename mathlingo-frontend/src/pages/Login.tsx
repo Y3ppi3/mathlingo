@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Sigma, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { API_BASE } from "../config/apiBase";
+import mascot from "../assets/logo.png";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = API_BASE;
 
 const Login = () => {
     const [email, setEmail] = useState("");
@@ -59,16 +61,13 @@ const Login = () => {
 
             <div className="w-full max-w-md relative z-10">
                 <div
-                    className="bg-white dark:bg-slate-800/50 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-2xl p-8 shadow-2xl transition-colors">
+                    className="bg-white dark:bg-slate-800 border-2 border-gray-100 dark:border-slate-700 rounded-3xl p-8 shadow-card-hover transition-colors">
 
                     {/* Заголовок */}
                     <div className="text-center mb-8">
-                        <div
-                            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 mb-4">
-                            <Sigma className="w-7 h-7 text-white"/>
-                        </div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors">
-                            Добро пожаловать
+                        <img src={mascot} alt="Маскот MathLingo" className="w-20 h-20 mx-auto object-contain animate-bob mb-3" />
+                        <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white transition-colors">
+                            С возвращением!
                         </h1>
                         <p className="text-gray-500 dark:text-slate-400 text-sm mt-1 transition-colors">
                             Войдите в MathLingo
@@ -77,7 +76,7 @@ const Login = () => {
 
                     <form onSubmit={handleLogin} className="space-y-4">
                         {error && (
-                            <p className="text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-500/10 px-3 py-2 rounded-xl transition-colors">
+                            <p className="text-cardinal dark:text-red-400 text-sm font-semibold bg-cardinal/10 border-2 border-cardinal/20 px-3 py-2 rounded-2xl transition-colors">
                                 {error}
                             </p>
                         )}
@@ -85,7 +84,7 @@ const Login = () => {
                         <div>
                             <label
                                 htmlFor="login-email"
-                                className="block text-sm font-medium text-gray-600 dark:text-slate-300 mb-1.5 transition-colors"
+                                className="block text-sm font-bold text-gray-600 dark:text-slate-300 mb-1.5 transition-colors"
                             >
                                 Email
                             </label>
@@ -98,14 +97,14 @@ const Login = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="w-full bg-white dark:bg-gray-900/80 border border-gray-300 dark:border-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-colors"
+                                className="w-full bg-white dark:bg-gray-900/80 border-2 border-gray-200 dark:border-slate-600 focus:border-brand focus:ring-2 focus:ring-brand/20 rounded-2xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-colors"
                             />
                         </div>
 
                         <div>
                             <label
                                 htmlFor="login-password"
-                                className="block text-sm font-medium text-gray-600 dark:text-slate-300 mb-1.5 transition-colors"
+                                className="block text-sm font-bold text-gray-600 dark:text-slate-300 mb-1.5 transition-colors"
                             >
                                 Пароль
                             </label>
@@ -119,7 +118,7 @@ const Login = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
-                                    className="w-full bg-white dark:bg-gray-900/80 border border-gray-300 dark:border-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 pr-12 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-colors"
+                                    className="w-full bg-white dark:bg-gray-900/80 border-2 border-gray-200 dark:border-slate-600 focus:border-brand focus:ring-2 focus:ring-brand/20 rounded-2xl px-4 py-3 pr-12 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-colors"
                                 />
                                 <button
                                     type="button"
@@ -136,18 +135,18 @@ const Login = () => {
                         {/* Запомнить / Забыли пароль */}
                         <div className="flex items-center justify-between text-sm">
                             <label
-                                className="flex items-center gap-2 text-gray-500 dark:text-slate-400 cursor-pointer transition-colors">
+                                className="flex items-center gap-2 text-gray-500 dark:text-slate-400 font-semibold cursor-pointer transition-colors">
                                 <input
                                     type="checkbox"
                                     checked={rememberMe}
                                     onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-indigo-500 focus:ring-indigo-500"
+                                    className="w-4 h-4 rounded accent-brand"
                                 />
                                 Запомнить меня
                             </label>
                             <Link
                                 to="/forgot-password"
-                                className="text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                                className="font-bold text-brand dark:text-brand-light hover:underline transition-colors"
                             >
                                 Забыли пароль?
                             </Link>
@@ -157,12 +156,7 @@ const Login = () => {
                             type="submit"
                             id="login-submit"
                             disabled={isLoading}
-                            style={{padding: '0.75rem'}}
-                            className={`w-full flex items-center justify-center font-semibold rounded-xl shadow-lg text-white ${
-                                isLoading
-                                    ? "bg-indigo-400 cursor-not-allowed shadow-none transition-all"
-                                    : "brand-gradient brand-gradient-hover shadow-indigo-500/25"
-                            }`}
+                            className="btn-3d w-full bg-brand hover:bg-brand-dark border-brand-deep text-white text-base py-3 disabled:opacity-60 focus-visible:ring-brand-light"
                         >
                             {isLoading ? "Вход..." : "Войти"}
                         </button>
@@ -172,7 +166,7 @@ const Login = () => {
                         Нет аккаунта?{" "}
                         <Link
                             to="/register"
-                            className="text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 font-medium transition-colors"
+                            className="font-bold text-brand dark:text-brand-light hover:underline transition-colors"
                         >
                             Зарегистрироваться
                         </Link>

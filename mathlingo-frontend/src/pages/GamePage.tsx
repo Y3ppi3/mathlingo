@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { LogOut, AlertTriangle } from 'lucide-react';
-import Navbar from '../components/layout/Navbar';
 import Button from '../components/ui/Button';
 import DerivFall from '../components/games/DerivFall';
 import IntegralBuilder from '../components/games/IntegralBuilder';
@@ -196,7 +195,6 @@ const GamePage = () => {
     if (loading) {
         return (
             <div className="fixed inset-0 bg-white dark:bg-gray-900 overflow-hidden select-none transition-colors flex flex-col" style={pageStyle}>
-                <Navbar />
                 <div className="flex-1 flex items-center justify-center">
                     <div className="flex items-center gap-3 text-gray-400 dark:text-gray-500">
                         <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -211,7 +209,6 @@ const GamePage = () => {
     if (error) {
         return (
             <div className="fixed inset-0 bg-white dark:bg-gray-900 overflow-hidden select-none transition-colors" style={pageStyle}>
-                <Navbar />
                 <div className="flex items-center justify-center h-full px-4">
                     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 text-center transition-colors max-w-sm w-full">
                         <p className="text-red-500 dark:text-red-400 text-lg mb-4">{error}</p>
@@ -227,8 +224,6 @@ const GamePage = () => {
             className="fixed inset-0 bg-white dark:bg-gray-900 overflow-hidden select-none transition-colors flex flex-col"
             style={{ paddingTop: NAVBAR_HEIGHT }}
         >
-            <Navbar />
-
             {/* Контент строго под Navbar — занимает оставшееся место */}
             <div className="flex-1 min-h-0 flex flex-col px-3 py-2 gap-2">
                 {!gameCompleted ? (

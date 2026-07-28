@@ -13,7 +13,7 @@ interface MathLabProps {
 
 interface Task {
   id: number | string;
-  type: 'analyze' | 'find' | 'calculate';
+  type: 'analyze' | 'find' | 'calculate' | 'limit';
   question: string;
   functionExpression: string;
   correctAnswer: string | number;
@@ -171,7 +171,8 @@ const MathLab: React.FC<MathLabProps> = ({ mode = 'derivatives', difficulty = 3,
           }
         } catch (localError) {
           // Пропускаем точки с ошибками
-          console.warn(`Пропуск точки x=${x}: ${localError.message}`);
+          const msg = localError instanceof Error ? localError.message : String(localError);
+          console.warn(`Пропуск точки x=${x}: ${msg}`);
         }
       }
 

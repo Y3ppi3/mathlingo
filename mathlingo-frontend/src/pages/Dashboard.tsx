@@ -5,6 +5,11 @@ import {
     Flame, Clock, Sigma, TrendingUp, Star
 } from "lucide-react";
 import { fetchStudentDashboard, getCurrentUser, StudentDashboard } from "../api/studentApi";
+import { API_BASE } from "../config/apiBase";
+import ProgressBar from "../components/ui/ProgressBar";
+import MyAssignments from "../components/tutor/MyAssignments";
+import MySessions from "../components/tutor/MySessions";
+import mascot from "../assets/logo.png";
 
 interface UserData {
     id: number;
@@ -35,7 +40,7 @@ const formatRelativeTime = (ms: number | null): string => {
 const formatDate = (isoDate: string): string =>
     new Date(isoDate).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = API_BASE;
 
 const Dashboard = () => {
     const [userData, setUserData]   = useState<UserData | null>(null);
@@ -117,36 +122,39 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="mt-16 min-h-screen bg-white dark:bg-gray-900 transition-colors">
+        <div className="mt-16 min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
             <div className="max-w-7xl mx-auto px-4 py-8">
 
                 {/* Заголовок */}
-                <div className="mb-8">
-                    <p className="text-gray-400 dark:text-slate-400 text-sm mb-1 transition-colors">
-                        Добро пожаловать
-                    </p>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white transition-colors">
-                        {userData?.username} 👋
-                    </h1>
-                    <p className="text-gray-400 dark:text-slate-400 mt-1 text-sm transition-colors">
-                        {userData?.email}
-                    </p>
+                <div className="flex items-center gap-4 mb-8">
+                    <img src={mascot} alt="" className="w-14 h-14 object-contain hidden sm:block" />
+                    <div>
+                        <p className="text-gray-400 dark:text-slate-400 text-sm mb-0.5">
+                            С возвращением 👋
+                        </p>
+                        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                            {userData?.username}
+                        </h1>
+                    </div>
                 </div>
 
+                {/* Хук вовлечения: занятия и задания от репетитора наверху.
+                    Обе секции сами прячутся, если репетитора/активности нет —
+                    никакого давления на тех, кто занимается сам. */}
+                <MySessions />
+                <MyAssignments />
+
                 {/* Статистика */}
-                <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
                     {STATS.map((s) => (
-                        <div
-                            key={s.label}
-                            className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 backdrop-blur transition-colors"
-                        >
-                            <div className={`inline-flex p-2.5 rounded-xl bg-gradient-to-br ${s.color} mb-3 text-white`}>
+                        <div key={s.label} className="card-soft p-4 sm:p-5 animate-pop-in">
+                            <div className={`inline-flex p-2.5 rounded-2xl bg-gradient-to-br ${s.color} mb-3 text-white`}>
                                 {s.icon}
                             </div>
-                            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1 transition-colors">
+                            <div className="text-2xl font-extrabold text-gray-900 dark:text-white mb-0.5">
                                 {s.value}
                             </div>
-                            <div className="text-sm text-gray-400 dark:text-slate-400 transition-colors">
+                            <div className="text-sm text-gray-400 dark:text-slate-400">
                                 {s.label}
                             </div>
                         </div>
@@ -157,8 +165,8 @@ const Dashboard = () => {
                 <div className="grid lg:grid-cols-3 gap-6 mb-6">
 
                     {/* Последняя активность */}
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                    <div className="lg:col-span-2 card-soft p-6">
+                        <h2 className="text-lg font-extrabold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
                             <TrendingUp className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
                             Последняя активность
                         </h2>
@@ -213,8 +221,8 @@ const Dashboard = () => {
                     </div>
 
                     {/* Прогресс по разделам */}
-                    <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 transition-colors">
+                    <div className="card-soft p-6">
+                        <h2 className="text-lg font-extrabold text-gray-900 dark:text-white mb-5">
                             Прогресс по разделам
                         </h2>
                         {dashboard && dashboard.topics_progress.length === 0 ? (
@@ -226,20 +234,15 @@ const Dashboard = () => {
                             {dashboard?.topics_progress.map((t) => (
                                 <div key={t.skill_id}>
                                     <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-sm text-gray-600 dark:text-slate-300 transition-colors">
+                                        <span className="text-sm font-bold text-gray-700 dark:text-slate-200">
                                             {t.skill_name}
                                         </span>
-                                        <span className="text-sm text-indigo-600 dark:text-indigo-400 font-medium transition-colors">
+                                        <span className="text-sm text-indigo-600 dark:text-indigo-400 font-bold">
                                             {LEVEL_LABEL[t.level] ?? t.level}
                                         </span>
                                     </div>
-                                    <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden transition-colors">
-                                        <div
-                                            className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
-                                            style={{ width: `${t.progress_pct}%` }}
-                                        />
-                                    </div>
-                                    <div className="text-xs text-gray-400 dark:text-slate-500 mt-1 transition-colors">
+                                    <ProgressBar progress={t.progress_pct} tone="brand" />
+                                    <div className="text-xs text-gray-400 dark:text-slate-500 mt-1">
                                         {t.done} {t.done === 1 ? "задание выполнено" : "заданий выполнено"}
                                     </div>
                                 </div>
@@ -251,55 +254,50 @@ const Dashboard = () => {
 
                 {/* Доступные предметы */}
                 <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white transition-colors">
+                    <h3 className="text-lg font-extrabold mb-4 text-gray-900 dark:text-white">
                         Доступные предметы
                     </h3>
                     {subjects.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                             {subjects.map((subject) => (
-                                <div
-                                    key={subject.id}
-                                    className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl overflow-hidden hover:border-gray-300 dark:hover:border-slate-600 backdrop-blur transition-all group"
-                                >
-                                    <div className="p-5">
-                                        <div className="flex items-center gap-3 mb-3">
-                                            {subject.icon && (
-                                                <img
-                                                    src={subject.icon}
-                                                    alt={subject.name}
-                                                    className="w-10 h-10 rounded-lg object-cover"
-                                                />
-                                            )}
-                                            <h3 className="text-base font-semibold text-gray-900 dark:text-white transition-colors">
-                                                {subject.name}
-                                            </h3>
-                                        </div>
-                                        <p className="text-sm text-gray-500 dark:text-slate-400 line-clamp-2 mb-4 transition-colors">
-                                            {subject.description}
-                                        </p>
-                                        <div className="flex gap-2">
-                                            <Link
-                                                to={`/subject/${subject.id}/tasks`}
-                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-sm font-medium rounded-xl transition-colors"
-                                            >
-                                                <BookOpen className="w-4 h-4" />
-                                                Обычный
-                                            </Link>
-                                            <Link
-                                                to={`/subject/${subject.id}/map`}
-                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 text-sm font-medium rounded-xl transition-colors"
-                                            >
-                                                <Map className="w-4 h-4" />
-                                                Приключение
-                                            </Link>
-                                        </div>
+                                <div key={subject.id} className="card-interactive p-5">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        {subject.icon && (
+                                            <img
+                                                src={subject.icon}
+                                                alt={subject.name}
+                                                className="w-11 h-11 rounded-2xl object-cover"
+                                            />
+                                        )}
+                                        <h3 className="text-base font-extrabold text-gray-900 dark:text-white">
+                                            {subject.name}
+                                        </h3>
+                                    </div>
+                                    <p className="text-sm text-gray-500 dark:text-slate-400 line-clamp-2 mb-4">
+                                        {subject.description}
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <Link
+                                            to={`/subject/${subject.id}/tasks`}
+                                            className="btn-3d flex-1 bg-macaw hover:brightness-105 border-macaw-shade text-white text-sm px-3 py-2 focus-visible:ring-macaw-light"
+                                        >
+                                            <BookOpen className="w-4 h-4" />
+                                            Обычный
+                                        </Link>
+                                        <Link
+                                            to={`/subject/${subject.id}/map`}
+                                            className="btn-3d flex-1 bg-brand-accent hover:brightness-105 border-brand-deep text-white text-sm px-3 py-2 focus-visible:ring-brand-light"
+                                        >
+                                            <Map className="w-4 h-4" />
+                                            Приключение
+                                        </Link>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-10 text-center transition-colors">
-                            <p className="text-gray-400 dark:text-slate-500 transition-colors">
+                        <div className="card-soft p-10 text-center">
+                            <p className="text-gray-400 dark:text-slate-500">
                                 Предметы не найдены
                             </p>
                         </div>

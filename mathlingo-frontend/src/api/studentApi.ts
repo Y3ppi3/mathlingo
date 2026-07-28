@@ -1,8 +1,9 @@
 // src/api/studentApi.ts
 import axios from "axios";
 import { clearLocalUserData } from "../utils/LocalUserStorage";
+import { API_BASE } from "../config/apiBase";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = API_BASE;
 
 // Хранение CSRF-токена
 let csrfToken: string | null = null;
@@ -525,7 +526,9 @@ export interface MathLabTaskProp {
 export const mapMathLabTasks = (tasks: MathLabTaskConfig[]): MathLabTaskProp[] =>
     tasks.map(t => ({
         id: t.id,
-        type: t.type,
+        // Общий конфиг допускает series/slope (для др. режимов); в MathLab
+        // (derivatives/integrals) приходят только analyze/find/calculate/limit.
+        type: t.type as MathLabTaskProp['type'],
         question: t.question,
         functionExpression: t.function_expression,
         correctAnswer: t.correct_answer,
@@ -682,12 +685,19 @@ export const fetchStudentDashboard = async (): Promise<StudentDashboard> => {
 };
 
 // ---------------------------------------------------------------------------
-// Матричные мини-игры (Фаза 0). Все мутирующие вызовы идут через общий api-
-// инстанс, поэтому X-CSRF-Token проставляется автоматически (см. интерцептор
-// выше) — телеметрия и прогресс не теряются на 403, в отличие от raw fetch.
+// Мини-игры. Все мутирующие вызовы идут через общий api-инстанс, поэтому
+// X-CSRF-Token проставляется автоматически (см. интерцептор выше) —
+// телеметрия и прогресс не теряются на 403, в отличие от raw fetch.
 // ---------------------------------------------------------------------------
 
-export type MatrixGameId = 'gauss_jordan' | 'eigen_arrow';
+// Должен совпадать с каталогом (app/services/game_catalog.py): бэкенд
+// валидирует game_id по нему и отдаёт 422 на незнакомую игру. Ошибки
+// телеметрии и прогресса обвязка игр глотает намеренно (они не должны ронять
+// геймплей), поэтому расхождение здесь не падает, а тихо теряет рекорды.
+export type GameId =
+    | 'gauss_jordan' | 'eigen_arrow'
+    | 'balance-scales' | 'number-line' | 'speed-math'
+    | 'deriv-fall' | 'integral-builder' | 'limits-approach' | 'series-filling' | 'slope-field';
 
 export interface GameEvent {
     event_type: string;
@@ -697,7 +707,7 @@ export interface GameEvent {
 }
 
 export interface GameEventsBatch {
-    game_id: MatrixGameId;
+    game_id: GameId;
     // Нет session_id -> сервер откроет новую сессию и вернёт её id.
     session_id?: number;
     events: GameEvent[];
@@ -722,13 +732,13 @@ export interface GameProgress {
     completed_at: string | null;
 }
 
-export const getGameProgress = async (gameId?: MatrixGameId): Promise<GameProgress[]> => {
+export const getGameProgress = async (gameId?: GameId): Promise<GameProgress[]> => {
     const response = await api.get('/api/games/progress', { params: gameId ? { game_id: gameId } : undefined });
     return response.data;
 };
 
 export const upsertGameProgress = async (
-    gameId: MatrixGameId,
+    gameId: GameId,
     levelId: string,
     stars: number,
     metric?: number,
@@ -751,7 +761,7 @@ export interface GameLevels {
     levels: GameLevelConfig[];
 }
 
-export const getGameLevels = async (gameId: MatrixGameId): Promise<GameLevels> => {
+export const getGameLevels = async (gameId: GameId): Promise<GameLevels> => {
     const response = await api.get(`/api/games/levels/${gameId}`);
     return response.data;
 };
@@ -817,7 +827,7 @@ export interface GameCatalogEntry {
     icon: string;
     category: string;
     levels: LearnerLevel[];
-    launch: { kind: 'matrix' | 'subject'; subject_hint?: string };
+    launch: { kind: 'internal' | 'subject'; subject_hint?: string };
 }
 
 export const getGameCatalog = async (): Promise<GameCatalogEntry[]> => {
@@ -854,5 +864,77 @@ export const getLeaderboard = async (gameId?: string, limit?: number): Promise<L
     if (gameId) params.game_id = gameId;
     if (limit) params.limit = limit;
     const response = await api.get('/api/games/leaderboard', { params });
+    return response.data;
+};
+// --- Курс подготовки к ЕГЭ/ОГЭ (Ф3) ---
+
+export interface ExamTask {
+    id: number;
+    exam: string;
+    track: string | null;
+    task_number: number | null;
+    topic: string | null;
+    difficulty: number;
+    statement: string;
+    answer_type: string;
+    choices: string[] | null;
+}
+
+export interface ExamAttemptResult {
+    correct: boolean;
+    correct_answer: string;
+    solution: string | null;
+}
+
+export interface ExamProgressItem {
+    task_number: number | null;
+    topic: string | null;
+    total: number;
+    solved: number;
+    attempts: number;
+    correct: number;
+    accuracy: number | null;
+    mastered: boolean;
+}
+
+export interface ExamProgress {
+    exam: string | null;
+    track: string | null;
+    total_tasks: number;
+    solved_tasks: number;
+    attempts: number;
+    correct: number;
+    accuracy: number | null;
+    mastered_numbers: number;
+    items: ExamProgressItem[];
+}
+
+export interface ExamFilters {
+    exam?: string;
+    track?: string;
+    topic?: string;
+    task_number?: number;
+}
+
+export const getExamProgress = async (exam?: string, track?: string): Promise<ExamProgress> => {
+    const response = await api.get('/api/exam/progress', { params: { exam, track } });
+    return response.data;
+};
+
+export const getNextExamTask = async (filters: ExamFilters): Promise<ExamTask> => {
+    const response = await api.get('/api/exam/next', { params: filters });
+    return response.data;
+};
+
+export const submitExamAnswer = async (
+    taskId: number,
+    answer: string,
+    timeSpentMs?: number,
+): Promise<ExamAttemptResult> => {
+    const response = await api.post('/api/exam/attempt', {
+        task_id: taskId,
+        answer,
+        time_spent_ms: timeSpentMs,
+    });
     return response.data;
 };

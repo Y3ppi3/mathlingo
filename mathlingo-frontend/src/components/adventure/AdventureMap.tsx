@@ -1,7 +1,7 @@
 // src/components/adventure/AdventureMap.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { API_BASE } from '../../config/apiBase';
 
 interface TaskGroup {
     id: number;
@@ -46,8 +46,7 @@ const AdventureMap = ({ subjectId }: AdventureMapProps) => {
     const [mapName, setMapName]                   = useState('');
     const [mapSubjectType, setMapSubjectType]     = useState('');
     const navigate    = useNavigate();
-    const { isAuthenticated } = useAuth();
-    const API_URL = import.meta.env.VITE_API_URL || '';
+    const API_URL = API_BASE;
 
     useEffect(() => {
         const loadMapData = async () => {
@@ -87,7 +86,7 @@ const AdventureMap = ({ subjectId }: AdventureMapProps) => {
                 }));
 
                 setLocations(processedLocations);
-            } catch (err) {
+            } catch {
                 setError('Не удалось загрузить карту приключений. Попробуйте позже.');
             } finally {
                 setLoading(false);
@@ -138,63 +137,77 @@ const AdventureMap = ({ subjectId }: AdventureMapProps) => {
                 </h2>
             )}
 
-            {/* Карта */}
-            <div className="relative w-full h-[560px] bg-gray-100 dark:bg-gray-900 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
+            {/* Карта. Высота адаптивна: ниже на телефоне. Фон и иконки —
+                самодостаточные (CSS-градиент + инлайн-SVG), без внешних
+                картинок: прежние /images/*.jpg|svg отдавали 404. */}
+            <div className="relative w-full h-[380px] sm:h-[520px] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
 
-                {/* Фон */}
+                {/* Фон-градиент */}
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-emerald-50 dark:from-slate-900 dark:via-gray-900 dark:to-indigo-950" />
+                {/* Точечная «сетка карты» */}
                 <div
-                    className="absolute inset-0 bg-cover bg-center z-0"
-                    style={{ backgroundImage: 'url(/images/map-background.jpg)' }}
+                    className="absolute inset-0 opacity-70 dark:opacity-40"
+                    style={{
+                        backgroundImage: 'radial-gradient(circle, rgba(99,102,241,0.28) 1px, transparent 1.4px)',
+                        backgroundSize: '22px 22px',
+                    }}
                 />
-                {/* Затемнение */}
-                <div className="absolute inset-0 bg-black/10 dark:bg-black/30 z-10" />
 
-                {/* Локации */}
-                <div className="absolute inset-0 z-20">
+                {/* Локации. Позиции клампятся, чтобы узел и подпись не
+                    обрезались у краёв на узких экранах. */}
+                <div className="absolute inset-0">
                     {locations.map(location => (
-                        <div
+                        <button
+                            type="button"
                             key={location.id}
-                            className={`absolute cursor-pointer transition-all duration-300 ${
+                            disabled={!location.unlocked}
+                            className={`absolute p-0 border-0 bg-transparent transition-transform duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded-full ${
                                 location.unlocked
-                                    ? 'opacity-100 hover:scale-110'
-                                    : 'opacity-40 grayscale pointer-events-none'
+                                    ? 'cursor-pointer hover:scale-110'
+                                    : 'opacity-45 grayscale cursor-not-allowed'
                             }`}
                             style={{
-                                left:      `${location.position_x}%`,
-                                top:       `${location.position_y}%`,
+                                left:      `clamp(3.5rem, ${location.position_x}%, calc(100% - 3.5rem))`,
+                                top:       `clamp(2.5rem, ${location.position_y}%, calc(100% - 3.5rem))`,
                                 transform: 'translate(-50%, -50%)',
-                                zIndex:    selectedLocation?.id === location.id ? 40 : 30,
+                                zIndex:    selectedLocation?.id === location.id ? 20 : 10,
                             }}
                             onClick={() => handleLocationClick(location)}
                         >
-                            {/* Иконка локации */}
-                            <div className={`w-12 h-12 flex items-center justify-center rounded-full shadow-lg p-1 ${
+                            {/* Иконка-маркер по состоянию */}
+                            <span className={`flex items-center justify-center w-12 h-12 rounded-full shadow-lg ring-2 ${
                                 location.completed
-                                    ? 'bg-green-500/80 ring-2 ring-green-400'
+                                    ? 'bg-green-500 ring-green-300'
                                     : location.unlocked
-                                        ? 'bg-indigo-500/80 ring-2 ring-indigo-400'
-                                        : 'bg-gray-500/60'
+                                        ? 'bg-indigo-500 ring-indigo-300'
+                                        : 'bg-gray-500 ring-gray-400'
                             }`}>
-                                <img
-                                    src={location.icon_url || '/images/default-location.svg'}
-                                    alt={location.name}
-                                    className="w-8 h-8 object-contain"
-                                />
-                            </div>
+                                {location.completed ? (
+                                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                ) : location.unlocked ? (
+                                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.958a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.367 2.446a1 1 0 00-.364 1.118l1.287 3.957c.3.922-.755 1.688-1.54 1.118l-3.366-2.446a1 1 0 00-1.176 0l-3.366 2.446c-.784.57-1.838-.196-1.539-1.118l1.287-3.957a1 1 0 00-.364-1.118L2.343 9.385c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.951-.69l1.285-3.958z" />
+                                    </svg>
+                                ) : (
+                                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                )}
+                            </span>
 
                             {/* Название */}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap z-50">
-                                <span className="text-xs font-semibold text-white bg-gray-900/80 dark:bg-gray-800/90 px-2 py-0.5 rounded-lg shadow">
-                                    {location.name}
-                                </span>
-                            </div>
-                        </div>
+                            <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 block max-w-[6.5rem] truncate text-center text-xs font-semibold text-white bg-gray-900/85 px-2 py-0.5 rounded-lg shadow">
+                                {location.name}
+                            </span>
+                        </button>
                     ))}
                 </div>
 
                 {/* Боковая панель выбранной локации */}
                 {selectedLocation && (
-                    <div className="absolute right-0 top-0 bottom-0 w-72 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-l border-gray-200 dark:border-gray-700 shadow-xl z-50 flex flex-col overflow-hidden transition-colors">
+                    <div className="absolute right-0 top-0 bottom-0 w-full sm:w-80 bg-white/95 dark:bg-gray-800/95 backdrop-blur border-l border-gray-200 dark:border-gray-700 shadow-xl z-50 flex flex-col overflow-hidden transition-colors">
 
                         {/* Шапка панели */}
                         <div className="flex items-start justify-between p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 transition-colors">

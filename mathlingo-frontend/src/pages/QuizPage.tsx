@@ -5,7 +5,6 @@
 // экзамен. Правильные ответы на клиент не приходят — балл считает сервер.
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
 import {
     getQuiz, submitQuiz,
     type AssessmentQuiz, type AssessmentResult, type QuizType,
@@ -73,12 +72,11 @@ const QuizPage = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="max-w-2xl mx-auto px-4 py-10 mt-16">
                 <button
                     type="button"
                     onClick={() => navigate('/games')}
-                    className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    className="text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-brand dark:hover:text-brand-light transition-colors"
                 >
                     ← Ко всем играм
                 </button>
@@ -86,17 +84,17 @@ const QuizPage = () => {
                 {loading ? (
                     <div className="mt-6 text-sm text-gray-400 dark:text-gray-500">Загрузка...</div>
                 ) : error ? (
-                    <div className="mt-6 px-4 py-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl text-sm text-red-600 dark:text-red-400">
+                    <div className="mt-6 px-4 py-3 bg-cardinal/10 border-2 border-cardinal/30 rounded-2xl text-sm font-semibold text-cardinal dark:text-red-400">
                         {error}
                     </div>
                 ) : result ? (
                     // --- Экран результата ---
-                    <div className="mt-6 p-6 rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 text-center">
-                        <div className="text-4xl mb-2">🧠</div>
-                        <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <div className="mt-6 card-soft p-8 text-center border-feather/30 bg-feather/5 dark:bg-feather/10 animate-pop-in">
+                        <div className="text-5xl mb-3">🧠</div>
+                        <div className="text-2xl font-extrabold text-gray-900 dark:text-white">
                             {result.score} из {result.max_score} верно
                         </div>
-                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-300 max-w-sm mx-auto">
                             {result.quiz_type === 'pre'
                                 ? 'Спасибо! Это стартовая точка. Теперь загляни в игры — а потом вернёшься за итоговым замером.'
                                 : 'Отлично, замер сохранён. Прогресс сравним с тем, что было до игр.'}
@@ -105,7 +103,7 @@ const QuizPage = () => {
                             <button
                                 type="button"
                                 onClick={() => navigate('/games')}
-                                className="h-11 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
+                                className="btn-3d bg-brand hover:bg-brand-dark border-brand-deep text-white text-sm px-5 py-2.5 focus-visible:ring-brand-light"
                             >
                                 К играм →
                             </button>
@@ -114,10 +112,10 @@ const QuizPage = () => {
                 ) : quiz ? (
                     // --- Вопросы ---
                     <>
-                        <h1 className="mt-4 text-2xl font-semibold text-gray-900 dark:text-white">
+                        <h1 className="mt-4 text-3xl font-extrabold text-gray-900 dark:text-white">
                             {quiz.quiz_type === 'pre' ? 'Замер до игры' : 'Итоговый замер'}
                         </h1>
-                        <p className="mt-2 text-gray-600 dark:text-gray-400">{INTRO[quiz.quiz_type]}</p>
+                        <p className="mt-2 text-gray-500 dark:text-gray-400">{INTRO[quiz.quiz_type]}</p>
                         {quiz.already_taken && (
                             <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
                                 Ты уже проходил этот тест — можно пройти снова, зачтётся последняя попытка.
@@ -126,12 +124,12 @@ const QuizPage = () => {
 
                         <div className="mt-6 space-y-5">
                             {quiz.questions.map((q, qi) => (
-                                <div key={q.id} className="p-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                                <div key={q.id} className="card-soft p-4">
                                     <div className="flex items-start justify-between gap-3">
-                                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                        <div className="text-sm font-bold text-gray-900 dark:text-white">
                                             {qi + 1}. {q.prompt}
                                         </div>
-                                        <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                                        <span className="shrink-0 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand dark:text-brand-light">
                                             {CONCEPT_LABEL[q.concept] ?? q.concept}
                                         </span>
                                     </div>
@@ -144,14 +142,14 @@ const QuizPage = () => {
                                                     type="button"
                                                     data-testid={`opt-${q.id}`}
                                                     onClick={() => choose(q.id, oi)}
-                                                    className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm transition-colors ${
+                                                    className={`w-full text-left px-3 py-2.5 rounded-2xl border-2 text-sm font-semibold transition-all ${
                                                         picked
-                                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-800 dark:text-indigo-200'
-                                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
+                                                            ? 'border-brand bg-brand/5 dark:bg-brand/10 text-brand dark:text-brand-light'
+                                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-brand/40 dark:hover:border-brand/40'
                                                     }`}
                                                 >
-                                                    <span className={`inline-flex items-center justify-center w-5 h-5 mr-2 rounded-full border text-xs ${
-                                                        picked ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-gray-300 dark:border-gray-600 text-transparent'
+                                                    <span className={`inline-flex items-center justify-center w-5 h-5 mr-2 rounded-full border-2 text-xs transition-colors ${
+                                                        picked ? 'border-brand bg-brand text-white' : 'border-gray-300 dark:border-gray-600 text-transparent'
                                                     }`}>
                                                         ✓
                                                     </span>
@@ -169,7 +167,7 @@ const QuizPage = () => {
                                 type="button"
                                 onClick={handleSubmit}
                                 disabled={!allAnswered || submitting}
-                                className="h-11 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-sm font-medium transition-colors"
+                                className="btn-3d bg-feather hover:bg-feather-shade border-feather-shade text-white text-sm px-6 py-2.5 disabled:opacity-40 focus-visible:ring-feather-light"
                             >
                                 {submitting ? 'Отправляем...' : 'Готово'}
                             </button>

@@ -287,9 +287,9 @@ const TaskSolver: React.FC = () => {
             {/* Награда после выполнения всех заданий */}
             {showReward && (
                 <RewardPopup
-                    points={earnedPoints}
-                    totalPoints={taskGroup.totalPoints}
-                    taskGroupName={taskGroup.name}
+                    score={earnedPoints}
+                    maxScore={taskGroup.totalPoints}
+                    rewardPoints={earnedPoints}
                     onClose={handleFinish}
                 />
             )}

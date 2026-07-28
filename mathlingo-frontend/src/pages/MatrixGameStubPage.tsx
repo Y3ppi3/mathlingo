@@ -7,11 +7,14 @@
 // через общий api-инстанс, поэтому CSRF проставляется автоматически.
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
 import {
     getGameLevels, getGameProgress, postGameEvents, upsertGameProgress,
-    type GameLevelConfig, type GameProgress, type MatrixGameId,
+    type GameLevelConfig, type GameProgress,
 } from '../api/studentApi';
+
+// Заглушка обслуживает только матричные игры — у остальных есть свои движки.
+// Поэтому здесь свой узкий тип, а не общий GameId из каталога.
+type MatrixGameId = 'gauss_jordan' | 'eigen_arrow';
 
 const TITLES: Record<MatrixGameId, string> = {
     gauss_jordan: 'Побег Гаусса-Жордана',
@@ -86,7 +89,6 @@ const MatrixGameStubPage = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="max-w-3xl mx-auto px-4 py-10 mt-16">
                 <button
                     type="button"

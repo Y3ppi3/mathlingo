@@ -12,7 +12,6 @@ interface Task         { id: number; title: string; description: string; subject
 // ── Переиспользуемые стили ────────────────────────────────────────────────────
 const inputCls = "w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors";
 const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 transition-colors";
-const sectionTitleCls = "text-base font-semibold text-gray-900 dark:text-white transition-colors";
 
 const cardCls = (active: boolean) =>
     `relative p-4 border rounded-xl cursor-pointer transition-all ${

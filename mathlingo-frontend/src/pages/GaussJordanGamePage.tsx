@@ -9,7 +9,6 @@
 // CSRF проставляется автоматически, поэтому очки/события не теряются на 403.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
 import GaussJordanGame, { type RowOpType } from '../components/games/GaussJordanGame';
 import { GAUSS_JORDAN_LEVELS } from '../games/gaussJordan/levels';
 import {
@@ -110,7 +109,6 @@ const GaussJordanGamePage = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="max-w-3xl mx-auto px-4 py-10 mt-16">
                 {activeLevel ? (
                     <GaussJordanGame

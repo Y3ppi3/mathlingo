@@ -1,10 +1,8 @@
 // src/pages/AdventureMapPage.tsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
 import AdventureMap from '../components/adventure/AdventureMap';
 import { api } from '../api/studentApi';
-import '../styles/adventure-map.css';
 
 interface Subject {
     id: number;
@@ -29,7 +27,7 @@ const AdventureMapPage = () => {
                 setLoading(true);
                 const response = await api.get(`/api/subjects/${subjectId}`);
                 setSubject(response.data);
-            } catch (err) {
+            } catch {
                 setError('Не удалось загрузить данные о предмете. Попробуйте позже.');
             } finally {
                 setLoading(false);
@@ -40,7 +38,6 @@ const AdventureMapPage = () => {
 
     if (loading) return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16 flex justify-center items-center h-96">
                 <div className="flex items-center gap-3 text-gray-400 dark:text-gray-500 transition-colors">
                     <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -52,7 +49,6 @@ const AdventureMapPage = () => {
 
     if (error || !subject) return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 text-center transition-colors">
                     <p className="text-red-500 dark:text-red-400 text-lg mb-4 transition-colors">
@@ -72,7 +68,6 @@ const AdventureMapPage = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-6 transition-colors">
 
@@ -105,9 +100,7 @@ const AdventureMapPage = () => {
                             Накапливайте очки и открывайте новые части карты!
                         </p>
 
-                        <div className="adventure-map-wrapper">
-                            <AdventureMap subjectId={parseInt(subjectId!)} />
-                        </div>
+                        <AdventureMap subjectId={parseInt(subjectId!)} />
                     </div>
 
                     {/* Инструкция */}

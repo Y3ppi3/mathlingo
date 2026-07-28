@@ -2,34 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Общий градиент бренда (R4) — раньше "from-indigo-500 to-violet-500"
-   просто повторялся в каждом файле (Login/Register/Dashboard/...).
-   Новые экраны используют эти классы вместо копирования утилит. */
+/* ── Дизайн-система MathLingo (редизайн в духе Duolingo) ────────────────────
+   Тёплый, округлый, тактильный интерфейс. Раньше здесь жили глобальные
+   стили button{} (padding/border/фон), которые дрались с Tailwind preflight
+   и порождали баги (ореол вокруг иконок-кнопок на карте). Убраны — вид кнопок
+   теперь задаёт компонент Button / утилиты ниже. */
+
 @layer components {
+  /* Фирменный градиент бренда. */
   .brand-gradient {
-    @apply bg-gradient-to-r from-indigo-500 to-violet-500 transition-transform duration-150;
+    @apply bg-gradient-to-r from-indigo-500 to-violet-500;
   }
-  /* Лёгкое увеличение при наведении/нажатии — как кнопки на игровых
-     консолях, подчёркивает игровой характер обучения (R4, правка
-     пользователя). Раньше здесь была только смена цвета градиента —
-     сам текст на кнопке иногда сливался с фоном из-за глобального
-     "a:hover { color }" ниже (см. правку в этом же коммите). */
   .brand-gradient-hover {
-    @apply hover:from-indigo-600 hover:to-violet-600 hover:scale-[1.03] active:scale-95;
+    @apply hover:from-indigo-600 hover:to-violet-600;
   }
   .brand-icon-badge {
     @apply inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500;
   }
+
+  /* Тактильная «объёмная» кнопка (сигнатурный приём Duolingo): нижняя кромка
+     тёмнее, при нажатии кнопка «вдавливается» — border-b исчезает, контент
+     съезжает вниз. Цвет кромки задаётся через переменную --lip у варианта. */
+  .btn-3d {
+    @apply relative inline-flex items-center justify-center gap-2 rounded-2xl
+           font-extrabold select-none whitespace-nowrap
+           border-b-4 transition-[transform,filter,background-color] duration-100
+           active:translate-y-[3px] active:border-b-0
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-y-0
+           disabled:active:border-b-4
+           focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2
+           focus-visible:ring-offset-transparent;
+  }
+
+  /* Дружелюбная карточка со скруглением и мягким «поднятием». */
+  .card-soft {
+    @apply bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700
+           rounded-3xl shadow-card transition-colors;
+  }
+  .card-interactive {
+    @apply card-soft hover:-translate-y-0.5 hover:shadow-card-hover
+           hover:border-indigo-200 dark:hover:border-indigo-500/40
+           transition-all duration-150;
+  }
 }
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: Nunito, Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: light dark;
-  /* color: rgba(255, 255, 255, 0.87); */
-  /* background-color: #242424; */ /* Удаляем/комментируем */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -37,49 +59,17 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* h1 - удаляем или комментируем, чтобы не ломать размеры Tailwind
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-*/
-
 body {
   margin: 0;
   min-width: 320px;
-  /* min-height: 100vh; */ /* Можно оставить или убрать, Tailwind всё равно перекроет */
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-/* Убираем глобальный фон и в @media,
-   чтобы Tailwind сам управлял светлой/тёмной темой
-*/
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    /* background-color: #ffffff; */ /* Комментируем, чтобы не было белых полос */
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
+/* Уважаем prefers-reduced-motion: гасим «прыгающие» анимации для тех, кому
+   движение некомфортно (дружелюбие = ещё и доступность). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

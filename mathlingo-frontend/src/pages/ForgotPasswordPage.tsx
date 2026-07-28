@@ -31,12 +31,12 @@ const ForgotPasswordPage = () => {
             </div>
 
             <div className="w-full max-w-md relative z-10">
-                <div className="bg-white dark:bg-slate-800/50 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-2xl p-8 shadow-2xl transition-colors">
+                <div className="bg-white dark:bg-slate-800 border-2 border-gray-100 dark:border-slate-700 rounded-3xl p-8 shadow-card-hover transition-colors">
                     <div className="text-center mb-8">
                         <div className="brand-icon-badge w-14 h-14 mb-4 mx-auto">
                             <Sigma className="w-7 h-7 text-white" />
                         </div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors">
+                        <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white transition-colors">
                             Восстановление пароля
                         </h1>
                         <p className="text-gray-500 dark:text-slate-400 text-sm mt-1 transition-colors">
@@ -45,7 +45,7 @@ const ForgotPasswordPage = () => {
                     </div>
 
                     {submitted ? (
-                        <p className="text-center text-sm text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-900/50 px-4 py-4 rounded-xl transition-colors">
+                        <p className="text-center text-sm text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-900/50 border-2 border-gray-100 dark:border-slate-700 px-4 py-4 rounded-2xl transition-colors">
                             Если такой email зарегистрирован, на него отправлена ссылка для сброса пароля.
                             Ссылка действует 30 минут.
                         </p>
@@ -54,7 +54,7 @@ const ForgotPasswordPage = () => {
                             <div>
                                 <label
                                     htmlFor="forgot-email"
-                                    className="block text-sm font-medium text-gray-600 dark:text-slate-300 mb-1.5 transition-colors"
+                                    className="block text-sm font-bold text-gray-600 dark:text-slate-300 mb-1.5 transition-colors"
                                 >
                                     Email
                                 </label>
@@ -66,19 +66,14 @@ const ForgotPasswordPage = () => {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
-                                    className="w-full bg-white dark:bg-gray-900/80 border border-gray-300 dark:border-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-colors"
+                                    className="w-full bg-white dark:bg-gray-900/80 border-2 border-gray-200 dark:border-slate-600 focus:border-brand focus:ring-2 focus:ring-brand/20 rounded-2xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-colors"
                                 />
                             </div>
 
                             <button
                                 type="submit"
                                 disabled={isLoading}
-                                style={{ padding: '0.75rem' }}
-                                className={`w-full flex items-center justify-center font-semibold rounded-xl transition-all shadow-lg text-white ${
-                                    isLoading
-                                        ? "bg-indigo-400 cursor-not-allowed shadow-none"
-                                        : "brand-gradient brand-gradient-hover shadow-indigo-500/25"
-                                }`}
+                                className="btn-3d w-full bg-brand hover:bg-brand-dark border-brand-deep text-white text-base py-3 disabled:opacity-60 focus-visible:ring-brand-light"
                             >
                                 {isLoading ? "Отправка..." : "Отправить ссылку"}
                             </button>
@@ -88,7 +83,7 @@ const ForgotPasswordPage = () => {
                     <p className="text-center text-gray-500 dark:text-slate-400 text-sm mt-6 transition-colors">
                         <Link
                             to="/login"
-                            className="inline-flex items-center gap-1.5 text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 font-medium transition-colors"
+                            className="inline-flex items-center gap-1.5 font-bold text-brand dark:text-brand-light hover:underline transition-colors"
                         >
                             <ArrowLeft className="w-3.5 h-3.5" /> Вернуться ко входу
                         </Link>

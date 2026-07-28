@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
 import { useUser } from '../hooks/useUser';
 import AvatarSelector from '../components/ui/AvatarSelector';
 import Input from '../components/ui/Input';
@@ -115,10 +114,9 @@ const ProfileSettingsPage = () => {
     if (loading) {
         return (
             <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-                <Navbar />
                 <div className="container mx-auto px-4 mt-16 flex justify-center items-center h-96">
                     <div className="flex items-center gap-3 text-gray-400 dark:text-slate-400">
-                        <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
                         Загрузка...
                     </div>
                 </div>
@@ -130,15 +128,14 @@ const ProfileSettingsPage = () => {
     if (error || !user) {
         return (
             <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-                <Navbar />
                 <div className="container mx-auto px-4 mt-16 py-8">
-                    <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-8 text-center transition-colors">
-                        <p className="text-red-500 dark:text-red-400 text-lg mb-4">
+                    <div className="card-soft p-8 text-center">
+                        <p className="text-cardinal dark:text-red-400 text-lg mb-4">
                             {error || 'Не удалось загрузить профиль'}
                         </p>
                         <Link
                             to="/dashboard"
-                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-sm font-medium rounded-xl transition-all"
+                            className="btn-3d bg-brand hover:bg-brand-dark border-brand-deep text-white text-sm px-5 py-2.5 focus-visible:ring-brand-light"
                         >
                             Вернуться на главную
                         </Link>
@@ -152,7 +149,6 @@ const ProfileSettingsPage = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="max-w-3xl mx-auto px-4 py-8 mt-16">
 
                 {/* Заголовок */}
@@ -160,13 +156,13 @@ const ProfileSettingsPage = () => {
                     <button
                         onClick={() => navigate('/profile')}
                         style={{padding: 0}} // глобальный button { padding: 0.6em 1.2em } из index.css ломает w-10 h-10
-                        className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all"
+                        className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-brand dark:hover:text-brand-light hover:border-brand/40 dark:hover:border-brand/40 transition-all"
                         aria-label="Назад к профилю"
                     >
                         <ArrowLeft className="w-5 h-5"/>
                     </button>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white transition-colors">
+                        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white transition-colors">
                             Настройки профиля
                         </h1>
                         <p className="text-gray-400 dark:text-slate-400 mt-0.5 text-sm transition-colors">
@@ -180,20 +176,20 @@ const ProfileSettingsPage = () => {
                     {/* Уведомления формы */}
                     {formError && (
                         <div
-                            className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-red-600 dark:text-red-400 text-sm transition-colors">
+                            className="bg-cardinal/10 border-2 border-cardinal/20 rounded-2xl px-4 py-3 text-cardinal dark:text-red-400 text-sm font-semibold transition-colors">
                             {formError}
                         </div>
                     )}
                     {successMessage && (
-                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 py-3 text-green-600 dark:text-green-400 text-sm transition-colors">
+                        <div className="bg-feather/10 border-2 border-feather/20 rounded-2xl px-4 py-3 text-feather-shade dark:text-feather text-sm font-semibold transition-colors">
                             {successMessage}
                         </div>
                     )}
 
                     {/* — Имя пользователя — */}
-                    <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
-                            <User className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                    <div className="card-soft p-6">
+                        <h2 className="text-lg font-extrabold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                            <User className="w-5 h-5 text-brand dark:text-brand-light" />
                             Основная информация
                         </h2>
                         <label className="block text-xs font-medium text-gray-400 dark:text-slate-400 mb-1.5 uppercase tracking-wider transition-colors">
@@ -211,10 +207,10 @@ const ProfileSettingsPage = () => {
                             <button
                                 type="submit"
                                 disabled={isSaving || !isFormChanged}
-                                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                className={`btn-3d text-sm px-6 py-2.5 ${
                                     isFormChanged && !isSaving
-                                        ? 'bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white shadow-sm shadow-indigo-500/25'
-                                        : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+                                        ? 'bg-brand hover:bg-brand-dark border-brand-deep text-white focus-visible:ring-brand-light'
+                                        : 'bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-400 dark:text-slate-500 cursor-not-allowed'
                                 }`}
                             >
                                 <Save className="w-4 h-4" />
@@ -224,9 +220,9 @@ const ProfileSettingsPage = () => {
                     </div>
 
                     {/* — Аватар — */}
-                    <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
-                            <Image className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                    <div className="card-soft p-6">
+                        <h2 className="text-lg font-extrabold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                            <Image className="w-5 h-5 text-brand dark:text-brand-light" />
                             Аватар
                         </h2>
                         <AvatarSelector
@@ -239,13 +235,13 @@ const ProfileSettingsPage = () => {
                     </div>
 
                     {/* — Email — */}
-                    <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
-                            <Mail className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                    <div className="card-soft p-6">
+                        <h2 className="text-lg font-extrabold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                            <Mail className="w-5 h-5 text-brand dark:text-brand-light" />
                             Email
                         </h2>
-                        <div className="bg-white dark:bg-gray-700/50 border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-3 transition-colors">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white transition-colors">
+                        <div className="bg-gray-50 dark:bg-gray-700/50 border-2 border-gray-200 dark:border-slate-600 rounded-2xl px-4 py-3 transition-colors">
+                            <p className="text-sm font-bold text-gray-900 dark:text-white transition-colors">
                                 {user.email}
                             </p>
                         </div>
@@ -257,9 +253,9 @@ const ProfileSettingsPage = () => {
                 </form>
 
                 {/* — Смена пароля — (отдельно от form) */}
-                <div className="mt-6 bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
-                        <Lock className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                <div className="mt-6 card-soft p-6">
+                    <h2 className="text-lg font-extrabold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                        <Lock className="w-5 h-5 text-brand dark:text-brand-light" />
                         Смена пароля
                     </h2>
                     <div className="grid sm:grid-cols-3 gap-4">
@@ -273,29 +269,29 @@ const ProfileSettingsPage = () => {
                                     placeholder="••••••••"
                                     value={passwords[key]}
                                     onChange={e => setPasswords(prev => ({ ...prev, [key]: e.target.value }))}
-                                    className="w-full bg-white dark:bg-gray-900/80 border border-gray-300 dark:border-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-2.5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-all text-sm"
+                                    className="w-full bg-white dark:bg-gray-900/80 border-2 border-gray-200 dark:border-slate-600 focus:border-brand focus:ring-2 focus:ring-brand/20 rounded-2xl px-4 py-2.5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-all text-sm"
                                 />
                             </div>
                         ))}
                     </div>
                     <div className="mt-4">
-                        <button className="px-6 py-2.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 rounded-xl text-gray-700 dark:text-white text-sm font-medium transition-all">
+                        <button className="btn-3d bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-slate-600 border-gray-200 dark:border-slate-600 text-gray-700 dark:text-white text-sm px-6 py-2.5 focus-visible:ring-gray-300">
                             Изменить пароль
                         </button>
                     </div>
                 </div>
 
                 {/* — Уведомления — */}
-                <div className="mt-6 bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 backdrop-blur transition-colors">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
-                        <Bell className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                <div className="mt-6 card-soft p-6">
+                    <h2 className="text-lg font-extrabold text-gray-900 dark:text-white mb-5 flex items-center gap-2 transition-colors">
+                        <Bell className="w-5 h-5 text-brand dark:text-brand-light" />
                         Уведомления
                     </h2>
                     <div className="space-y-4">
                         {notificationItems.map(n => (
                             <div key={n.key} className="flex items-center justify-between py-1">
                                 <div>
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white transition-colors">{n.label}</div>
+                                    <div className="text-sm font-bold text-gray-900 dark:text-white transition-colors">{n.label}</div>
                                     <div className="text-xs text-gray-400 dark:text-slate-500 transition-colors">{n.desc}</div>
                                 </div>
                                 <button
@@ -303,7 +299,7 @@ const ProfileSettingsPage = () => {
                                     onClick={() => toggleNotification(n.key)}
                                     aria-label={`Переключить ${n.label}`}
                                     className={`relative w-12 h-6 rounded-full transition-all ${
-                                        notifications[n.key] ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-slate-700'
+                                        notifications[n.key] ? 'bg-brand' : 'bg-gray-200 dark:bg-slate-700'
                                     }`}
                                 >
                                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
@@ -316,15 +312,15 @@ const ProfileSettingsPage = () => {
                 </div>
 
                 {/* — Danger zone — */}
-                <div className="mt-6 bg-red-50 dark:bg-red-500/5 border border-red-200 dark:border-red-500/20 rounded-2xl p-6 backdrop-blur transition-colors">
-                    <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2 transition-colors">
+                <div className="mt-6 bg-cardinal/5 border-2 border-cardinal/20 rounded-3xl p-6 transition-colors">
+                    <h2 className="text-lg font-extrabold text-cardinal dark:text-red-400 mb-2 flex items-center gap-2 transition-colors">
                         <Trash2 className="w-5 h-5" />
                         Опасная зона
                     </h2>
                     <p className="text-gray-500 dark:text-slate-400 text-sm mb-4 transition-colors">
                         Удаление аккаунта необратимо. Все данные будут уничтожены.
                     </p>
-                    <button className="flex items-center gap-2 px-5 py-2.5 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 border border-red-200 dark:border-red-500/30 hover:border-red-300 dark:hover:border-red-500/50 text-red-600 dark:text-red-400 rounded-xl text-sm font-medium transition-all">
+                    <button className="btn-3d bg-cardinal/10 hover:bg-cardinal/20 border-cardinal/30 text-cardinal dark:text-red-400 text-sm px-5 py-2.5 focus-visible:ring-cardinal/40">
                         <Trash2 className="w-4 h-4" />
                         Удалить аккаунт
                     </button>

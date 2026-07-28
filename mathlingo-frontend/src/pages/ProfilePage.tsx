@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
 import UserAvatar from '../components/ui/UserAvatar';
 import { useUser } from '../hooks/useUser';
 import { Settings, CheckCircle, Percent, Flame, Clock } from 'lucide-react';
@@ -10,7 +9,6 @@ const ProfilePage = () => {
     if (loading) {
         return (
             <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-                <Navbar />
                 <div className="container mx-auto px-4 mt-16 flex justify-center items-center h-96">
                     <div className="flex items-center gap-3 text-gray-400 dark:text-slate-400">
                         <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -24,7 +22,6 @@ const ProfilePage = () => {
     if (error || !user) {
         return (
             <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-                <Navbar />
                 <div className="container mx-auto px-4 mt-16 py-8">
                     <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-8 text-center transition-colors">
                         <p className="text-red-500 dark:text-red-400 text-lg mb-4">
@@ -51,7 +48,6 @@ const ProfilePage = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="max-w-3xl mx-auto px-4 py-8 mt-16">
 
                 {/* Заголовок */}

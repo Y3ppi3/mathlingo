@@ -12,7 +12,6 @@
 // лучше), как у «гольфа» игры A метрика — число ходов.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
 import EigenArrowGame from '../components/games/EigenArrowGame';
 import { EIGEN_ARROW_LEVELS } from '../games/eigenArrow/levels';
 import {
@@ -117,7 +116,6 @@ const EigenArrowGamePage = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="max-w-3xl mx-auto px-4 py-10 mt-16">
                 {activeLevel ? (
                     <EigenArrowGame

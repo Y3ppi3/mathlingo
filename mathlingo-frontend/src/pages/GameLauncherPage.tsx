@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/studentApi';
-import Navbar from '../components/layout/Navbar';
 import Button from '../components/ui/Button';
 
 interface GameInfo {
@@ -161,7 +160,7 @@ const GameLauncherPage = () => {
                 setGames(filteredGames);
                 setGameGroups(groupedGames);
                 if (filteredGames.length === 1) setSelectedGame(filteredGames[0]);
-            } catch (err) {
+            } catch {
                 setError('Не удалось загрузить данные. Попробуйте позже.');
             } finally {
                 setLoading(false);
@@ -175,7 +174,6 @@ const GameLauncherPage = () => {
     if (loading) {
         return (
             <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-                <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16 flex justify-center items-center h-96">
                     <div className="flex items-center gap-3 text-gray-400 dark:text-gray-500 transition-colors">
                         <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -190,7 +188,6 @@ const GameLauncherPage = () => {
     if (error) {
         return (
             <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-                <Navbar />
                 <div className="container mx-auto px-4 py-8 mt-16">
                     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 text-center transition-colors">
                         <p className="text-red-500 dark:text-red-400 text-lg mb-4 transition-colors">{error}</p>
@@ -203,7 +200,6 @@ const GameLauncherPage = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
-            <Navbar />
             <div className="container mx-auto px-4 py-8 mt-16">
                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm overflow-hidden transition-colors">
                     <div className="p-6">
