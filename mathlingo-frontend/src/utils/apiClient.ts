@@ -1,7 +1,8 @@
 // src/utils/apiClient.ts
 import { fetchWithRetry } from './fetchUtils';
+import { API_BASE } from '../config/apiBase';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = API_BASE;
 
 // Базовые настройки запросов
 const defaultOptions = {

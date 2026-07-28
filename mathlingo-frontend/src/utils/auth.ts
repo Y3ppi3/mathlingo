@@ -1,10 +1,11 @@
 // src/utils/auth.ts (исправленный)
 import { getCurrentUser } from '../api/studentApi';
+import { API_BASE } from '../config/apiBase';
 
 // Функции для обычных пользователей
 export const login = async (email: string, password: string): Promise<any> => {
     try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login/`, {
+        const response = await fetch(`${API_BASE}/api/login/`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password }),
@@ -27,7 +28,7 @@ export const login = async (email: string, password: string): Promise<any> => {
 
 export const register = async (username: string, email: string, password: string): Promise<any> => {
     try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/register/`, {
+        const response = await fetch(`${API_BASE}/api/register/`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, email, password }),
@@ -55,7 +56,7 @@ export const logout = async (): Promise<void> => {
 
     // Отправляем запрос на сервер для удаления cookie
     try {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/logout/`, {
+        await fetch(`${API_BASE}/api/logout/`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
@@ -79,7 +80,7 @@ export type AdminRole = 'superadmin' | 'content_manager' | 'teacher';
 
 export const adminLogin = async (email: string, password: string): Promise<any> => {
     try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/login`, {
+        const response = await fetch(`${API_BASE}/admin/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password })

@@ -33,6 +33,10 @@ services:
     environment:
       DATABASE_URL: postgresql://mathlingo_user:test123@db/mathlingo
       REDIS_URL: redis://redis:6379/0
+      # Локальный режим: кука без Secure + CORS для LAN-подсетей, чтобы
+      # заходить с телефона по http://<IP>:5173. В production НЕ задавать
+      # (по умолчанию APP_ENV=production, кука Secure/strict).
+      APP_ENV: local
     ports:
       - "8000:8000"
     volumes:

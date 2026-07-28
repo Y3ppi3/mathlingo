@@ -1,9 +1,10 @@
 // Updated adminApi.ts with improved error handling
 import axios from "axios";
+import { API_BASE } from "../config/apiBase";
 
 const ACCOUNT_DEACTIVATED_DETAIL = "Аккаунт деактивирован";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = API_BASE;
 
 // Create axios instance with base settings
 export const adminApi = axios.create({

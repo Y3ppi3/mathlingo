@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import User
 from app.schemas import UserLogin, UserCreate, UserLevelUpdate
 from app.auth import verify_password, hash_password, create_access_token, get_current_user
+from app.config import auth_cookie_kwargs, COOKIE_SECURE, COOKIE_SAMESITE
 
 router = APIRouter()
 
@@ -31,15 +32,14 @@ def login_user(user: UserLogin, response: Response, db: Session = Depends(get_db
         expires_delta=timedelta(seconds=max_age) if user.remember_me else None,
     )
 
-    # Устанавливаем куку на переданном объекте response
+    # Устанавливаем куку на переданном объекте response.
+    # Атрибуты secure/samesite берём из config (в local ослаблены — иначе
+    # кука не уходит по HTTP в локальной сети).
     response.set_cookie(
         key="token",
         value=access_token,
-        httponly=True,
-        secure=True,
-        samesite="strict",
         max_age=max_age,
-        path="/"
+        **auth_cookie_kwargs(),
     )
 
     return {"message": "Успешный вход"}
@@ -67,18 +67,23 @@ def register_user(user: UserCreate, response: Response, db: Session = Depends(ge
     response.set_cookie(
         key="token",
         value=access_token,
-        httponly=True,
-        secure=True,
-        samesite="strict",
         max_age=86400,
-        path="/"
+        **auth_cookie_kwargs(),
     )
 
     return {"message": "Регистрация успешна"}
 
 @router.post("/logout/")
 def logout_user(response: Response):
-    response.delete_cookie(key="token", path="/")
+    # Атрибуты должны совпадать с set_cookie, иначе браузер не сматчит куку
+    # для удаления.
+    response.delete_cookie(
+        key="token",
+        path="/",
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        httponly=True,
+    )
     return {"message": "Вы вышли из системы"}
 
 @router.get("/me")

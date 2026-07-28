@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clearLocalUserData, saveLocalUserData } from "../utils/LocalUserStorage";
 import { api } from "../api/studentApi";
+import { API_BASE } from "../config/apiBase";
 
 // Интерфейс для данных пользователя
 interface UserData {
@@ -22,8 +23,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Получаем базовый URL API из переменной окружения
-const API_URL = import.meta.env.VITE_API_URL;
+// Базовый URL API — единый резолвер (см. config/apiBase).
+const API_URL = API_BASE;
 
 // Ключ для хранения токена в localStorage
 const AUTH_TOKEN_KEY = 'mathlingo_auth_token';
