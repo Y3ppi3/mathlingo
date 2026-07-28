@@ -33,7 +33,7 @@ def test_catalog_lists_all_games_with_levels(client, user):
     ids = {e["id"] for e in entries}
     assert {"gauss_jordan", "eigen_arrow", "deriv-fall", "slope-field"} <= ids
     gj = next(e for e in entries if e["id"] == "gauss_jordan")
-    assert gj["launch"]["kind"] == "matrix"
+    assert gj["launch"]["kind"] == "internal"
     assert "student" in gj["levels"]
     df = next(e for e in entries if e["id"] == "deriv-fall")
     assert df["launch"]["kind"] == "subject"
@@ -42,6 +42,28 @@ def test_catalog_lists_all_games_with_levels(client, user):
 
 def test_catalog_requires_auth(client):
     assert client.get("/api/games/catalog").status_code == 401
+
+
+def test_catalog_covers_every_learner_level(client, user):
+    """Ф4: у каждого учебного уровня есть хотя бы одна игра. До Ф4 school был
+    пуст, и школьник видел пустой каталог — регресс сюда же и вернётся."""
+    entries = client.get("/api/games/catalog", headers=_student_header(user)).json()["entries"]
+    for level in User.LEVELS:
+        assert any(level in e["levels"] for e in entries), f"нет ни одной игры для уровня {level}"
+
+
+def test_catalog_entries_are_well_formed(client, user):
+    """Каталог — единственный источник игр, и фронт разбирает launch вслепую:
+    неизвестный kind или subject-игра без подсказки предмета = битая кнопка."""
+    entries = client.get("/api/games/catalog", headers=_student_header(user)).json()["entries"]
+    ids = [e["id"] for e in entries]
+    assert len(ids) == len(set(ids)), "в каталоге дублирующиеся id"
+    for e in entries:
+        assert e["levels"], f"{e['id']}: игра не привязана ни к одному уровню"
+        assert set(e["levels"]) <= set(User.LEVELS), f"{e['id']}: неизвестный уровень"
+        assert e["launch"]["kind"] in ("internal", "subject"), f"{e['id']}: неизвестный kind"
+        if e["launch"]["kind"] == "subject":
+            assert e["launch"]["subject_hint"], f"{e['id']}: subject-игра без subject_hint"
 
 
 # --- Лидерборд ---
