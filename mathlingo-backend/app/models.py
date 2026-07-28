@@ -162,7 +162,9 @@ class Attempt(Base):
     """
     __tablename__ = "attempts"
 
-    CONTENT_TYPES = ("task", "diagnostic", "game")
+    # "exam" — попытки тренажёра ЕГЭ/ОГЭ, content_id смотрит на exam_tasks
+    # (Ф3, app/services/exam_trainer.py).
+    CONTENT_TYPES = ("task", "diagnostic", "game", "exam")
     SOURCES = ("manual", "game")
 
     id = Column(Integer, primary_key=True, index=True)
@@ -655,3 +657,149 @@ class AssessmentResult(Base):
     taken_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+
+class ExamTask(Base):
+    """
+    Задание банка подготовки к экзаменам (ОГЭ/ЕГЭ). Отдельно от Task (у того —
+    адвенчер + тяжёлый ревью-воркфлоу): здесь другой разрез (экзамен/трек/номер
+    КИМ/тема), большие объёмы и портируемые контент-паки (см.
+    app/services/content_pack.py). source: ai|import|manual. external_id —
+    стабильный ключ из источника для дедупликации при импорте пака.
+    Ответ/разбор наружу студенту не отдаются до проверки (см. app/routes/exam.py).
+    """
+    __tablename__ = "exam_tasks"
+
+    EXAMS = ("oge", "ege")
+    TRACKS = ("base", "profile")  # у ЕГЭ; у ОГЭ track=None
+    ANSWER_TYPES = ("single_answer", "multiple_choice")
+    SOURCES = ("ai", "import", "manual")
+
+    id = Column(Integer, primary_key=True, index=True)
+    exam = Column(String, nullable=False, index=True)
+    track = Column(String, nullable=True, index=True)
+    task_number = Column(Integer, nullable=True, index=True)   # номер задания в КИМ
+    topic = Column(String, nullable=True, index=True)
+    difficulty = Column(Integer, nullable=False, default=1)     # 1..3
+    statement = Column(String, nullable=False)                 # условие
+    answer_type = Column(String, nullable=False, default="single_answer")
+    answer = Column(String, nullable=True)                     # для single_answer
+    choices = Column(JSON, nullable=True)                      # для multiple_choice
+    solution = Column(String, nullable=True)                   # разбор
+    source = Column(String, nullable=False, default="manual")
+    external_id = Column(String, nullable=True, index=True)    # дедуп при импорте
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TutorProfile(Base):
+    """
+    Публичный профиль репетитора в маркетплейсе. Связь 1:1 с User — наличие
+    профиля и делает пользователя репетитором (отдельного флага в users нет,
+    чтобы не трогать таблицу учеников). is_listed управляет видимостью в
+    каталоге: можно завести профиль и пока не публиковать.
+    """
+    __tablename__ = "tutor_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    headline = Column(String, nullable=False)      # «Репетитор по математике, ЕГЭ/ОГЭ»
+    bio = Column(String, nullable=True)            # о себе
+    subjects = Column(JSON, nullable=True)         # список направлений/тем (строки)
+    hourly_rate = Column(Integer, nullable=True)   # ставка ₽/час; NULL — не указана
+    is_listed = Column(Boolean, default=True)      # виден в маркетплейсе
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class TutorStudent(Base):
+    """
+    Связь «репетитор ↔ ученик». Ученик выбирает репетитора в маркетплейсе и
+    создаёт связь (status=pending — заявка); репетитор принимает (status=active).
+    Пара уникальна, чтобы не плодить дубли. Обе стороны — обычные users.
+    """
+    __tablename__ = "tutor_students"
+    __table_args__ = (UniqueConstraint("tutor_id", "student_id", name="uq_tutor_student"),)
+
+    STATUSES = ("pending", "active")
+
+    id = Column(Integer, primary_key=True, index=True)
+    tutor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    status = Column(String, nullable=False, default="pending")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TutorAssignment(Base):
+    """
+    Задание, которое репетитор назначил своему ученику (Фаза 3). Универсальный
+    контейнер: kind говорит, на что задание ссылается (игра/номер экзамена/
+    произвольное), а link — уже готовый внутренний путь, который строит фронт
+    при создании (например /exam/train?exam=ege&task_number=7 или /games/speed-math).
+    Так бэкенд не знает про маршрутизацию фронта и остаётся простым; для
+    kind=custom ссылки нет — только текст задания. Выполнение отмечает сам
+    ученик (status assigned → done).
+    """
+    __tablename__ = "tutor_assignments"
+
+    KINDS = ("exam", "game", "material", "custom")
+    STATUSES = ("assigned", "done")
+
+    id = Column(Integer, primary_key=True, index=True)
+    tutor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    kind = Column(String, nullable=False, default="custom")
+    title = Column(String, nullable=False)          # что делать (заголовок задания)
+    link = Column(String, nullable=True)            # внутренний путь фронта; NULL для custom
+    note = Column(String, nullable=True)            # комментарий/инструкция репетитора
+    due_at = Column(DateTime, nullable=True)        # срок; NULL — без срока
+    status = Column(String, nullable=False, default="assigned")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+
+class TutorSession(Base):
+    """
+    Запланированное занятие/конференция между репетитором и учеником (Фаза 5).
+    Из этих записей собирается «календарь» репетитора (кто и когда) и агенда
+    ближайших встреч у ученика. meeting_url — внешняя ссылка на видеосвязь
+    (Zoom/Meet/…), в отличие от заданий здесь это допустимо и ожидаемо.
+    starts_at хранится в UTC; локальное время показывает фронт.
+    """
+    __tablename__ = "tutor_sessions"
+
+    STATUSES = ("scheduled", "cancelled")
+
+    id = Column(Integer, primary_key=True, index=True)
+    tutor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    starts_at = Column(DateTime, nullable=False, index=True)
+    duration_min = Column(Integer, nullable=False, default=60)
+    title = Column(String, nullable=True)          # тема занятия
+    meeting_url = Column(String, nullable=True)     # ссылка на видеовстречу
+    note = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="scheduled")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TutorContent(Base):
+    """
+    Собственный контент репетитора (Фаза 4): его задачи и материалы, которые он
+    заводит сам и потом назначает ученикам (назначение — обычный TutorAssignment
+    с kind="material" и link на просмотрщик /tutors/material/{id}). kind:
+    task — с ответом для самопроверки; material — справочный текст/ссылка.
+    attachment_url — внешняя ссылка на файл (pdf/doc/…). Виден владельцу и его
+    активным ученикам (см. проверку доступа в routes/tutors.py).
+    """
+    __tablename__ = "tutor_content"
+
+    KINDS = ("task", "material")
+
+    id = Column(Integer, primary_key=True, index=True)
+    tutor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    kind = Column(String, nullable=False, default="material")
+    title = Column(String, nullable=False)
+    body = Column(String, nullable=True)            # текст задачи/материала
+    answer = Column(String, nullable=True)          # ответ (для kind=task, самопроверка)
+    attachment_url = Column(String, nullable=True)  # внешняя ссылка на файл
+    created_at = Column(DateTime, default=datetime.utcnow)

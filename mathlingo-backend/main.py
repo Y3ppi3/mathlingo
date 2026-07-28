@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
+from app.config import IS_LOCAL
 from app.database import get_db
 from app.models import AuditLog
 from app.auth import get_admin_current_user_optional
@@ -15,7 +16,8 @@ from app.routes import (
     users, tasks, admin, admin_tasks, admin_ai, admin_content_quality,
     gamification_maps, gamification_tasks, gamification_mastery,
     subjects, subject_operations, skills, game_scenarios, dashboard, password_reset,
-    games, admin_games_analytics, assessment,
+    games, admin_games_analytics, assessment, exam, admin_exam,
+    tutors,
 )
 from app.routes.admin_gamification import router as admin_gamification_router
 
@@ -210,9 +212,19 @@ origins = [
 # списки (subjects/skills/tasks), самые крупные JSON-ответы в проекте.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# В локальном режиме дополнительно разрешаем ЛЮБОЙ адрес из приватных
+# LAN-подсетей на дев-портах — чтобы заходить с телефона/планшета без правки
+# списка origins под каждый IP. В production (IS_LOCAL=False) регэксп не
+# подключается, работает только явный список выше.
+lan_origin_regex = (
+    r"http://(?:localhost|127\.0\.0\.1|(?:192\.168|10|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}):(?:5173|5174|8000)"
+    if IS_LOCAL else None
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=lan_origin_regex,
     allow_credentials=True,  # Важно для передачи куки
     allow_methods=["*"],     # Разрешаем все методы
     allow_headers=["*"],     # Разрешаем все заголовки
@@ -244,8 +256,11 @@ app.include_router(game_scenarios.router)
 app.include_router(game_scenarios.student_router)
 app.include_router(games.router)
 app.include_router(assessment.router)
+app.include_router(exam.router)
 app.include_router(admin_games_analytics.router)
+app.include_router(admin_exam.router)
 app.include_router(dashboard.router)
+app.include_router(tutors.router, prefix="/api", tags=["tutors"])
 
 
 @app.get("/")

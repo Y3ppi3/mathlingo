@@ -2,6 +2,10 @@ from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
+# Каталог игр — источник допустимых game_id (см. GameId ниже). Модуль ничего
+# не импортирует, поэтому цикла здесь нет.
+from app.services.game_catalog import catalog_ids
+
 AdminRole = Literal["superadmin", "content_manager", "teacher"]
 
 
@@ -785,12 +789,15 @@ class TaskSubmissionResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Матричные мини-игры (Фаза 0): телеметрия, прогресс, конфиг уровней.
+# Мини-игры: телеметрия, прогресс, конфиг уровней.
 # game_id ограничен известными играми на уровне схемы — неизвестная игра
 # отбрасывается 422 до похода в БД.
 # ---------------------------------------------------------------------------
 
-GameId = Literal["gauss_jordan", "eigen_arrow"]
+# Список берём из каталога, а не переписываем руками: каталог и так объявлен
+# единственным источником правды об играх, а раздвоение уже стоило бы дорого —
+# игра из каталога запускалась бы, но её прогресс отлетал бы по 422.
+GameId = Literal[catalog_ids()]  # type: ignore[valid-type]
 
 # Потолок на размер батча событий — офлайн-очередь (Фаза 7) может накопить
 # много, но один запрос не должен превращаться в неограниченную вставку.
@@ -953,8 +960,8 @@ class UserLevelUpdate(BaseModel):
 
 
 class GameLaunch(BaseModel):
-    # kind="matrix" -> внутренний маршрут /games/{id};
-    # kind="subject" -> тематическая игра через /subject/{id}/game/{game_id}.
+    # kind="internal" -> внутренний маршрут /games/{id};
+    # kind="subject"  -> тематическая игра через /subject/{id}/game/{game_id}.
     kind: str
     subject_hint: Optional[str] = None
 
@@ -987,3 +994,101 @@ class LeaderboardResponse(BaseModel):
     game_id: Optional[str] = None   # None = сводный рейтинг по всем играм
     entries: List[LeaderboardEntry]
     me: Optional[LeaderboardEntry] = None  # позиция текущего игрока (может быть вне топа)
+
+
+# --- Банк заданий ЕГЭ/ОГЭ ---
+
+class ExamTaskPublic(BaseModel):
+    """Условие задания для студента — без ответа и разбора (их сервер отдаёт
+    только после проверки)."""
+    id: int
+    exam: str
+    track: Optional[str] = None
+    task_number: Optional[int] = None
+    topic: Optional[str] = None
+    difficulty: int
+    statement: str
+    answer_type: str
+    choices: Optional[Any] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ExamTaskList(BaseModel):
+    items: List[ExamTaskPublic]
+    total: int
+    limit: int
+    offset: int
+
+
+class ExamTopicFacet(BaseModel):
+    exam: str
+    track: Optional[str] = None
+    topic: Optional[str] = None
+    task_number: Optional[int] = None
+    count: int
+
+
+class ExamBankStats(BaseModel):
+    total: int
+    by_exam: Dict[str, int]
+    by_source: Dict[str, int]
+    topics: List[ExamTopicFacet]
+
+
+class ExamImportResult(BaseModel):
+    imported: int   # новых вставлено
+    updated: int    # обновлено по external_id
+    skipped: int    # пропущено (битые строки)
+    total: int
+
+
+class ExamGenerateRequest(BaseModel):
+    exam: Optional[str] = None       # oge | ege | None (все)
+    track: Optional[str] = None      # base | profile | None
+    count: int = Field(default=20, ge=1, le=500)
+    topics: Optional[List[str]] = None
+    seed: Optional[int] = None
+
+
+class ExamGenerateResult(BaseModel):
+    created: int
+    duplicates: int
+    requested: int
+
+
+class ExamAttemptRequest(BaseModel):
+    task_id: int
+    answer: str
+    time_spent_ms: Optional[int] = Field(default=None, ge=0)
+
+
+class ExamAttemptResult(BaseModel):
+    """Ответ и разбор отдаются только здесь — после того, как студент ответил."""
+    correct: bool
+    correct_answer: str
+    solution: Optional[str] = None
+
+
+class ExamProgressItem(BaseModel):
+    task_number: Optional[int] = None
+    topic: Optional[str] = None
+    total: int          # заданий в банке по этому номеру
+    solved: int         # из них решено (разных)
+    attempts: int
+    correct: int
+    accuracy: Optional[float] = None
+    mastered: bool
+
+
+class ExamProgress(BaseModel):
+    exam: Optional[str] = None
+    track: Optional[str] = None
+    total_tasks: int
+    solved_tasks: int
+    attempts: int
+    correct: int
+    accuracy: Optional[float] = None
+    mastered_numbers: int
+    items: List[ExamProgressItem]
